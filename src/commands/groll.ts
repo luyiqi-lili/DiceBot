@@ -40,9 +40,10 @@ export function handleGroll(msg: any, env: any): Record<string, any> {
     }
     rolls.push({ user: replier, point: Math.floor(Math.random() * 100) + 1 });
 
-    // 提取 initiator
+    // 提取 initiator 和描述
     const titleLine = msg.message.text.split("\n")[0];
-    const initiator = (titleLine.match(/^🎲\s*(.+?)\s*发起了一个群骰/) || [])[1] || "玩家";
+    const initiatorMatch = titleLine.match(/^🎲\s*(.+?)\s*发起了一个群骰(?:\s+(.+))?$/);
+    const initiator = initiatorMatch?.[1] || "玩家";
 
     // 重建文本
     let text = `${titleLine}\n`;
@@ -85,11 +86,12 @@ export function handleGroll(msg: any, env: any): Record<string, any> {
   }
 
   // —— 发起阶段 ——
-  const m = msg.text?.match(new RegExp(`@${botName}\\s+/groll`, "i"));
-  if (m) {
+  const startMatch = msg.text?.match(new RegExp(`@${botName}\\s+/groll\\s*(.*)`, "i"));
+  if (startMatch) {
     const initiator = getName(msg.from);
-    const point = Math.floor(Math.random() * 100) + 1;
-    const text = `🎲 ${initiator} 发起了一个群骰\n- ${initiator}：${point}\n\n其他玩家点击按钮加入掷点：`;
+    const description = startMatch[1]?.trim();
+    const title = description ? `🎲 ${initiator} 发起了一个群骰 ${description}` : `🎲 ${initiator} 发起了一个群骰`;
+    const text = `${title}\n\n其他玩家点击按钮加入掷点：`;
     const buttons = [
       [{ text: "我也要 Roll 🎲", callback_data: "groll_accept" }],
       [{ text: "结束群骰", callback_data: "groll_end" }]
