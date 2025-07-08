@@ -3,6 +3,7 @@ import { handleRoll } from "./commands/roll";
 import { handleGroll } from "./commands/groll";
 import { handleHelp } from "./commands/help";
 import { handleDuel } from "./commands/duel";
+import { handleLike } from "./commands/like";
 
 export default {
   async fetch(request, env) {
@@ -107,6 +108,17 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
+    if (text.includes(`@${env.BOT_USERNAME}`)) {
+      const userId = msg.from.id;
+      const key = `count:${userId}`;
+      // 从 KV 读旧值（字符串），转换数字
+      const prev = await env.TGBOTCOUNT.get(key);
+      const oldCount = parseInt(prev || "0", 10);
+      const newCount = oldCount + 1;
+      // 写回 KV
+      await env.TGBOTCOUNT.put(key, newCount.toString());
+    }
+
     console.log("➡️ 将处理文本 =", text);
 
     let payload: any = {
@@ -133,7 +145,13 @@ export default {
     } else if (/\/duel\b/.test(text)) {
       console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
       payload = { ...payload, ...handleDuel(msg, env) };
-    } else if (/\/help\b/.test(text)) {
+    } else if (/\/like\b/.test(text)) {
+      // 调用我们在下一步定义的 handleLike
+      const res = await handleLike(msg, env);
+      payload.text = res.text;
+      if (res.reply_markup) payload.reply_markup = res.reply_markup;
+    }
+    else if (/\/help\b/.test(text)) {
       console.log("ℹ️ 检测到 /help 命令，返回完整帮助信息");
       const helpResponse = handleHelp(env.BOT_USERNAME);
       payload.text = helpResponse.text;
