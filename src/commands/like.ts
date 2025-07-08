@@ -4,7 +4,7 @@ import { likeTextMapFriend, likeTextMapDaughter } from "./liketext";
 
 // 亲密风格白名单用户 ID
 const daughterUserIds = new Set<number>([
-  5621587953 // 示例 ID，请替换
+  10 // 示例 ID，请替换
 ]);
 
 export async function handleLike(
