@@ -4,6 +4,8 @@ import { handleGroll } from "./commands/groll";
 import { handleHelp } from "./commands/help";
 import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
+import { handleNews } from "./commands/news";
+
 
 export default {
   async fetch(request, env) {
@@ -98,6 +100,16 @@ export default {
       msg.chat?.id
       // 如果是回调，就退而求其次用 msg.message.chat.id
       ?? msg.message.chat.id;
+    // ✅ 只允许在指定群组中响应
+    const ALLOWED_CHAT_IDS = new Set([
+      -1002742074355,
+      -1002848481881
+    ]);
+
+    if (!ALLOWED_CHAT_IDS.has(chatId)) {
+      console.log(`🚫 chatId ${chatId} 不在允许响应的群组内，跳过处理`);
+      return new Response("OK", { status: 200 });
+    }
     const threadId =
       msg.message_thread_id
       ?? msg.message?.message_thread_id;
@@ -150,14 +162,50 @@ export default {
       const res = await handleLike(msg, env);
       payload.text = res.text;
       if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    }
-    else if (/\/help\b/.test(text)) {
+    } else if (/\/help\b/.test(text)) {
       console.log("ℹ️ 检测到 /help 命令，返回完整帮助信息");
       const helpResponse = handleHelp(env.BOT_USERNAME);
       payload.text = helpResponse.text;
       payload.parse_mode = helpResponse.parse_mode;
       payload.reply_markup = helpResponse.reply_markup;
-    } else {
+    } else if (/\/news\b/.test(text)) {
+      console.log("📰 检测到 /news 命令，进入新闻逻辑");
+      const res = await handleNews(msg, env);
+      payload.text = res.text;
+      if (res.parse_mode) payload.parse_mode = res.parse_mode;
+      if (res.reply_markup) payload.reply_markup = res.reply_markup;
+    } else if (/\/whoami\b/.test(text)) {
+      console.log("🆔 检测到 /whoami 命令");
+
+      // 用户基本信息
+      const userId = msg.from.id;
+      const userName = msg.from.first_name || "";
+
+      // 群组信息
+      const chatId = msg.chat.id;
+      const chatTitle = msg.chat.title || "(无群名)";
+
+      // 主题 / 线程 信息（Telegram 论坛群组专用）
+      // message_thread_id 在普通群里通常是 undefined
+      const threadId =
+        msg.message_thread_id
+        ?? msg.message?.message_thread_id;
+
+      // 构造输出文本
+      let replyText = `你的用户 ID：<code>${userId}</code>\n` +
+        `你的用户名：<code>${userName}</code>\n` +
+        `群组 ID：<code>${chatId}</code>\n` +
+        `群组名称：<code>${chatTitle}</code>\n`;
+
+      if (threadId) {
+        replyText += `主题 ID：<code>${threadId}</code>\n`;
+      }
+
+      payload.text = replyText;
+      payload.parse_mode = "HTML";
+
+    }
+    else {
       // 未识别命令 —— 提示用户输入 /help 查询
       const responses = [
         "呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨",

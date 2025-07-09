@@ -17,6 +17,10 @@
 		{
 			"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
 			"id": "b46f250639e04e8b9045702f1adfb934" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
+		},
+		{ 
+			"binding" :"NEWS_STORE",     // 新增的新闻汇总 KV
+			"id"      : "e6044e8767934c77892c05a59811bba6" 
 		}
 	],
 	"vars": {
