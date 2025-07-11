@@ -2,14 +2,18 @@ export function handleHelp(botUsername: string) {
   console.log("📖 返回帮助信息");
 
   const text = `🤖 <b>可用命令：</b>
-
-/echo &lt;内容&gt; - 让骰娘判断你说的对不对  
+<blockquote expandable>/echo &lt;内容&gt; - 让骰娘判断你说的对不对  
 /roll - 掷一个 1~100 的随机数  
 /roll XdY - 掷 X 个 Y 面骰子，例如 /roll 2d6  
 /roll {A B C} - 从多个选项中抽取一个，例如 /roll {红 白 绿}  
 /roll Nd{A B C} - 从多个选项中抽取 N 次，例如 /roll 3d{红 白 绿}  
 /duel @目标 赌注内容 - 向某人发起一场赌注决斗！
 /groll - 发起一个群骰，支持最多 20 人加入
+/book - 查看自己的书签 
+/book &lt;关键字&gt; - 回复自己消息并带上备注，添加书签到个人列表  
+/book del #序号 - 删除指定序号的书签  
+/book all - 查看本群所有用户的书签  
+/book @用户名 - 查看指定用户的书签   
 
 <b>使用方法：</b>  
 <i>请先 @${botUsername} 再输入命令！</i>
@@ -20,7 +24,13 @@ export function handleHelp(botUsername: string) {
 <code>@${botUsername} /roll {红 白 绿}</code>  
 <code>@${botUsername} /roll 3d{红 白 绿}</code>  
 <code>@${botUsername} /duel @对手 一杯奶茶</code>
-<code>@${botUsername} /groll</code>`;
+<code>@${botUsername} /groll</code>
+<code>@${botUsername} /book</code>  
+<code>@${botUsername} /book 阅读笔记</code>  
+<code>@${botUsername} /book del #2</code>  
+<code>@${botUsername} /book all</code>  
+<code>@${botUsername} /book @alice</code>
+</blockquote>`;
 
   const reply_markup = {
     inline_keyboard: [
@@ -33,6 +43,11 @@ export function handleHelp(botUsername: string) {
         { text: "/roll {选项}", switch_inline_query_current_chat: `/roll {红 白 绿}` },
         { text: "/duel", switch_inline_query_current_chat: `/duel @对手 一杯奶茶` },
         { text: "/groll", switch_inline_query_current_chat: `/groll` }
+      ],
+      [
+        { text: "/book", switch_inline_query_current_chat: `/book` },
+        { text: "/book @alice", switch_inline_query_current_chat: `/book @alice` },
+        { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` }
       ]
     ]
   };

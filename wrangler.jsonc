@@ -21,6 +21,10 @@
 		{ 
 			"binding" :"NEWS_STORE",     // 新增的新闻汇总 KV
 			"id"      : "e6044e8767934c77892c05a59811bba6" 
+		},
+		{ 
+			"binding" :"BOOK_STORE",     // 新增的新闻汇总 KV
+			"id"      : "09eed80e95ee4d1f9decaedf9c0cea4d" 
 		}
 	],
 	"vars": {
