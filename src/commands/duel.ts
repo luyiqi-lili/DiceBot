@@ -13,12 +13,16 @@ export function handleDuel(msg: any, env: any): Record<string, any> {
     const pointA = parseInt(pointAStr, 10);
     const replier = getId(msg.from);
 
+    // 调试日志：打印 replier 和 期望的 userB
+    console.log(`[Duel] Replier: \${replier}, Expected target: \${userB}`);
+    console.log(`[Duel] msg.from.username: \${msg.from.username}, msg.from.first_name: \${msg.from.first_name}`);
+
     // 只有被挑战者能点
     if (replier !== userB) {
       return {
         method: "answerCallbackQuery",
         callback_query_id: msg.id,
-        text: `只有 ${userB} 本人才能接受此决斗。`,
+        text: `只有 \${userB} 本人才能接受此决斗。`,
         show_alert: true
       };
     }
@@ -36,10 +40,8 @@ export function handleDuel(msg: any, env: any): Record<string, any> {
       method: "editMessageText",
       chat_id,
       message_id: msg.message.message_id,
-//      ...(thread_id && { message_thread_id: thread_id }),
       text: resultText,
       parse_mode: "HTML",
-      // ← 清空 inline 按钮
       reply_markup: { inline_keyboard: [] }
     };
   }

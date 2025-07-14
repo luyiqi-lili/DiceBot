@@ -7,6 +7,7 @@ import { handleLike } from "./commands/like";
 import { handleNews } from "./commands/news";
 import { handleBook } from "./commands/book";
 import { handleTrans } from "./commands/trans";
+import { handle21 } from "./commands/21";
 
 
 export default {
@@ -58,7 +59,14 @@ export default {
         cq.data.startsWith("groll_end")) {
         payload = handleGroll(cq, env);
         console.log("➡️ [callback] handleGroll 返回 payload:", payload);
-      } else {
+      } else if (
+        cq.data.startsWith("21_draw") ||
+        cq.data.startsWith("21_next")
+      ) {
+        payload = handle21(cq, env);
+      }
+
+      else {
         console.log("ℹ️ 未知 callback_data，忽略");
         return new Response("OK", { status: 200 });
       }
@@ -156,6 +164,9 @@ export default {
     } else if (/\/groll\b/.test(text)) {
       console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
       payload = { ...payload, ...handleGroll(msg, env) };
+    } else if (/\/21\b/.test(text)) {
+      console.log("🎲 检测到 /21点 命令，进入 21 逻辑");
+      payload = { ...payload, ...handle21(msg, env) };
     } else if (/\/duel\b/.test(text)) {
       console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
       payload = { ...payload, ...handleDuel(msg, env) };
