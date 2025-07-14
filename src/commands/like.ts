@@ -1,62 +1,93 @@
-// commands/like.ts
 import type { Env, TelegramMessage } from "../types";
 import { likeTextMapFriend, likeTextMapDaughter } from "./liketext";
 
-// 亲密风格白名单用户 ID
-type CountEntry = { name: string; value?: string };
-const daughterUserIds = new Set<number>([ 10 // 示例 ID，请替换
+const daughterUserIds = new Set<number>([
+  10 // 示例 ID，请替换
 ]);
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 export async function handleLike(
   msg: TelegramMessage,
   env: Env
-): Promise<{ text: string; reply_markup?: any }> {
-  const text = msg.text?.trim() || "";
+): Promise<{ text: string; parse_mode?: string; reply_markup?: any }> {
+  const mention = `@${env.BOT_USERNAME}`;
+  const isAllQuery = msg.text?.trim() === `${mention} /like all`;
 
-  // 扩展：当命令为 `/like all` 时，列出所有用户的使用次数统计（按次数从多到少排序），不带评价
-  if (text === "@LichDiceBot /like all") {
-    // 从 KV 存储中获取所有键
+  if (isAllQuery) {
+    // 获取所有 key，实时维护 Top 10，避免全量排序
     const list = await env.TGBOTCOUNT.list({ prefix: "count:" });
-    const stats: Array<{ firstName: string; count: number }> = [];
+    const top10: { userId: number; count: number; firstName: string }[] = [];
 
-    for (const entry of list.keys as CountEntry[]) {
-      const userId = parseInt(entry.name.split(":")[1], 10);
-      // 优先使用 value 字段，否则再单独读取
-      const countStr = entry.value ?? (await env.TGBOTCOUNT.get(entry.name));
-      const count = parseInt(countStr || "0", 10);
-
-      // 调用 Telegram Bot API 获取用户 first_name
-      const resp = await fetch(
-        `https://api.telegram.org/bot${env.BOT_TOKEN}/getChat?chat_id=${userId}`
-      );
-      const data = await resp.json();
-      const firstName = data.result?.first_name || `ID:${userId}`;
-
-      stats.push({ firstName, count });
+    for (const entry of list.keys) {
+      const userId = parseInt(entry.name.replace("count:", ""), 10);
+      const raw = await env.TGBOTCOUNT.get(entry.name);
+      let count = 0;
+      let firstName = "";
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          count = typeof parsed.count === 'number' ? parsed.count : parseInt(raw, 10) || 0;
+          firstName = typeof parsed.firstName === 'string' ? parsed.firstName : '';
+        } catch {
+          count = parseInt(raw, 10) || 0;
+        }
+      }
+      // 插入 top10 队列
+      if (top10.length < 10 || count > top10[top10.length - 1].count) {
+        // 插入并保持降序
+        const item = { userId, count, firstName };
+        let i = top10.length - 1;
+        while (i >= 0 && top10[i].count < count) {
+          i--;
+        }
+        top10.splice(i + 1, 0, item);
+        if (top10.length > 10) top10.pop();
+      }
     }
 
-    // 按使用次数降序排序
-    stats.sort((a, b) => b.count - a.count);
-    const lines = stats.map(item => `${item.firstName}: ${item.count}`);
+    const results = top10.map(u => {
+      const name = u.firstName ? escapeHtml(u.firstName) : `ID ${u.userId}`;
+      return `${name}：${u.count} 次`;
+    });
 
     return {
-      text: `使用统计（按次数从多到少排序）：\n${lines.join("\n")}`
+      text: `<b>骰娘Top 10 使用榜：</b>\n<blockquote expandable>${escapeHtml(results.join("\n"))}</blockquote>`,
+      parse_mode: "HTML"
     };
   }
 
-  // 普通 /like 逻辑
+  // 默认个人查询
   const userId = msg.from.id;
   const key = `count:${userId}`;
-  const countStr = await env.TGBOTCOUNT.get(key);
-  const count = parseInt(countStr || "0", 10);
+  const raw = await env.TGBOTCOUNT.get(key);
+  let record: { count: number; firstName: string };
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      record = {
+        count: typeof parsed.count === 'number' ? parsed.count : parseInt(raw, 10) || 0,
+        firstName: typeof parsed.firstName === 'string' ? parsed.firstName : ''
+      };
+    } catch {
+      record = { count: parseInt(raw, 10) || 0, firstName: '' };
+    }
+  } else {
+    record = { count: 0, firstName: '' };
+  }
 
-  // 选择风格
+  const count = record.count;
   const likeTextMap = daughterUserIds.has(userId)
     ? likeTextMapDaughter
     : likeTextMapFriend;
 
-  // 匹配对应文本段
   let attitudePool: string[] = [];
+
   for (const entry of likeTextMap) {
     if (entry.range === "above" && count > 1000) {
       attitudePool = entry.texts;
@@ -74,9 +105,13 @@ export async function handleLike(
     attitudePool = ["骰娘一时搞不清你属于哪个等级啦！🤔"];
   }
 
-  const remark = attitudePool[Math.floor(Math.random() * attitudePool.length)];
+  const remark = escapeHtml(
+    attitudePool[Math.floor(Math.random() * attitudePool.length)]
+  );
+  const safeCount = escapeHtml(count.toString());
 
   return {
-    text: `你已经召唤骰娘<b>${count}</b>次了！${remark}`
+    text: `你已经召唤骰娘<b>${safeCount}</b>次了！${remark}`,
+    parse_mode: "HTML"
   };
 }

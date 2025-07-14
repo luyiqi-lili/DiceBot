@@ -131,14 +131,35 @@ export default {
     }
 
     if (text.includes(`@${env.BOT_USERNAME}`)) {
+
       const userId = msg.from.id;
+      const firstName = msg.from.first_name || "";
       const key = `count:${userId}`;
-      // 从 KV 读旧值（字符串），转换数字
+      // 读取原始记录（可能是旧版的纯数字）
       const prev = await env.TGBOTCOUNT.get(key);
-      const oldCount = parseInt(prev || "0", 10);
-      const newCount = oldCount + 1;
-      // 写回 KV
-      await env.TGBOTCOUNT.put(key, newCount.toString());
+      let record;
+      if (prev) {
+        try {
+          // 尝试解析为 JSON
+          record = JSON.parse(prev);
+          if (typeof record.count !== 'number') {
+            // 如果结构不符，退回到旧版数值
+            record = { count: parseInt(prev, 10) || 0 };
+          }
+        } catch (e) {
+          // 旧版数据为纯数字字符串
+          record = { count: parseInt(prev, 10) || 0 };
+        }
+      } else {
+        record = { count: 0 };
+      }
+      // 更新记录
+      record.count += 1;
+      record.firstName = firstName;
+      // 写回 KV，使用 JSON 格式
+      await env.TGBOTCOUNT.put(key, JSON.stringify(record));
+
+
     }
 
     console.log("➡️ 将处理文本 =", text);
