@@ -125,7 +125,6 @@ export async function handleNews(msg: any, env: Env) {
     }[] = JSON.parse(stored);
 
     const dateDisplay = `${dateKey.slice(0,4)}年${dateKey.slice(4,6)}月${dateKey.slice(6)}日`;
-    // 这里用一个点号开头，模拟 Telegram 的引用格式；你也可以改成 '>' 或 '<blockquote>'
     const header = `📰${dateDisplay} 紫罗兰小道消息 <blockquote expandable>`;
     const body = list
       .map(e => `${e.invoker} 爆料 ${e.targetUser} 说了：${e.text}`)

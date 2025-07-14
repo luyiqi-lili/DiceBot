@@ -6,6 +6,7 @@ import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
 import { handleNews } from "./commands/news";
 import { handleBook } from "./commands/book";
+import { handleTrans } from "./commands/trans";
 
 
 export default {
@@ -169,13 +170,18 @@ export default {
       payload.text = helpResponse.text;
       payload.parse_mode = helpResponse.parse_mode;
       payload.reply_markup = helpResponse.reply_markup;
+    } else if (/\/trans\b/.test(text)) {
+      console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
+      const res = await handleTrans(msg, env);
+      payload.text = res.text;
+      if (res.parse_mode) payload.parse_mode = res.parse_mode;
     } else if (/\/news\b/.test(text)) {
       console.log("📰 检测到 /news 命令，进入新闻逻辑");
       const res = await handleNews(msg, env);
       payload.text = res.text;
       if (res.parse_mode) payload.parse_mode = res.parse_mode;
       if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    }  else if (/\/book\b/.test(text)) {
+    } else if (/\/book\b/.test(text)) {
       console.log("📰 检测到 /book 命令，进入书签逻辑");
       const res = await handleBook(msg, env);
       payload.text = res.text;

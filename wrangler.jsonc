@@ -28,7 +28,8 @@
 		}
 	],
 	"vars": {
-		"BOT_USERNAME": "LichDiceBot"
+		"BOT_USERNAME": "LichDiceBot",
+		"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
 	}
 	/**
 	 * Smart Placement
