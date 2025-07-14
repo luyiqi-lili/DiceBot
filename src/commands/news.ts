@@ -82,7 +82,7 @@ export async function handleNews(msg: any, env: Env) {
     }
 
     const targetUser = reply.from?.first_name || "某人";
-    const snippet = content.slice(0, 8) + "...";
+    const snippet = content.slice(0, 50) + "...";
     const link = buildMessageLink(msg);
 
     const linkedSnippet = link ? `<a href=\"${link}\">${snippet}</a>` : snippet;
