@@ -14,6 +14,7 @@ export function handleHelp(botUsername: string) {
 /book del #序号 - 删除指定序号的书签  
 /book all - 查看本群所有用户的书签  
 /book @用户名 - 查看指定用户的书签   
+/21 - <a href="https://t.me/c/2742074355/345/196400">发起一局多人 21 点游戏 </a>
 
 <b>使用方法：</b>  
 <i>请先 @${botUsername} 再输入命令！</i>
@@ -30,6 +31,7 @@ export function handleHelp(botUsername: string) {
 <code>@${botUsername} /book del #2</code>  
 <code>@${botUsername} /book all</code>  
 <code>@${botUsername} /book @alice</code>
+<code>@${botUsername} /book @12</code>
 </blockquote>`;
 
   const reply_markup = {
@@ -46,8 +48,8 @@ export function handleHelp(botUsername: string) {
       ],
       [
         { text: "/book", switch_inline_query_current_chat: `/book` },
-        { text: "/book @alice", switch_inline_query_current_chat: `/book @alice` },
-        { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` }
+        { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` },
+        { text: "/21", switch_inline_query_current_chat: `/21` } 
       ]
     ]
   };
