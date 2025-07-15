@@ -81,11 +81,20 @@ export async function handleNews(msg: any, env: Env) {
       }
     }
 
+    // 检查是否已对该消息爆料过
+    const link = buildMessageLink(msg);
+    if (list.some(e => e.invokerId === invokerId && e.link === link)) {
+      return {
+        text: `⚠️ ${invoker} 已经对这条消息爆料过了！`,
+        parse_mode: "HTML",
+      };
+    }
+
     const targetUser = reply.from?.first_name || "某人";
     const snippet = content.slice(0, 50) + "...";
-    const link = buildMessageLink(msg);
+    const linkedSnippet = link ? `<a href="${link}">${snippet}</a>` : snippet;
 
-    const linkedSnippet = link ? `<a href=\"${link}\">${snippet}</a>` : snippet;
+
 
     const entry = {
       invoker,
