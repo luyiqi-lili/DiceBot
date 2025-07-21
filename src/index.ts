@@ -202,6 +202,35 @@ export default {
       console.log("📢 检测到 /echo 命令");
       const userName = msg.from?.first_name || "某人";
       payload.text = handleEcho(text, userName);
+    } else if (/^\/rh\b/.test(text)) {
+      console.log("🎲 检测到 /rh 命令，进行隐藏掷骰");
+      const userName = msg.from?.first_name || "某人";
+      const rollResult = handleRoll(text.replace(/^\/rh/, "/roll"), userName);  // 替换为 /roll 处理逻辑
+
+      // 发群组提示（可选）
+      await fetch(`https://api.telegram.org/bot${env.TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_thread_id : threadId,
+          parse_mode: "HTML",
+          text: `🎲 已将掷骰结果发送至 <b>${userName}</b> 的私聊。`
+        })
+      });
+
+      // 发私聊消息
+      await fetch(`https://api.telegram.org/bot${env.TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: msg.from.id,
+          parse_mode: "HTML",
+          text: `🎲 <b>你的隐藏掷骰结果</b>：\n${rollResult}`
+        })
+      });
+
+      return new Response("OK", { status: 200 });
     } else if (/\/r/.test(text)) {
       console.log("🎯 检测到 /roll 命令");
       const userName = msg.from?.first_name || "某人";
