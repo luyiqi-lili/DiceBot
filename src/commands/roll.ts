@@ -5,8 +5,22 @@
  * @returns 格式化后的回复字符串
  */
 export function handleRoll(text: string, userName: string): string {
-//  const input = text.replace(/.*\/roll\s*/i, "").trim();
-  const input = text.replace(/.*\/r(?:oll)?\s*/i, "").trim();
+  //  const input = text.replace(/.*\/roll\s*/i, "").trim();
+  let input = text.replace(/.*\/r(?:oll)?\s*/i, "").trim();
+
+
+  // /rd → 1d100，或 /rd   → 1d100
+  if (/^[dD]\s*$/.test(input)) {
+    input = "1d100";
+  }
+
+  // /rd20 → 1d20
+  input = input.replace(/\b[dD](\d+)/g, "1d$1");
+
+
+
+
+  input = input.replace(/\b[dD](\d+)/g, "1d$1");
   console.log("🎲 用户输入骰点参数 =", input || "默认");
 
   // 空参数，默认 1d100
