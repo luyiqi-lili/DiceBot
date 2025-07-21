@@ -23,6 +23,10 @@
 			"id"      : "e6044e8767934c77892c05a59811bba6" 
 		},
 		{ 
+			"binding" :"AFFECTION_KV",     // 互相的 KV
+			"id"      : "c385fa3ae69b4a3699f57d47730a5e07" 
+		},
+		{ 
 			"binding" :"BOOK_STORE",     // 新增的新闻汇总 KV
 			"id"      : "09eed80e95ee4d1f9decaedf9c0cea4d" 
 		}

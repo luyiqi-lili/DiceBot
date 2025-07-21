@@ -5,7 +5,8 @@
  * @returns 格式化后的回复字符串
  */
 export function handleRoll(text: string, userName: string): string {
-  const input = text.replace(/.*\/roll\s*/i, "").trim();
+//  const input = text.replace(/.*\/roll\s*/i, "").trim();
+  const input = text.replace(/.*\/r(?:oll)?\s*/i, "").trim();
   console.log("🎲 用户输入骰点参数 =", input || "默认");
 
   // 空参数，默认 1d100

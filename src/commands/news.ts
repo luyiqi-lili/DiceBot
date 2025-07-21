@@ -16,6 +16,8 @@ const WHITE_LIST = new Set<string>([
   "7860415401", //琉璃
   "6653537474", //蘭
   "8074655816", //小母龙
+  "7209920386", //勇菈
+  "7222745396", //酥酥
   "mock"
 ]);
 
@@ -70,7 +72,7 @@ export async function handleNews(msg: any, env: Env) {
 
     const todayEntries = list.filter(e => e.invokerId === invokerId);
     const isVip = WHITE_LIST.has(invoker) || WHITE_LIST.has(invokerId);
-    const maxPerDay = isVip ? 20 : 5;
+    const maxPerDay = isVip ? 99 : 5;
     console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，${isVip? "白名单":"普通"}用户上限 ${maxPerDay}`);
 
     if (todayEntries.length >= maxPerDay) {

@@ -8,6 +8,8 @@ import { handleNews } from "./commands/news";
 import { handleBook } from "./commands/book";
 import { handleTrans } from "./commands/trans";
 import { handle21 } from "./commands/21";
+import { recordAffection } from "./commands/handleAffinity";
+import { handleRose } from "./commands/rose";
 
 
 export default {
@@ -125,12 +127,34 @@ export default {
       ?? msg.message?.message_thread_id;
 
     console.log(`🔍 检查是否包含 @${env.BOT_USERNAME}`);
-    if (!text.includes(`@${env.BOT_USERNAME}`)) {
-      console.log("➖ 文本未包含 Bot 用户名，忽略");
+
+
+    if (
+      msg.reply_to_message &&
+      text &&
+      !msg.reply_to_message.forum_topic_created &&
+      !text.trim().startsWith(`@${env.BOT_USERNAME}`) &&
+      !text.trim().startsWith("/r")
+    ) {
+      console.log("检测到回复消息，进入好感度记录");
+
+      const fromId = msg.from.id;
+      const toMsg = msg.reply_to_message.from;
+      const toId = toMsg.id;
+      const toName = toMsg.first_name || "";
+      const increment = text.length;
+      await recordAffection(fromId, toId, toName, increment, env);
+      return new Response("OK", { status: 200 });
+
+    } else if (
+      !text.trim().startsWith(`@${env.BOT_USERNAME}`) &&
+      !text.trim().startsWith("/r")
+    ) {
+      console.log("➖ 文本不不是以 @Bot 用户名，或者/r 开头，忽略");
       return new Response("OK", { status: 200 });
     }
 
-    if (text.includes(`@${env.BOT_USERNAME}`)) {
+    else {
 
       const userId = msg.from.id;
       const firstName = msg.from.first_name || "";
@@ -178,13 +202,16 @@ export default {
       console.log("📢 检测到 /echo 命令");
       const userName = msg.from?.first_name || "某人";
       payload.text = handleEcho(text, userName);
-    } else if (/\/roll\b/.test(text)) {
+    } else if (/\/r/.test(text)) {
       console.log("🎯 检测到 /roll 命令");
       const userName = msg.from?.first_name || "某人";
       payload.text = handleRoll(text, userName);
     } else if (/\/groll\b/.test(text)) {
       console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
       payload = { ...payload, ...handleGroll(msg, env) };
+    } else if (/\/rose\b/.test(text)) {
+      console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
+      payload = { ...payload, ...(await handleRose(msg, env)) };
     } else if (/\/21\b/.test(text)) {
       console.log("🎲 检测到 /21点 命令，进入 21 逻辑");
       payload = { ...payload, ...handle21(msg, env) };
