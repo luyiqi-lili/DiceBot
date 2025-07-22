@@ -25,77 +25,88 @@ function scoreToEmoji(score: number): string {
 }
 
 /**
- * 处理 /rose 命令，查询自己对目标用户的好感度（只支持 @username 形式）
+ * 处理 /rose 命令，通过回复消息获取目标用户，查询或增加好感度
+ * 支持：
+ *   /rose            查询好感度
+ *   /rose send       向目标用户送花，好感度 +120 并持久化，每天每个用户限送一朵
  */
 export async function handleRose(msg: any, env: Env) {
   const chatId = msg.chat.id;
   const fromId = msg.from.id;
-  let targetId: number | null = null;
-  let targetName = '';
+  const fromName = msg.from.first_name || '你';
 
-  console.log("[rose] 收到 /rose 请求，msg.text=", msg.text);
-  // 仅支持 @username 提及，实体类型为 'mention'
-  if (msg.entities && Array.isArray(msg.entities)) {
-    for (const ent of msg.entities) {
-      if (ent.type === 'mention') {
-        const raw = msg.text.substr(ent.offset, ent.length); // '@username'
-        const username = raw.replace('@', '');
-        console.log("[rose] 检测到 mention 实体，用户名=", username);
-        try {
-          // 调用 getChatMember 获取用户信息
-          const res = await fetch(
-            `https://api.telegram.org/bot${env.TOKEN}/getChatMember`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ chat_id: chatId, user_id: username })
-            }
-          );
-          const data = await res.json();
-          if (data.ok && data.result && data.result.user) {
-            targetId = data.result.user.id;
-            targetName = data.result.user.first_name || username;
-            console.log("[rose] getChatMember 成功，targetId=", targetId);
-          } else {
-            console.log("[rose] getChatMember 未找到用户，返回=", data);
-          }
-        } catch (err) {
-          console.error("[rose] getChatMember 调用异常", err);
-        }
-        break;
-      }
-    }
-  }
+  // 解析命令参数，看是否是 "send"
+  const parts = msg.text.trim().split(/\s+/);
+  const isSend = parts.slice(1).map(s => s.toLowerCase()).includes('send');
 
-  if (!targetId) {
-    console.log("[rose] 未获取到目标用户ID，返回用法提示");
+  // 如果用户没有回复任何消息，则提示用法
+  if (!msg.reply_to_message || !msg.reply_to_message.from || msg.reply_to_message.forum_topic_created) {
     return {
       method: 'sendMessage',
       chat_id: chatId,
-      text: '请使用 `@BotUsername /rose @目标用户名` 来查询好感度。',
-      parse_mode: 'Markdown'
+      text: '请在想操作的用户消息上回复并使用 @LichDiceBot /rose 或 /rose send 来查询或送花。',
     };
   }
 
-  // 获取好感度地图
+  // 从回复的消息中获取目标用户信息
+  const targetUser = msg.reply_to_message.from;
+  const targetId = targetUser.id;
+  const targetName = targetUser.first_name || targetUser.username || '该用户';
+
+  // 查询当前好感度地图
   const map = await getAffectionMap(fromId, env);
-  const record = map[targetId.toString()];
-  const score = record ? record.value : 0;
-  console.log("[rose] 好感度查询，source=", fromId, "target=", targetId, "score=", score);
+  const key = targetId.toString();
+  const record = map[key] || { firstName: targetName, value: 0 };
+  let score = record.value;
 
-  // 构造回复内容
-  let text: string;
-  if (score < 10) {
-    text = `你对${targetName} 的好感度不够高，快多互动吧！`;
-  } else {
+  if (isSend) {
+    // 检查当天是否已送花（UTC 日期）
+    const sendKey = `rose_send:${fromId}`;
+    const lastSendDate = await env.AFFECTION_KV.get(sendKey);
+    const todayUTC = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    if (lastSendDate === todayUTC) {
+      // 已经送过
+      return {
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `${fromName} 今天已经送过花啦，明天再来哦！`,
+      };
+    }
+
+    // 送花，增加 160 点好感度
+    score += 160;
+    map[key] = { firstName: targetName, value: score };
+
+    // 持久化好感度地图
+    const kvAffKey = `affection:${fromId}`;
+    await env.AFFECTION_KV.put(kvAffKey, JSON.stringify(map));
+
+    // 更新送花日期，24 小时后过期
+    await env.AFFECTION_KV.put(sendKey, todayUTC, { expirationTtl: 86400 });
+
+    // 构造送花后的回复
     const emoji = scoreToEmoji(score);
-    text = `你对 ${targetName} 的好感度为 ${emoji}`;
+    return {
+      method: 'sendMessage',
+      chat_id: chatId,
+      text: `${fromName} 已经向 ${targetName} 送出了一朵 🌷，目前好感度为 ${emoji}`,
+      parse_mode: 'HTML'
+    };
+  } else {
+    // 仅查询当前好感度
+    let text: string;
+    if (score < 10) {
+      text = `${fromName} 对 ${targetName} 的好感度不够高，快多互动吧！`;
+    } else {
+      const emoji = scoreToEmoji(score);
+      text = `${fromName} 对 ${targetName} 的好感度为 ${emoji}`;
+    }
+    return {
+      method: 'sendMessage',
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML'
+    };
   }
-
-  return {
-    method: 'sendMessage',
-    chat_id: chatId,
-    text,
-    parse_mode: 'HTML'
-  };
 }

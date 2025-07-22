@@ -21,6 +21,15 @@ const WHITE_LIST = new Set<string>([
   "mock"
 ]);
 
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function getDateStr(date = new Date()) {
   return date.toISOString().slice(0, 10).replace(/-/g, "");
 }
@@ -57,7 +66,7 @@ export async function handleNews(msg: any, env: Env) {
   console.log("[News] 使用日期 key =", dateKey);
 
   if (isExplicitReply) {
-    const content = reply.text!.trim();
+    const content = escapeHtml(reply.text!.trim());
 
     // 读取当前列表并统计当天该用户已爆料数量
     const raw = await env.NEWS_STORE.get(kvKey);
