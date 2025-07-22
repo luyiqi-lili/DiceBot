@@ -64,7 +64,7 @@ export async function handleNews(msg: any, env: Env) {
   const dateKey = dateMatch?.[1] || getDateStr();
   const kvKey = `news:${dateKey}`;
   console.log("[News] 使用日期 key =", dateKey);
-
+  const segmenter = new Intl.Segmenter('zh', { granularity: 'grapheme' });
   if (isExplicitReply) {
     const content = escapeHtml(reply.text!.trim());
 
@@ -82,7 +82,7 @@ export async function handleNews(msg: any, env: Env) {
     const todayEntries = list.filter(e => e.invokerId === invokerId);
     const isVip = WHITE_LIST.has(invoker) || WHITE_LIST.has(invokerId);
     const maxPerDay = isVip ? 99 : 5;
-    console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，${isVip? "白名单":"普通"}用户上限 ${maxPerDay}`);
+    console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，${isVip ? "白名单" : "普通"}用户上限 ${maxPerDay}`);
 
     if (todayEntries.length >= maxPerDay) {
       const idx = list.findIndex(e => e.invokerId === invokerId);
@@ -102,7 +102,12 @@ export async function handleNews(msg: any, env: Env) {
     }
 
     const targetUser = reply.from?.first_name || "某人";
-    const snippet = content.slice(0, 50) + "...";
+    const snippet = [...segmenter.segment(content)]
+      .map(seg => seg.segment)
+      .slice(0, 50)
+      .join("") + "...";
+
+
     const linkedSnippet = link ? `<a href="${link}">${snippet}</a>` : snippet;
 
 
@@ -123,7 +128,7 @@ export async function handleNews(msg: any, env: Env) {
 
     return {
       text: `✅ ${invoker} 给骰娘爆料：<b>${targetUser}</b> 说了「${linkedSnippet}」` +
-            `（你今日已爆料 ${Math.min(todayEntries.length + 1, maxPerDay)}/${maxPerDay} 条）`,
+        `（你今日已爆料 ${Math.min(todayEntries.length + 1, maxPerDay)}/${maxPerDay} 条）`,
       parse_mode: "HTML",
     };
   } else {
@@ -138,8 +143,8 @@ export async function handleNews(msg: any, env: Env) {
       };
     }
 
-    const list: Array<{invoker: string; targetUser: string; text: string; link: string}> = JSON.parse(stored);
-    const dateDisplay = `${dateKey.slice(0,4)}年${dateKey.slice(4,6)}月${dateKey.slice(6)}日`;
+    const list: Array<{ invoker: string; targetUser: string; text: string; link: string }> = JSON.parse(stored);
+    const dateDisplay = `${dateKey.slice(0, 4)}年${dateKey.slice(4, 6)}月${dateKey.slice(6)}日`;
     const header = `📰${dateDisplay} 紫罗兰小道消息 <blockquote expandable>`;
 
     const body = list
