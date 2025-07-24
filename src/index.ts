@@ -10,6 +10,7 @@ import { handleTrans } from "./commands/trans";
 import { handle21 } from "./commands/21";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
+import { handleTopicEdited } from "./commands/topicEditHandler";
 
 
 export default {
@@ -94,6 +95,8 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
+    const editResponse = await handleTopicEdited(update, env);
+    if (editResponse) return editResponse;
 
     const msg = update.message ?? update.channel_post;
     if (!msg) {
