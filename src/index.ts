@@ -94,9 +94,18 @@ export default {
 
       return new Response("OK", { status: 200 });
     }
+    try {
+      const editResponse = await handleTopicEdited(update, env);
+      if (editResponse) return editResponse;
 
-    const editResponse = await handleTopicEdited(update, env);
-    if (editResponse) return editResponse;
+    }
+    catch (e) {
+      console.error(`❌ [callback] ${method} 标题更新失败`, e);
+
+      return new Response("OK", { status: 200 });
+    }
+
+
 
     const msg = update.message ?? update.channel_post;
     if (!msg) {
@@ -132,7 +141,7 @@ export default {
     console.log(`🔍 检查是否包含 @${env.BOT_USERNAME}`);
 
 
-     if (
+    if (
       !text.trim().startsWith(`@${env.BOT_USERNAME}`) &&
       !text.trim().startsWith("/r")
     ) {
@@ -199,7 +208,7 @@ export default {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
-          message_thread_id : threadId,
+          message_thread_id: threadId,
           parse_mode: "HTML",
           text: `🎲 已将掷骰结果发送至 <b>${userName}</b> 的私聊。`
         })
@@ -217,7 +226,7 @@ export default {
       });
 
       return new Response("OK", { status: 200 });
-    }else if (/\/rose\b/.test(text)) {
+    } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
     } else if (/\/r/.test(text)) {
@@ -227,7 +236,7 @@ export default {
     } else if (/\/groll\b/.test(text)) {
       console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
       payload = { ...payload, ...handleGroll(msg, env) };
-    }  else if (/\/21\b/.test(text)) {
+    } else if (/\/21\b/.test(text)) {
       console.log("🎲 检测到 /21点 命令，进入 21 逻辑");
       payload = { ...payload, ...handle21(msg, env) };
     } else if (/\/duel\b/.test(text)) {
