@@ -6,7 +6,7 @@ export interface Env {
     // 绑定到 Cloudflare Workers KV 的命名空间
     TOPIC_KV: KVNamespace;
     // Telegram Bot 的 token，需在 wrangler.toml 中配置
-    BOT_TOKEN: string;
+    TOKEN: string;
 }
 
 export async function handleTopicEdited(update: any, env: any): Promise<Response | undefined> {
@@ -20,10 +20,16 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
         return;
     }
 
+
+
     // 2. 提取必要字段
     const chatId: number = msg.chat.id;
     const threadId: number = msg.message_thread_id;
-    const newTitle: string = editInfo.name;  // 从 forum_topic_edited.name 获取新标题
+    const newTitle: string | undefined = editInfo.name;
+    if (typeof newTitle !== 'string') {
+        console.log('仅更新了图标，无标题文本变更，跳过处理');
+        return;
+    }
 
     // 3. 白名单配置：只监听特定群组和话题
     const whitelist: Record<number, number[]> = {
@@ -117,20 +123,47 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
         }
     }
 
-    // 9.2 构造新提示内容（HTML 格式）
+    // 9.2 构造新提示内容（HTML 格式），❤️房间优先，其余在后，并用 <blockquote expandable> 包裹
     let content = `<b>${roomMeta[threadId]?.name || threadId}</b> 状态从「${prevTitle}」变成了「${newTitle}」\n\n`;
     content += `<b>当前所有房间的状态：</b>\n`;
-    for (const [tid, title] of Object.entries(record.titles)) {
+
+
+    // 按是否含 ❤️ 分组
+    const entries = Object.entries(record.titles);
+    const heartEntries = entries.filter(([_, title]) => title.includes('❤️'));
+    const normalEntries = entries.filter(([_, title]) => !title.includes('❤️'));
+
+    // 先输出含 ❤️ 的
+    for (const [tid, title] of heartEntries) {
         const num = Number(tid);
         const meta = roomMeta[num];
-        if (meta && meta.link) {
-            // 房间名 + 标题，用 HTML 链接包裹
+        if (meta?.link) {
             content += `<a href="${meta.link}">${meta.name}: ${title}</a>\n`;
         } else {
-            // 回退为普通文本
             content += `${tid}: ${title}\n`;
         }
     }
+    content += `<blockquote expandable>`;
+    // 再输出不含 ❤️ 的
+    for (const [tid, title] of normalEntries) {
+        const num = Number(tid);
+        const meta = roomMeta[num];
+        if (meta?.link) {
+            content += `<a href="${meta.link}">${meta.name}: ${title}</a>\n`;
+        } else {
+            content += `${tid}: ${title}\n`;
+        }
+    }
+
+    content += `</blockquote>\n`;
+
+
+
+
+
+
+
+
 
     // 9.3 发送新提示
     const sendUrl = `https://api.telegram.org/bot${env.TOKEN}/sendMessage`;

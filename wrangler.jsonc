@@ -13,6 +13,8 @@
 	"observability": {
 		"enabled": true
 	},
+//	"account_id": "CF_ACCOUNT_ID",
+
 	"kv_namespaces": [
 		{
 			"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
