@@ -23,7 +23,7 @@ jobs:
         run: npm install -g wrangler
 
       - name: Wrangler 登录（可选，以验证环境变量）
-        run: wrangler login
+        run: wrangler whoami
   
       - name: 部署到 Workers
         run: wrangler deploy
