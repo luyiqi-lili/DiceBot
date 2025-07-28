@@ -3,18 +3,18 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "telegram-bot",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-06-28",
-	"compatibility_flags": [
-		"global_fetch_strictly_public"
-	],
-	"observability": {
-		"enabled": true
-	},
 	"env": {
 		"dev": {
+			"$schema": "node_modules/wrangler/config-schema.json",
+			"name": "telegram-bot",
+			"main": "src/index.ts",
+			"compatibility_date": "2025-06-28",
+			"compatibility_flags": [
+				"global_fetch_strictly_public"
+			],
+			"observability": {
+				"enabled": true
+			},
 			"kv_namespaces": [
 				{
 					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
@@ -43,6 +43,16 @@
 			}
 		},
 		"prod": {
+			"$schema": "node_modules/wrangler/config-schema.json",
+			"name": "telegram-bot",
+			"main": "src/index.ts",
+			"compatibility_date": "2025-06-28",
+			"compatibility_flags": [
+				"global_fetch_strictly_public"
+			],
+			"observability": {
+				"enabled": true
+			},
 			"kv_namespaces": [
 				{
 					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
