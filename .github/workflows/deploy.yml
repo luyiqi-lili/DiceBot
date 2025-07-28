@@ -29,5 +29,5 @@ jobs:
         run: wrangler whoami
   
       - name: 部署到 Workers
-        run: wrangler deploy
+        run: wrangler deploy -e prod
  

@@ -13,33 +13,63 @@
 	"observability": {
 		"enabled": true
 	},
-//	"account_id": "CF_ACCOUNT_ID",
-
-	"kv_namespaces": [
-		{
-			"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
-			"id": "b46f250639e04e8b9045702f1adfb934" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
+	"env": {
+		"dev": {
+			"kv_namespaces": [
+				{
+					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
+					"id": "b46f250639e04e8b9045702f1adfb934" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
+				},
+				{
+					"binding": "NEWS_STORE", // 新增的新闻汇总 KV
+					"id": "e6044e8767934c77892c05a59811bba6"
+				},
+				{
+					"binding": "AFFECTION_KV", // 互相的 KV
+					"id": "c385fa3ae69b4a3699f57d47730a5e07"
+				},
+				{
+					"binding": "BOOK_STORE", // 新增的新闻汇总 KV
+					"id": "09eed80e95ee4d1f9decaedf9c0cea4d"
+				},
+				{
+					"binding": "TOPIC_KV", // 房间标题 KV
+					"id": "79b6ac92940c4ad895508d57e6daa617"
+				}
+			],
+			"vars": {
+				"BOT_USERNAME": "LichDiceBot",
+				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
+			}
 		},
-		{ 
-			"binding" :"NEWS_STORE",     // 新增的新闻汇总 KV
-			"id"      : "e6044e8767934c77892c05a59811bba6" 
-		},
-		{ 
-			"binding" :"AFFECTION_KV",     // 互相的 KV
-			"id"      : "c385fa3ae69b4a3699f57d47730a5e07" 
-		},
-		{ 
-			"binding" :"BOOK_STORE",     // 新增的新闻汇总 KV
-			"id"      : "09eed80e95ee4d1f9decaedf9c0cea4d" 
-		},
-		{ 
-			"binding" :"TOPIC_KV",     // 房间标题 KV
-			"id"      : "79b6ac92940c4ad895508d57e6daa617" 
+		"prod": {
+			"kv_namespaces": [
+				{
+					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
+					"id": "5854fe22c3aa4159a9ea47725bb5ed38" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
+				},
+				{
+					"binding": "NEWS_STORE", // 新增的新闻汇总 KV
+					"id": "8802a37e7ae949b8b900fe41bb160200"
+				},
+				{
+					"binding": "AFFECTION_KV", // 互相的 KV
+					"id": "940ecfd62a0745afa04a1bcbfdeabd20"
+				},
+				{
+					"binding": "BOOK_STORE", // 新增的新闻汇总 KV
+					"id": "4d3c5e4c177e4eb490cbae9ec2cab70c"
+				},
+				{
+					"binding": "TOPIC_KV", // 房间标题 KV
+					"id": "f16bb535b489446f953995a79fb6532a"
+				}
+			],
+			"vars": {
+				"BOT_USERNAME": "LichDiceBot",
+				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
+			}
 		}
-	],
-	"vars": {
-		"BOT_USERNAME": "LichDiceBot",
-		"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
 	}
 	/**
 	 * Smart Placement
