@@ -138,7 +138,7 @@ export async function handleNews(msg: any, env: Env) {
 
     if (!stored) {
       return {
-        text: `📭 ${dateKey} 暂无小道消息～回复一条消息并发送 <b>@LichDiceBot /news</b> 即可爆料喔！`,
+        text: `📭 ${dateKey} 暂无小道消息～回复一条消息并发送 <b>@${env.BOT_USERNAME} /news</b> 即可爆料喔！`,
         parse_mode: "HTML",
       };
     }
