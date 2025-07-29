@@ -33,7 +33,7 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
 
     // 3. 白名单配置：只监听特定群组和话题
     const whitelist: Record<number, number[]> = {
-        [-1002848481881]: [104, 69],
+//        [-1002848481881]: [104, 69],
         [-1002742074355]: [
             184, 176, 33861, 205, 382, 88693, 168, 7571,
             211, 361, 244, 234072, 165, 258, 182, 194,
