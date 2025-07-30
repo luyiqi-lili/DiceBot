@@ -55,11 +55,11 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
         205: { name: '柔柔', link: 'https://t.me/c/2742074355/205' },
         382: { name: '耀阳', link: 'https://t.me/c/2742074355/382' },
         88693: { name: '缘宝', link: 'https://t.me/c/2742074355/88693' },
-        168: { name: '兰兰', link: 'https://t.me/c/2742074355/168' },
-        7571: { name: '小母龙', link: 'https://t.me/c/2742074355/7571' },
+        168: { name: '蘭蘭', link: 'https://t.me/c/2742074355/168' },
+        7571: { name: '耶梦加得', link: 'https://t.me/c/2742074355/7571' },
         211: { name: '小小M', link: 'https://t.me/c/2742074355/211' },
         361: { name: '满月', link: 'https://t.me/c/2742074355/361' },
-        244: { name: '闪闪', link: 'https://t.me/c/2742074355/244' },
+        244: { name: '閃閃', link: 'https://t.me/c/2742074355/244' },
         234072: { name: '落雪', link: 'https://t.me/c/2742074355/234072' },
         165: { name: '酥酥', link: 'https://t.me/c/2742074355/165' },
         258: { name: '汐汐', link: 'https://t.me/c/2742074355/258' },
@@ -108,8 +108,8 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
     }
 
     // 9. 在固定目标话题中只保留一条提示
-    const targetChatId = -1002848481881;
-    const targetThreadId = 66;
+    const targetChatId = -1002742074355;
+    const targetThreadId = 302677;
 
     // 9.1 删除上一次提示消息
     if (record.message_id) {
