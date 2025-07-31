@@ -3,7 +3,7 @@ name: 🚀 Deploy Workers
 on:
   push:
     branches:
-      - main       # 或者你自己的默认分支
+      - '**'       # 监听所有分支
 env:
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -29,5 +29,9 @@ jobs:
         run: wrangler whoami
   
       - name: 部署到 Workers
-        run: wrangler deploy -e prod
- 
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            wrangler deploy -e prod
+          else
+            wrangler deploy -e dev
+          fi

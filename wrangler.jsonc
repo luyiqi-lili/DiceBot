@@ -4,7 +4,7 @@
  */
 {
 	"env": {
-		"dev": {
+		"local": {
 			"$schema": "node_modules/wrangler/config-schema.json",
 			"name": "telegram-bot",
 			"main": "src/index.ts",
@@ -39,6 +39,44 @@
 			],
 			"vars": {
 				"BOT_USERNAME": "LichDiceBot",
+				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
+			}
+		},
+		"dev": {
+			"$schema": "node_modules/wrangler/config-schema.json",
+			"name": "telegram-bot-dev",
+			"main": "src/index.ts",
+			"compatibility_date": "2025-06-28",
+			"compatibility_flags": [
+				"global_fetch_strictly_public"
+			],
+			"observability": {
+				"enabled": true
+			},
+			"kv_namespaces": [
+				{
+					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
+					"id": "4df63dc530714871951dab48a9587ef3" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
+				},
+				{
+					"binding": "NEWS_STORE", // 新增的新闻汇总 KV
+					"id": "1741aafc430d4c90b3160f76c6c711ff"
+				},
+				{
+					"binding": "AFFECTION_KV", // 互相的 KV
+					"id": "79192abfe91d4221abba3ee13cdc868e"
+				},
+				{
+					"binding": "BOOK_STORE", // 新增的新闻汇总 KV
+					"id": "6008672fe7f14dc6ba7f8ab806f1513e"
+				},
+				{
+					"binding": "TOPIC_KV", // 房间标题 KV
+					"id": "f46b32828f934342b2dbc61519ee4e0d"
+				}
+			],
+			"vars": {
+				"BOT_USERNAME": "lili_DevDiceBot",
 				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
 			}
 		},
