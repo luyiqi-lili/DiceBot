@@ -1,23 +1,3 @@
-// commands/trans.ts
-// 环境配置方法：
-// 方法一：在 Cloudflare Workers Dashboard 中
-//   1. 打开 Workers → 选择对应的脚本 → 点击 "Settings" → "Variables"
-//   2. 新增变量：
-//      键: SILICONFLOW_API_KEY
-//      值: 你的 SiliconFlow API Key
-//      键: BOT_USERNAME
-//      值: 你的 Bot 用户名，如 LichDiceBot
-// 方法二：使用 wrangler.toml 本地部署
-//   在 wrangler.toml 中添加：
-//   [vars]
-//   SILICONFLOW_API_KEY = "你的 SiliconFlow API Key"
-//   BOT_USERNAME = "LichDiceBot"
-
-type Env = {
-  SILICONFLOW_API_KEY: string;
-  BOT_USERNAME: string;
-};
-
 export async function handleTrans(msg: any, env: Env) {
   console.log("[Trans] 🔍 进入 handleTrans");
 
@@ -45,34 +25,35 @@ export async function handleTrans(msg: any, env: Env) {
 
   const contentToTranslate = replied.text;
   console.log("[Trans] 📄 待翻译文本:", contentToTranslate);
-
   const payload = {
-    model: "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
-    temperature: 0,
-    messages: [
+    contents: [
       {
-        role: "system",
-        content: `你是一个精通网络用语、俚语和流行梗的骰娘。对日语、中文、英语等多种语言的网络表达、缩写、梗图文字等都有深入了解。` +
-                 `当收到翻译时，能识别并准确转换网络俚语和梗文化，输出简练自然的目标语言结果，避免直译造成生硬。只输出翻译文本，不要输出任何多余的分析或思考过程。` +
-                 `在CoT过程中。直接称呼自己为"骰娘",称呼用户为"你"，**绝对避免**使用“用户”这个称呼，保持友好、耐心、幽默、富有同理心，避免过于正式、冰冷或机械化的语言` +
-                 `特别记住，杂鱼的日语翻译是雑魚（ざこ）` 
-      },
-      {
-        role: "user",
-        content: `翻译下面的内容为${targetLang}：\n${contentToTranslate}`
+        parts: [
+          { text: `翻译下面的内容为${targetLang}：\n${contentToTranslate}` }
+        ]
       }
-    ]
+    ],
+    systemInstruction: {
+      parts: [
+        { text: `你是一个精通网络用语、俚语和流行梗的骰娘。只输出翻译，不要多余说明。` }
+      ]
+    },
+    generationConfig: {
+      thinkingConfig: { thinkingBudget: -1 }
+    }
   };
+
   console.log("[Trans] 📤 发送翻译请求 payload:", JSON.stringify(payload));
 
   try {
+
     const apiRes = await fetch(
-      "https://api.siliconflow.cn/v1/chat/completions",
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${env.SILICONFLOW_API_KEY}`
+          "x-goog-api-key": env.GOOGLE_API_KEY
         },
         body: JSON.stringify(payload)
       }
@@ -81,9 +62,8 @@ export async function handleTrans(msg: any, env: Env) {
     const json = await apiRes.json();
     console.log("[Trans] ✅ 收到翻译响应:", JSON.stringify(json));
 
-    const choice = json.choices?.[0]?.message;
-    const translation = choice?.content?.trim();
-    const reasoning = (choice as any)?.reasoning_content?.trim();
+    const translation = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
 
     if (!translation) {
       console.log("[Trans] ⚠️ 翻译结果为空或未找到 choices 内容");
@@ -91,13 +71,9 @@ export async function handleTrans(msg: any, env: Env) {
     }
 
     console.log("[Trans] 🎯 翻译结果:", translation);
-    if (reasoning) console.log("[Trans] 💭 思考内容:", reasoning);
 
     // 构建输出，包含可展开的思考
-    let replyText = `骰娘刚刚听到： 「${contentToTranslate}」 翻译一下就是： 「${translation}」`;
-    if (reasoning) {
-      replyText += ` <blockquote expandable><tg-spoiler>${reasoning}</tg-spoiler></blockquote>`;
-    }
+    const replyText = `骰娘刚刚听到： 「${contentToTranslate}」 翻译一下就是： 「${translation}」`;
 
     return { text: replyText, parse_mode: "HTML" };
   } catch (e) {
