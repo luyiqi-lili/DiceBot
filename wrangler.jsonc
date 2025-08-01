@@ -4,44 +4,6 @@
  */
 {
 	"env": {
-		"local": {
-			"$schema": "node_modules/wrangler/config-schema.json",
-			"name": "telegram-bot",
-			"main": "src/index.ts",
-			"compatibility_date": "2025-06-28",
-			"compatibility_flags": [
-				"global_fetch_strictly_public"
-			],
-			"observability": {
-				"enabled": true
-			},
-			"kv_namespaces": [
-				{
-					"binding": "TGBOTCOUNT", // 在代码里通过 env.USER_COUNT 访问
-					"id": "b46f250639e04e8b9045702f1adfb934" // 把这里换成你从 Dashboard/KV 拿到的 namespace ID
-				},
-				{
-					"binding": "NEWS_STORE", // 新增的新闻汇总 KV
-					"id": "e6044e8767934c77892c05a59811bba6"
-				},
-				{
-					"binding": "AFFECTION_KV", // 互相的 KV
-					"id": "c385fa3ae69b4a3699f57d47730a5e07"
-				},
-				{
-					"binding": "BOOK_STORE", // 新增的新闻汇总 KV
-					"id": "09eed80e95ee4d1f9decaedf9c0cea4d"
-				},
-				{
-					"binding": "TOPIC_KV", // 房间标题 KV
-					"id": "79b6ac92940c4ad895508d57e6daa617"
-				}
-			],
-			"vars": {
-				"BOT_USERNAME": "LichDiceBot",
-				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
-			}
-		},
 		"dev": {
 			"$schema": "node_modules/wrangler/config-schema.json",
 			"name": "telegram-bot-dev",
@@ -77,7 +39,8 @@
 			],
 			"vars": {
 				"BOT_USERNAME": "lili_DevDiceBot",
-				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
+				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh",
+				"GOOGLE_API_KEY": "AIzaSyDdKQQNWz3Zhk6bnkrBXI7nJ4PoVQsNdvM"
 			}
 		},
 		"prod": {
@@ -115,7 +78,8 @@
 			],
 			"vars": {
 				"BOT_USERNAME": "lili_DiceBot",
-				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh"
+				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh",
+				"GOOGLE_API_KEY": "AIzaSyDdKQQNWz3Zhk6bnkrBXI7nJ4PoVQsNdvM"
 			}
 		}
 	}
