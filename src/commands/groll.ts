@@ -35,7 +35,7 @@ export function handleGroll(msg: any, env: any): Record<string, any> {
     if (rolls.some(r => r.user === replier)) {
       return { method: "answerCallbackQuery", callback_query_id: msg.id, text: `${replier} 已经掷过点了。`, show_alert: true };
     }
-    if (rolls.length >= 20) {
+    if (rolls.length >= 100) {
       return { method: "answerCallbackQuery", callback_query_id: msg.id, text: `参加人数已达上限（20 人）。`, show_alert: true };
     }
     rolls.push({ user: replier, point: Math.floor(Math.random() * 100) + 1 });
