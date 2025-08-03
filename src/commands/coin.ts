@@ -15,50 +15,27 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   const userId = msg.from.id.toString();
   const userName = msg.from.first_name || "你";
 
-  // 原始消息文本，可能形如 "@BotUsername /coin pray" 或者 "/coin pray"
-  console.log("📥 [handleCoin] 收到消息 text =", msg.text);
-
-  // 1. 去除开头的 Bot 提及（如果有），例如 "@lili_DevDiceBot"
+  // 去除 @BotUsername 提及（如有）
   let text = msg.text.trim();
   const botMention = `@${env.BOT_USERNAME}`;
-  if (text.startsWith(botMention)) {
-    text = text.slice(botMention.length).trim();
-    console.log(`🔍 [handleCoin] 去除 Bot 提及，剩余 text = "${text}"`);
-  }
-
-  // 2. 拆分为若干部分，parts[0] 应为 "/coin"，parts[1] 为子命令（"pray" 或 "send"）
+  if (text.startsWith(botMention)) text = text.slice(botMention.length).trim();
   const parts = text.split(/\s+/);
-  console.log("📋 [handleCoin] 拆分 parts =", parts);
+  if (parts[0] !== "/coin") return {};
 
-  // 如果 parts[0] 不是 /coin，说明不应该由此处理
-  if (parts[0] !== "/coin") {
-    console.warn(`⚠️ [handleCoin] 非 /coin 命令，跳过处理：${parts[0]}`);
-    // 返回 undefined，让上层继续其他逻辑
-    return {};
-  }
-
-  // 子命令，比如 "pray"、"send" 等
   const sub = parts[1]?.toLowerCase();
-  console.log(`🔖 [handleCoin] 识别到子命令 sub = "${sub}"`);
 
-  // Helper: 读取并解析用户余额
-  async function getBalance(): Promise<number> {
-    const raw = await env.COIN_KV.get(userId);
-    const bal = raw ? parseInt(raw, 10) : 0;
-    console.log(`💾 [handleCoin] 读取余额 userId=${userId} => ${bal}`);
-    return bal;
+  // 余额读写
+  async function getBalance(id: string): Promise<number> {
+    const raw = await env.COIN_KV.get(id);
+    return raw ? parseInt(raw, 10) : 0;
+  }
+  async function setBalance(id: string, bal: number) {
+    await env.COIN_KV.put(id, bal.toString());
   }
 
-  // Helper: 存储余额
-  async function setBalance(balance: number) {
-    console.log(`💾 [handleCoin] 存储余额 userId=${userId} <= ${balance}`);
-    await env.COIN_KV.put(userId, balance.toString());
-  }
-
-  // —— 分支 1：仅 "/coin"，查询余额 —— 
+  // ——— 查询余额 ———
   if (!sub) {
-    const bal = await getBalance();
-    console.log(`💰 [handleCoin] 查询余额，回复 ${bal}`);
+    const bal = await getBalance(userId);
     return {
       method: "sendMessage",
       chat_id: chatId,
@@ -67,16 +44,12 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     };
   }
 
-  // —— 分支 2："/coin pray"，每日祈福 —— 
+  // ——— 每日祈福 ———
   if (sub === "pray") {
-    console.log("🙏 [handleCoin] 进入 pray 分支");
     const prayKey = `coin_pray:${userId}`;
     const last = await env.COIN_KV.get(prayKey);
     const today = new Date().toISOString().split("T")[0];
-    console.log(`📅 [handleCoin] 上次祈福日期 =`, last, "，今天 =", today);
-
     if (last === today) {
-      console.log("⛔ [handleCoin] 今日已祈福，拒绝重复");
       return {
         method: "sendMessage",
         chat_id: chatId,
@@ -84,17 +57,11 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-
-    const gain = randomInt(10, 100);  // 随机获得 10–100
-    console.log(`✨ [handleCoin] 随机祈福收益 gain = ${gain}`);
-    const bal = await getBalance();
+    const gain = randomInt(10, 100);
+    const bal = await getBalance(userId);
     const newBal = bal + gain;
-    await setBalance(newBal);
-
-    // 标记今天已祈福
+    await setBalance(userId, newBal);
     await env.COIN_KV.put(prayKey, today);
-    console.log(`✅ [handleCoin] 标记 prayKey=${prayKey} 为 ${today}`);
-
     return {
       method: "sendMessage",
       chat_id: chatId,
@@ -103,15 +70,10 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     };
   }
 
-  // —— 分支 3："/coin send X"，向被回复用户转账 —— 
+  // ——— 转账，并由接收者支付阶梯手续费 ———
   if (sub === "send") {
-    console.log("💸 [handleCoin] 进入 send 分支");
     const amount = parseInt(parts[2] || "", 10);
-    console.log(`🔢 [handleCoin] 解析转账金额 amount =`, amount);
-
-    // 检查金额是否合法
     if (isNaN(amount) || amount <= 0) {
-      console.log("❌ [handleCoin] 转账金额无效，返回错误提示");
       return {
         method: "sendMessage",
         chat_id: chatId,
@@ -119,12 +81,8 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-
-    // 必须是在回复一条消息的上下文中
     const target = msg.reply_to_message?.from;
-    console.log("📨 [handleCoin] 回复上下文 target =", target?.id);
     if (!target) {
-      console.log("❌ [handleCoin] 未检测到回复用户，返回提示");
       return {
         method: "sendMessage",
         chat_id: chatId,
@@ -133,44 +91,50 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       };
     }
 
-    // 检查自己的余额是否足够
-    const bal = await getBalance();
-    if (bal < amount) {
-      console.log("❌ [handleCoin] 余额不足，当前余额 =", bal);
+    // 1. 检查并扣除发送者余额
+    const senderBal = await getBalance(userId);
+    if (senderBal < amount) {
       return {
         method: "sendMessage",
         chat_id: chatId,
-        text: `❌ ${userName}，你的余额不足，当前只有 ${bal} 💰。`,
+        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
         parse_mode: "HTML",
       };
     }
+    const newSenderBal = senderBal - amount;
+    await setBalance(userId, newSenderBal);
 
-    // 扣款
-    const newBal = bal - amount;
-    await setBalance(newBal);
-    console.log(`➖ [handleCoin] 扣除 ${amount} 后余额 = ${newBal}`);
-
-    // 给对方加款
+    // 2. 读取接收者原始余额 oldBal
     const targetId = target.id.toString();
-    const rawT = await env.COIN_KV.get(targetId);
-    const tBal = rawT ? parseInt(rawT, 10) : 0;
-    const targetNewBal = tBal + amount;
-    await env.COIN_KV.put(targetId, targetNewBal.toString());
-    console.log(`➕ [handleCoin] 给 targetId=${targetId} 增加 ${amount}，新余额 = ${targetNewBal}`);
+    const oldBal = await getBalance(targetId);
+
+    // 3. 确定阶梯费率（示例）
+    let rate: number;
+    if (oldBal < 1_000) rate = 0.01;        // 1%
+    else if (oldBal < 5_000) rate = 0.02;   // 2%
+    else if (oldBal < 10_000) rate = 0.03;  // 3%
+    else rate = 0.05;                       // 5%
+
+    // 4. 计算手续费（向下取整）
+    const fee = Math.floor(amount * rate);
+    // 5. 更新接收者余额：oldBal + amount - fee
+    const newTargetBal = oldBal + amount - fee;
+    await setBalance(targetId, newTargetBal);
 
     const targetName = target.first_name || "TA";
     return {
       method: "sendMessage",
       chat_id: chatId,
       text:
-        `💸 ${userName} 向 ${targetName} 支付了 ${amount} 💰。\n` +
-        `你的新余额：${newBal} 💰。`,
+        `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
+        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate*100).toFixed(0)}%，手续费 ${fee} 💰。\n` +
+        `✅ 转账后 ${targetName} 新余额：${newTargetBal} 💰；\n` +
+        `🪙 你的新余额：${newSenderBal} 💰。`,
       parse_mode: "HTML",
     };
   }
 
-  // —— 分支 4：未知子命令 —— 
-  console.warn(`❓ [handleCoin] 未知子命令 sub="${sub}"`);
+  // ——— 未知子命令 ———
   return {
     method: "sendMessage",
     chat_id: chatId,
