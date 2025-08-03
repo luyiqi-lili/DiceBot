@@ -46,6 +46,22 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   // ——— 每日祈福 ———
   if (sub === "pray") {
+    // —— 新增：仅允许在特定群组和主题中使用 pray —— 
+    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
+    const allowed =
+      (chatId === -1002848481881 && [66].includes(threadId)) ||
+      (chatId === -1002742074355 && [62, 215].includes(threadId));
+    if (!allowed) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text:
+          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+        parse_mode: "HTML",
+      };
+    }
+
+
     const prayKey = `coin_pray:${userId}`;
     const last = await env.COIN_KV.get(prayKey);
     const today = new Date().toISOString().split("T")[0];

@@ -89,7 +89,7 @@ export async function handleRose(msg: any, env: Env) {
       return {
         method: 'sendMessage',
         chat_id: chatId,
-        text: `❌ ${fromName} 今天已经免费送过花了，若要额外送花需支付 30 💰，但你的余额仅有 ${coinBal} 💰。`,
+        text: `❌ ${fromName} 今天已经送过花了，若要额外送花需支付 30 💰，但你的余额仅有 ${coinBal} 💰。`,
         parse_mode: 'HTML'
       };
     }
