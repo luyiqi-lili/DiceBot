@@ -15,7 +15,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   const userId = msg.from.id.toString();
   const userName = msg.from.first_name || "你";
   const parts = msg.text.trim().split(/\s+/);
-  const sub = parts[1]?.toLowerCase();
+  const sub = parts[2]?.toLowerCase();
 
   // Helper: 读取并解析用户余额
   async function getBalance(): Promise<number> {
