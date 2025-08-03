@@ -57,7 +57,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-    const gain = randomInt(10, 100);
+    const gain = randomInt(1, 10);
     const bal = await getBalance(userId);
     const newBal = bal + gain;
     await setBalance(userId, newBal);
