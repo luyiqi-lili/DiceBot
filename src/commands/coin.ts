@@ -115,7 +115,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     else if (oldBal < 50) rate = 0.5;  // 50%
     else if (oldBal < 70) rate = 0.7;  // 70%
     else if (oldBal < 90) rate = 0.9;  // 90%
-    else rate = 0.9;                       // 90%
+    else rate = 0.99;                       // 99%
 
     // 4. 计算手续费（向下取整）
     const fee = Math.floor(amount * rate);
