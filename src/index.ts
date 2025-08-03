@@ -11,6 +11,7 @@ import { handle21 } from "./commands/21";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
++import { handleCoin } from "./commands/coin";
 
 
 export default {
@@ -270,6 +271,11 @@ export default {
       payload.text = res.text;
       if (res.parse_mode) payload.parse_mode = res.parse_mode;
       if (res.reply_markup) payload.reply_markup = res.reply_markup;
+    } else if (/\/coin\b/.test(text)) {
+      // 新增 coin 命令
+      const res = await handleCoin(msg, env);
+      payload = { ...payload, ...res };
+
     } else if (/\/whoami\b/.test(text)) {
       console.log("🆔 检测到 /whoami 命令");
 
