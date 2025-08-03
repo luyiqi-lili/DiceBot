@@ -11,7 +11,7 @@ import { handle21 } from "./commands/21";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
-+import { handleCoin } from "./commands/coin";
+import { handleCoin } from "./commands/coin";
 
 
 export default {
