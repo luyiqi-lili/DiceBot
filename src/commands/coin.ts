@@ -110,10 +110,12 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
     // 3. 确定阶梯费率（示例）
     let rate: number;
-    if (oldBal < 1_000) rate = 0.01;        // 1%
-    else if (oldBal < 5_000) rate = 0.02;   // 2%
-    else if (oldBal < 10_000) rate = 0.03;  // 3%
-    else rate = 0.05;                       // 5%
+    if (oldBal < 10) rate = 0.1;        // 10%
+    else if (oldBal < 30) rate = 0.2;   // 30%
+    else if (oldBal < 50) rate = 0.5;  // 50%
+    else if (oldBal < 70) rate = 0.7;  // 70%
+    else if (oldBal < 90) rate = 0.9;  // 90%
+    else rate = 0.9;                       // 90%
 
     // 4. 计算手续费（向下取整）
     const fee = Math.floor(amount * rate);
