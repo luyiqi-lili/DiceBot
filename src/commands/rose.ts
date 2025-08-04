@@ -60,40 +60,55 @@ export async function handleRose(msg: any, env: Env) {
   let score = record.value;
 
   if (isSend) {
-    // 检查当天是否已送花（UTC 日期）
+    // 检查当天是否已送花（UTC 日期） 
     const sendKey = `rose_send:${fromId}`;
     const lastSendDate = await env.AFFECTION_KV.get(sendKey);
-    const todayUTC = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const todayUTC = new Date().toISOString().split('T')[0];
 
-    if (lastSendDate === todayUTC) {
-      // 已经送过
+    if (lastSendDate !== todayUTC) {
+      // 第一次免费送花：+160 好感
+      score += 160;
+      map[key] = { firstName: targetName, value: score };
+      // 持久化好感度和送花日期
+      await env.AFFECTION_KV.put(`affection:${fromId}`, JSON.stringify(map));
+      await env.AFFECTION_KV.put(sendKey, todayUTC, { expirationTtl: 86400 });
+
+      const emoji = scoreToEmoji(score);
       return {
         method: 'sendMessage',
         chat_id: chatId,
-        text: `${fromName} 今天已经送过花啦，明天再来哦！`,
+        text: `${fromName} 已经向 ${targetName} 送出了一朵 🌷，目前好感度为 ${emoji}`,
+        parse_mode: 'HTML'
       };
     }
 
-    // 送花，增加 160 点好感度
+    // 超过免费次数，尝试花费 30 coin 继续送花
+    const coinRaw = await env.COIN_KV.get(fromId.toString());
+    const coinBal = coinRaw ? parseInt(coinRaw, 10) : 0;
+    if (coinBal < 30) {
+      return {
+        method: 'sendMessage',
+        chat_id: chatId,
+        text: `❌ ${fromName} 今天已经送过花了，若要额外送花需支付 30 💰，但你的余额仅有 ${coinBal} 💰。`,
+        parse_mode: 'HTML'
+      };
+    }
+    // 扣除 30 coin 并送花 +160 好感
+    await env.COIN_KV.put(fromId.toString(), (coinBal - 30).toString());
     score += 160;
     map[key] = { firstName: targetName, value: score };
+    await env.AFFECTION_KV.put(`affection:${fromId}`, JSON.stringify(map));
 
-    // 持久化好感度地图
-    const kvAffKey = `affection:${fromId}`;
-    await env.AFFECTION_KV.put(kvAffKey, JSON.stringify(map));
-
-    // 更新送花日期，24 小时后过期
-    await env.AFFECTION_KV.put(sendKey, todayUTC, { expirationTtl: 86400 });
-
-    // 构造送花后的回复
     const emoji = scoreToEmoji(score);
     return {
       method: 'sendMessage',
       chat_id: chatId,
-      text: `${fromName} 已经向 ${targetName} 送出了一朵 🌷，目前好感度为 ${emoji}`,
+      text:
+        `${fromName} 支付 30 💰 向 ${targetName} 额外送出了一朵 🌷，` +
+        `目前好感度为 ${emoji}，你当前余额 ${coinBal - 30} 💰。`,
       parse_mode: 'HTML'
-    };
-  } else {
+    }; 
+   } else {
     // 仅查询当前好感度
     let text: string;
     if (score < 10) {

@@ -138,9 +138,9 @@ export async function handleTopicEdited(update: any, env: any): Promise<Response
         const num = Number(tid);
         const meta = roomMeta[num];
         if (meta?.link) {
-            content += `<a href="${meta.link}">${meta.name}: ${title}</a>\n`;
+            content += `<a href="${meta.link}">${meta.name}正处于性欲高涨阶段，现在立刻马上想要涩涩</a>\n`;
         } else {
-            content += `${tid}: ${title}\n`;
+            content += `${tid}正处于性欲高涨阶段，现在立刻马上想要涩涩\n`;
         }
     }
     content += `<blockquote expandable>`;

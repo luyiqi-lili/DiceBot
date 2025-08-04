@@ -66,6 +66,13 @@ export async function handleNews(msg: any, env: Env) {
   console.log("[News] 使用日期 key =", dateKey);
   const segmenter = new Intl.Segmenter('zh', { granularity: 'grapheme' });
   if (isExplicitReply) {
+    const reply_markup = {
+      inline_keyboard: [
+
+        [{ text: "清理爆料痕迹~", callback_data: "delete_message" }]
+      ]
+    };
+
     const content = escapeHtml(reply.text!.trim());
 
     // 读取当前列表并统计当天该用户已爆料数量
@@ -98,6 +105,7 @@ export async function handleNews(msg: any, env: Env) {
       return {
         text: `⚠️ ${invoker} 已经对这条消息爆料过了！`,
         parse_mode: "HTML",
+        reply_markup
       };
     }
 
@@ -130,6 +138,7 @@ export async function handleNews(msg: any, env: Env) {
       text: `✅ ${invoker} 给骰娘爆料：<b>${targetUser}</b> 说了「${linkedSnippet}」` +
         `（你今日已爆料 ${Math.min(todayEntries.length + 1, maxPerDay)}/${maxPerDay} 条）`,
       parse_mode: "HTML",
+      reply_markup
     };
   } else {
     console.log("[News] 查询模式，读取 KV at", kvKey);
@@ -159,9 +168,16 @@ export async function handleNews(msg: any, env: Env) {
       `</tg-spoiler></blockquote>`;
     console.log("[News] 返回内容 =", result);
 
+    const reply_markup = {
+      inline_keyboard: [
+
+        [{ text: "烧了它！", callback_data: "delete_message" }]
+      ]
+    };
     return {
       text: result,
       parse_mode: "HTML",
+      reply_markup
     };
   }
 }

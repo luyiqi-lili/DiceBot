@@ -1,0 +1,166 @@
+interface CoinResponse {
+  method: string;
+  chat_id: number;
+  text: string;
+  parse_mode?: string;
+}
+
+// 随机整数，包含 min 和 max
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinResponse>> {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id.toString();
+  const userName = msg.from.first_name || "你";
+
+  // 去除 @BotUsername 提及（如有）
+  let text = msg.text.trim();
+  const botMention = `@${env.BOT_USERNAME}`;
+  if (text.startsWith(botMention)) text = text.slice(botMention.length).trim();
+  const parts = text.split(/\s+/);
+  if (parts[0] !== "/coin") return {};
+
+  const sub = parts[1]?.toLowerCase();
+
+  // 余额读写
+  async function getBalance(id: string): Promise<number> {
+    const raw = await env.COIN_KV.get(id);
+    return raw ? parseInt(raw, 10) : 0;
+  }
+  async function setBalance(id: string, bal: number) {
+    await env.COIN_KV.put(id, bal.toString());
+  }
+
+  // ——— 查询余额 ———
+  if (!sub) {
+    const bal = await getBalance(userId);
+    return {
+      method: "sendMessage",
+      chat_id: chatId,
+      text: `${userName}，你目前有 ${bal} 💰。`,
+      parse_mode: "HTML",
+    };
+  }
+
+  // ——— 每日祈福 ———
+  if (sub === "pray") {
+    // —— 新增：仅允许在特定群组和主题中使用 pray —— 
+    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
+    const allowed =
+      (chatId === -1002848481881 && [66].includes(threadId)) ||
+      (chatId === -1002742074355 && [215].includes(threadId));
+    if (!allowed) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text:
+          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+        parse_mode: "HTML",
+      };
+    }
+
+
+    const prayKey = `coin_pray:${userId}`;
+    const last = await env.COIN_KV.get(prayKey);
+    const today = new Date().toISOString().split("T")[0];
+    if (last === today) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `🙏 ${userName}，你今天已经祈福过了，明天再来吧！`,
+        parse_mode: "HTML",
+      };
+    }
+    const gain = randomInt(1, 10);
+    const bal = await getBalance(userId);
+    const newBal = bal + gain;
+    await setBalance(userId, newBal);
+    await env.COIN_KV.put(prayKey, today);
+    return {
+      method: "sendMessage",
+      chat_id: chatId,
+      text: `✨ ${userName}，你祈福获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      parse_mode: "HTML",
+    };
+  }
+
+  // ——— 转账，并由接收者支付阶梯手续费 ———
+  if (sub === "send") {
+    const amount = parseInt(parts[2] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，请指定正确的转账数量，例如：<code>/coin send 50</code>。`,
+        parse_mode: "HTML",
+      };
+    }
+    const target = msg.reply_to_message?.from;
+    if (!target) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
+        parse_mode: "HTML",
+      };
+    }
+
+    // 1. 检查并扣除发送者余额
+    const senderBal = await getBalance(userId);
+    if (senderBal < amount) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
+        parse_mode: "HTML",
+      };
+    }
+    const newSenderBal = senderBal - amount;
+    await setBalance(userId, newSenderBal);
+
+    // 2. 读取接收者原始余额 oldBal
+    const targetId = target.id.toString();
+    const oldBal = await getBalance(targetId);
+
+    // 3. 确定阶梯费率（示例）
+    let rate: number;
+    if (oldBal < 10) rate = 0.1;        // 10%
+    else if (oldBal < 30) rate = 0.2;   // 30%
+    else if (oldBal < 50) rate = 0.5;  // 50%
+    else if (oldBal < 70) rate = 0.7;  // 70%
+    else if (oldBal < 90) rate = 0.9;  // 90%
+    else rate = 0.99;                       // 99%
+
+    // 4. 计算手续费（向下取整）
+    const fee = Math.floor(amount * rate);
+    // 5. 更新接收者余额：oldBal + amount - fee
+    const newTargetBal = oldBal + amount - fee;
+    await setBalance(targetId, newTargetBal);
+
+    const targetName = target.first_name || "TA";
+    return {
+      method: "sendMessage",
+      chat_id: chatId,
+      text:
+        `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
+        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate*100).toFixed(0)}%，手续费 ${fee} 💰。\n` +
+        `✅ 转账后 ${targetName} 新余额：${newTargetBal} 💰；\n` +
+        `🪙 你的新余额：${newSenderBal} 💰。`,
+      parse_mode: "HTML",
+    };
+  }
+
+  // ——— 未知子命令 ———
+  return {
+    method: "sendMessage",
+    chat_id: chatId,
+    text:
+      `❓ 不支持的子命令，请用：\n` +
+      `<code>/coin</code> 查询余额\n` +
+      `<code>/coin pray</code> 今日祈福\n` +
+      `<code>/coin send 50</code> 回复消息支付 50 💰`,
+    parse_mode: "HTML",
+  };
+}
