@@ -167,7 +167,7 @@ export async function handleNews(msg: any, env: Env) {
     };
     return {
       text: result,
-      parse_mode: "HTML",,
+      parse_mode: "HTML",
       reply_markup
     };
   }
