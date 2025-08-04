@@ -12,6 +12,7 @@ import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
+import { handleDeleteMessage } from "./commands/deleteMessage";
 
 
 export default {
@@ -68,6 +69,9 @@ export default {
         cq.data.startsWith("21_next")
       ) {
         payload = handle21(cq, env);
+      }
+      else if (cq.data === "delete_message") {
+        payload = await handleDeleteMessage(cq, env);
       }
 
       else {

@@ -159,9 +159,16 @@ export async function handleNews(msg: any, env: Env) {
       `</tg-spoiler></blockquote>`;
     console.log("[News] 返回内容 =", result);
 
+    const reply_markup = {
+      inline_keyboard: [
+
+        [{ text: "删除消息", callback_data: "delete_message" }]
+      ]
+    };
     return {
       text: result,
-      parse_mode: "HTML",
+      parse_mode: "HTML",,
+      reply_markup
     };
   }
 }
