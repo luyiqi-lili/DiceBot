@@ -50,8 +50,7 @@ export function handleHelp(botUsername: string) {
         { text: "/book", switch_inline_query_current_chat: `/book` },
         { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` },
         { text: "/21", switch_inline_query_current_chat: `/21` }
-      ],
-      [{ text: "我知道了(删除当前消息）", callback_data: "delete_message" }]
+      ]
 
     ]
   };
