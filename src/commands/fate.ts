@@ -86,8 +86,9 @@ export async function handleFate(
   console.log('🕰️ 牌位映射:', positions.join(', '));
 
   // 构造 media 数组
-  const media = indices.map((i, j) => {
-    const card = MAJOR_ARCANA[i];
+  const order = [1, 0, 2];
+  const media = order.map((posIdx, j) =>  {
+    const card = MAJOR_ARCANA[indices[posIdx]];
     console.log(`📸 准备发送图片: ${card.file}`);
     const entry: {
       type: 'photo';
