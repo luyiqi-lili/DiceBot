@@ -13,6 +13,7 @@ import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
 import { handleDeleteMessage } from "./commands/deleteMessage";
+import { handleFate } from "./commands/fate";
 
 
 export default {
@@ -231,6 +232,9 @@ export default {
       });
 
       return new Response("OK", { status: 200 });
+    } else if (/\/fate\b/.test(text)) {
+      console.log("🔮 检测到 /fate 命令，抽取塔罗牌");
+      payload = await handleFate(msg, env);
     } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
