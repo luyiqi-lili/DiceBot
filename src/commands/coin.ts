@@ -88,12 +88,14 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   // ——— 转账，并由接收者支付阶梯手续费 ———
   if (sub === "send") {
-          return {
+    if (1 == 1) {
+      return {
         method: "sendMessage",
         chat_id: chatId,
         text: `❌ ${userName}，转账功能升级中，敬请期待~</code>。`,
         parse_mode: "HTML",
       };
+    }
 
     const amount = parseInt(parts[2] || "", 10);
     if (isNaN(amount) || amount <= 0) {
@@ -152,7 +154,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       chat_id: chatId,
       text:
         `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
-        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate*100).toFixed(0)}%，手续费 ${fee} 💰。\n` +
+        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate * 100).toFixed(0)}%，手续费 ${fee} 💰。\n` +
         `✅ 转账后 ${targetName} 新余额：${newTargetBal} 💰；\n` +
         `🪙 你的新余额：${newSenderBal} 💰。`,
       parse_mode: "HTML",
