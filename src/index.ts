@@ -233,8 +233,23 @@ export default {
 
       return new Response("OK", { status: 200 });
     } else if (/\/fate\b/.test(text)) {
-      console.log("🔮 检测到 /fate 命令，抽取塔罗牌");
-      payload = await handleFate(msg, env);
+      console.log("🔮 检测到 /fate 命令，开始发送媒体组");
+      try {
+        const mediaPayload = await handleFate(msg, env);
+        const res = await fetch(
+          `https://api.telegram.org/bot${env.TOKEN}/sendMediaGroup`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(mediaPayload)
+          }
+        );
+        const data = await res.json();
+        console.log("✅ sendMediaGroup API 返回", data);
+      } catch (err) {
+        console.error("❌ /fate 发送媒体组失败", err);
+      }
+      return new Response("OK", { status: 200 });
     } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
