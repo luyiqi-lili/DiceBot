@@ -92,7 +92,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       return {
         method: "sendMessage",
         chat_id: chatId,
-        text: `❌ ${userName}，转账功能升级中，敬请期待~</code>。`,
+        text: `❌ ${userName}，转账功能升级中，敬请期待。`,
         parse_mode: "HTML",
       };
     }
