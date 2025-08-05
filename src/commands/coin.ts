@@ -88,6 +88,13 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   // ——— 转账，并由接收者支付阶梯手续费 ———
   if (sub === "send") {
+          return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，转账功能升级中，敬请期待~</code>。`,
+        parse_mode: "HTML",
+      };
+
     const amount = parseInt(parts[2] || "", 10);
     if (isNaN(amount) || amount <= 0) {
       return {
