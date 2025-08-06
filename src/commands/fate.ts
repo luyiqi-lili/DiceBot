@@ -77,7 +77,7 @@ export async function handleFate(msg, env) {
     if (isInterpret) {
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
         // 系统层指令：定义解析角色和风格
-        const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接纯文本的输出解析。';
+        const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接纯文本的输出解析，不要使用Markdown格式。';
         // 用户层指令：包含三张牌及对应位置
         const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${cap}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，给出一个包括[牌面的解释、占卜结果、建议、谶语、未来趋势及注意事项]的解析。`;
         console.log('📨 [handleFate] 调用 API 的 prompt:', userPrompt);
@@ -125,7 +125,7 @@ export async function handleFate(msg, env) {
             method: 'sendMessage',
             chat_id: msg.chat.id,
             text: replyText,
-            parse_mode: 'Markdown'
+            parse_mode: 'HTML'
         };
     }
 
