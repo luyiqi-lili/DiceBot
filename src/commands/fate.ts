@@ -1,5 +1,6 @@
 /* commands/fate.js */
 // 提取 22 张大阿卡那塔罗牌
+// 每张牌对象包含 name（牌名）和 file（图片 URL）
 const MAJOR_ARCANA = [
     { name: '愚者', file: 'https://luyiqi-lili.github.io/pic/0.jpg' },
     { name: '魔术师', file: 'https://luyiqi-lili.github.io/pic/1.jpg' },
@@ -23,7 +24,7 @@ const MAJOR_ARCANA = [
     { name: '太阳', file: 'https://luyiqi-lili.github.io/pic/19.jpg' },
     { name: '审判', file: 'https://luyiqi-lili.github.io/pic/20.jpg' },
     { name: '世界', file: 'https://luyiqi-lili.github.io/pic/21.jpg' },
-    { name: '逆愚者', file: 'https://luyiqi-lili.github.io/0d.jpg' },
+    { name: '逆愚者', file: 'https://luyiqi-lili.github.io/pic/0d.jpg' },
     { name: '逆魔术师', file: 'https://luyiqi-lili.github.io/pic/1d.jpg' },
     { name: '逆女祭司', file: 'https://luyiqi-lili.github.io/pic/2d.jpg' },
     { name: '逆皇后', file: 'https://luyiqi-lili.github.io/pic/3d.jpg' },
@@ -45,104 +46,106 @@ const MAJOR_ARCANA = [
     { name: '逆太阳', file: 'https://luyiqi-lili.github.io/pic/19d.jpg' },
     { name: '逆审判', file: 'https://luyiqi-lili.github.io/pic/20d.jpg' },
     { name: '逆世界', file: 'https://luyiqi-lili.github.io/pic/21d.jpg' }
-
-
 ];
 
 /**
- * 处理 /fate 命令：随机抽取 3 张大阿卡那
- * @param msg - Telegram 消息对象
- * @param env - Cloudflare Worker 环境
- * @returns 发送媒体组所需的 payload
+ * 处理 /fate 命令：随机抽取 3 张大阿卡那，或解析已抽取的牌
+ * @param {TelegramMessage} msg - Telegram 消息对象
+ * @param {Env} env - Cloudflare Worker 环境变量
+ * @returns 发送媒体组或文本消息所需的 payload
  */
-export async function handleFate(
-    msg: TelegramMessage,
-    env: Env
-): Promise<{
-    method: 'sendMediaGroup';
-    chat_id: number;
-    message_thread_id?: number;
-    media: Array<{
-        type: 'photo';
-        media: string;
-        caption?: string;
-        parse_mode?: 'HTML';
-    }>;
-}> {
-    console.log('🔮 /fate 命令开始处理，用户：', msg.from.username || msg.from.first_name);
-
+export async function handleFate(msg, env) {
+    console.log('🔮 [handleFate] 收到消息:', msg.text);
 
     const text = msg.text || '';
-    // 如果是回复消息且命令为 /fate，并且回复的 caption 同时包含“昨天”“今天”“明天”，则执行塔罗牌含义解析
     const replied = msg.reply_to_message;
     const cap = replied?.caption || '';
+    console.log(`🔍 [handleFate] text = ${text}`);
+    console.log(`🔍 [handleFate] replied = ${replied}`);
+    console.log(`🔍 [handleFate] cap = ${cap}`);
+    // 判断是否需要执行塔罗牌含义解析
     const isInterpret = /^\/fate(@\w+)?/i.test(text) && replied && cap.includes('昨天') && cap.includes('今天') && cap.includes('明天');
+    console.log(`🔍 [handleFate] isInterpret = ${isInterpret}`);
+
     if (isInterpret) {
-        // 提取并解析 caption
+        console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
+        // 系统层指令：定义解析角色和风格
         const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接输出解析。';
+        // 用户层指令：包含三张牌及对应位置
         const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${cap}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，每条不少于50字。`;
-        const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] }, generationConfig: { thinkingConfig: { thinkingBudget: -1 } } };
+        console.log('📨 [handleFate] 调用 API 的 prompt:', userPrompt);
+
+        // 构造 API 请求体
+        const payload = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
+        };
+        console.log('📤 [handleFate] 发送到 Gemini API 的 payload:', JSON.stringify(payload));
+
+        // 调用 Gemini Text API 生成解析内容
         const res = await fetch(
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-            { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GOOGLE_API_KEY }, body: JSON.stringify(payload) }
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': env.GOOGLE_API_KEY
+                },
+                body: JSON.stringify(payload)
+            }
         );
         const { candidates } = await res.json();
         const textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
-        return { method: 'sendMessage', chat_id: msg.chat.id, text: textOut, parse_mode: 'HTML' };
+        console.log('✅ [handleFate] 解析完成，内容:', textOut);
+
+        // 返回文本消息
+        return {
+            method: 'sendMessage',
+            chat_id: msg.chat.id,
+            text: textOut,
+            parse_mode: 'HTML'
+        };
     }
 
-    // 默认 /fate 抽牌流程
-
-
-    // 随机不重复选择 3 张牌
+    // --- 随机抽取 3 张大阿卡那牌流程 ---
+    console.log('🎴 [handleFate] 执行抽牌流程');
     const pickCount = 3;
-    const indices: number[] = [];
+    const indices = [];
     while (indices.length < pickCount) {
         const idx = Math.floor(Math.random() * MAJOR_ARCANA.length);
         if (!indices.includes(idx)) {
             indices.push(idx);
-            console.log(`🎴 选中牌索引: ${idx} (${MAJOR_ARCANA[idx].name})`);
+            console.log(`🎲 [handleFate] 选中牌索引: ${idx} (${MAJOR_ARCANA[idx].name})`);
         }
     }
 
     const positions = ['昨天', '今天', '明天'];
-    console.log('🕰️ 牌位映射:', positions.join(', '));
+    console.log('🕰️ [handleFate] 牌位映射顺序:', positions);
 
-    // 构造 media 数组
+    // 为了布局美观，图片顺序调整为：今天、昨天、明天
     const order = [1, 0, 2];
     const media = order.map((posIdx, j) => {
         const card = MAJOR_ARCANA[indices[posIdx]];
-        console.log(`📸 准备发送图片: ${card.file}`);
-        const entry: {
-            type: 'photo';
-            media: string;
-            caption?: string;
-            parse_mode?: 'HTML';
-        } = {
-            type: 'photo',
-            media: `${card.file}`
-        };
-
+        console.log(`📸 [handleFate] 准备发送图片: ${card.file}`);
+        const entry = { type: 'photo', media: card.file };
         if (j === 0) {
-            // 仅第一张附带 caption
-            const captionText = positions
-                .map((pos, k) => `${pos}：${MAJOR_ARCANA[indices[k]].name}`)
-                .join('\n');
+            // 第一张图附带 caption，展示三张牌的原始位置
+            const captionText = positions.map((pos, k) => `${pos}：${MAJOR_ARCANA[indices[k]].name}`).join('\n');
             entry.caption = captionText;
             entry.parse_mode = 'HTML';
-            console.log('📝 Caption 文本:', captionText.replace(/\n/g, ' | '));
+            console.log('📝 [handleFate] 设置 caption:', captionText);
         }
         return entry;
     });
 
-    // 构造并返回 payload
+    // 返回 MediaGroup 格式
     const payload = {
-        method: 'sendMediaGroup' as const,
+        method: 'sendMediaGroup',
         chat_id: msg.chat.id,
         message_thread_id: msg.message_thread_id,
         media
     };
-    console.log('📤 sendMediaGroup payload:', JSON.stringify(payload, null, 2));
-
+    console.log('📤 [handleFate] sendMediaGroup payload:', JSON.stringify(payload, null, 2));
     return payload;
 }
