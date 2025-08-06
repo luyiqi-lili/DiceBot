@@ -242,6 +242,13 @@ export default {
         // 2. 删除 method 字段，剩下的就是请求 body
         delete payload.method;
         console.log(`➡️ 调用 Telegram API 方法：${method}`, payload);
+
+        if (threadId) {
+          payload.message_thread_id = threadId;
+          console.log("📌 [fate] 附加 message_thread_id:", threadId);
+        }
+
+
         // 3. 根据 method 动态请求
         const apiRes = await fetch(
           `https://api.telegram.org/bot${env.TOKEN}/${method}`,
