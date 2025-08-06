@@ -77,9 +77,9 @@ export async function handleFate(msg, env) {
     if (isInterpret) {
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
         // 系统层指令：定义解析角色和风格
-        const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接输出解析。';
+        const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接纯文本的输出解析。';
         // 用户层指令：包含三张牌及对应位置
-        const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${cap}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，每条不少于50字。`;
+        const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${cap}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，给出一个包括[牌面的解释、占卜结果、建议、谶语、未来趋势及注意事项]的解析。`;
         console.log('📨 [handleFate] 调用 API 的 prompt:', userPrompt);
 
         // 构造 API 请求体
@@ -107,10 +107,23 @@ export async function handleFate(msg, env) {
         console.log('✅ [handleFate] 解析完成，内容:', textOut);
 
         // 返回文本消息
+        const firstName = msg.from.first_name || '';
+        // 把 caption 的换行改成顿号或逗号，便于内嵌在一句话里
+        const cardList = cap
+          .split('\n')
+          .map(line => line.split('：')[1])   // 提取每行的牌名部分
+          .filter(Boolean)
+          .join('、');
+
+        const replyText =
+          `${firstName} 你好，关于刚刚抽取的 ${cardList} 这三张牌的解读如下：\n\n` +
+          textOut;
+
+        // 返回文本消息
         return {
             method: 'sendMessage',
             chat_id: msg.chat.id,
-            text: textOut,
+            text: replyText,
             parse_mode: 'HTML'
         };
     }
