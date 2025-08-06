@@ -116,15 +116,16 @@ export async function handleFate(msg, env) {
           .join('、');
 
         const replyText =
-          `${firstName} 你好，关于刚刚抽取的 ${cardList} 这三张牌的解读如下：\n\n` +
-          textOut;
+          `${firstName} 你好，关于刚刚抽取的 ${cardList} 这三张牌的解读如下： <blockquote expandable>` +
+          textOut+
+          `</blockquote>`;
 
         // 返回文本消息
         return {
             method: 'sendMessage',
             chat_id: msg.chat.id,
             text: replyText,
-            parse_mode: 'HTML'
+            parse_mode: 'Markdown'
         };
     }
 
