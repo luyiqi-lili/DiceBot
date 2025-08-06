@@ -104,8 +104,8 @@ export async function handleFate(msg, env) {
                 body: JSON.stringify(payload)
             }
         );
+        console.log('📨 [handleFate] 调用 API 的 响应:', res);
         const { candidates } = await res.json();
-        console.log('📨 [handleFate] 调用 API 的 响应:', candidates);
 
         let textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
         console.log('✅ [handleFate] 解析完成，内容:', textOut);
