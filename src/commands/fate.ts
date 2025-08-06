@@ -64,8 +64,15 @@ export async function handleFate(msg, env) {
     console.log(`🔍 [handleFate] replied = ${replied}`);
     console.log(`🔍 [handleFate] cap = ${cap}`);
     // 判断是否需要执行塔罗牌含义解析
-    const isInterpret = /^\/fate(@\w+)?/i.test(text) && replied && cap.includes('昨天') && cap.includes('今天') && cap.includes('明天');
-    console.log(`🔍 [handleFate] isInterpret = ${isInterpret}`);
+    const isInterpret = (
+        // 以 /fate 开头，或以 @BotUsername /fate 开头
+        /^(?:\/fate(?:@\w+)?|@\w+\s*\/fate(?:@\w+)?)/i.test(text)
+        && replied
+        && cap.includes('昨天')
+        && cap.includes('今天')
+        && cap.includes('明天')
+    );
+    console.log('🔍 [handleFate] isInterpret =', isInterpret);
 
     if (isInterpret) {
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
