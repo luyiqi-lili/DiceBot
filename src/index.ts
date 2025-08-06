@@ -234,22 +234,31 @@ export default {
       return new Response("OK", { status: 200 });
     } else if (/\/fate\b/.test(text)) {
       console.log("🔮 检测到 /fate 命令，开始发送媒体组");
+      console.log("🔮 检测到 /fate 命令，开始处理 handleFate 返回的 payload");
       try {
-        const mediaPayload = await handleFate(msg, env);
-        const res = await fetch(
-          `https://api.telegram.org/bot${env.TOKEN}/sendMediaGroup`,
+        // 1. 调用 handleFate，拿到完整 payload，包括 method 字段
+        const payload = await handleFate(msg, env);
+        const method = payload.method || 'sendMessage';
+        // 2. 删除 method 字段，剩下的就是请求 body
+        delete payload.method;
+        console.log(`➡️ 调用 Telegram API 方法：${method}`, payload);
+        // 3. 根据 method 动态请求
+        const apiRes = await fetch(
+          `https://api.telegram.org/bot${env.TOKEN}/${method}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(mediaPayload)
+            body: JSON.stringify(payload)
           }
         );
-        const data = await res.json();
-        console.log("✅ sendMediaGroup API 返回", data);
+        const data = await apiRes.json();
+        console.log(`✅ ${method} API 返回`, data);
       } catch (err) {
-        console.error("❌ /fate 发送媒体组失败", err);
+        console.error("❌ /fate 处理失败", err);
       }
       return new Response("OK", { status: 200 });
+
+
     } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
