@@ -94,7 +94,7 @@ export async function handleFate(msg, env) {
 
         // 调用 Gemini Text API 生成解析内容
         const res = await fetch(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
             {
                 method: 'POST',
                 headers: {
