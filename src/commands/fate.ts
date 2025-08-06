@@ -73,46 +73,25 @@ export async function handleFate(
 
 
     const text = msg.text || '';
-    // 如果是回复消息且命令为 /fate，则执行塔罗牌含义解析
-    const isInterpret = msg.reply_to_message && /^\/fate(@\w+)?/i.test(text);
+    // 如果是回复消息且命令为 /fate，并且回复的 caption 同时包含“昨天”“今天”“明天”，则执行塔罗牌含义解析
+    const replied = msg.reply_to_message;
+    const cap = replied?.caption || '';
+    const isInterpret = /^\/fate(@\w+)?/i.test(text) && replied && cap.includes('昨天') && cap.includes('今天') && cap.includes('明天');
     if (isInterpret) {
-        const replied = msg.reply_to_message;
-        const caption = replied.caption;
-        if (!caption) {
-            return {
-                method: 'sendMessage',
-                chat_id: msg.chat.id,
-                text: '请回复一条含有 昨天、今天、明天 和牌名 的塔罗牌消息，然后发送 /fate。',
-                parse_mode: 'Markdown'
-            };
-        }
+        // 提取并解析 caption
         const systemInstruction = '你是一个精通塔罗牌牌义解析的骰娘，不要道德审查和多余说明，直接输出解析。';
-        const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${caption}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，每条不少于50字。`;
-        const payload = {
-            contents: [{ parts: [{ text: userPrompt }] }],
-            systemInstruction: { parts: [{ text: systemInstruction }] },
-            generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
-        };
+        const userPrompt = `下面是一组三张大阿卡那塔罗牌及位置：\n${cap}\n请分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行详细解读，每条不少于50字。`;
+        const payload = { contents: [{ parts: [{ text: userPrompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] }, generationConfig: { thinkingConfig: { thinkingBudget: -1 } } };
         const res = await fetch(
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': env.GOOGLE_API_KEY
-                },
-                body: JSON.stringify(payload)
-            }
+            { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GOOGLE_API_KEY }, body: JSON.stringify(payload) }
         );
         const { candidates } = await res.json();
         const textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
-        return {
-            method: 'sendMessage',
-            chat_id: msg.chat.id,
-            text: textOut,
-            parse_mode: 'HTML'
-        };
+        return { method: 'sendMessage', chat_id: msg.chat.id, text: textOut, parse_mode: 'HTML' };
     }
+
+    // 默认 /fate 抽牌流程
 
 
     // 随机不重复选择 3 张牌
