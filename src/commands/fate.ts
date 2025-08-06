@@ -105,8 +105,9 @@ export async function handleFate(msg, env) {
             }
         );
         const { candidates } = await res.json();
-        const textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
+        let textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
         console.log('✅ [handleFate] 解析完成，内容:', textOut);
+        textOut = textOut.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
         // 返回文本消息
         // 把 caption 的换行改成顿号或逗号，便于内嵌在一句话里
