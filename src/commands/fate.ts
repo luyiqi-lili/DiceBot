@@ -104,7 +104,9 @@ export async function handleFate(msg, env) {
                 body: JSON.stringify(payload)
             }
         );
-        console.log('📨 [handleFate] 调用 API 的 响应:', res);
+
+        console.log('Gemini HTTP status:', res.status, res.statusText);
+
         const { candidates } = await res.json();
 
         let textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
