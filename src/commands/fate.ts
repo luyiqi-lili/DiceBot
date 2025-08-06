@@ -1,9 +1,9 @@
 /* commands/fate.js */
 // 提取 22 张大阿卡那塔罗牌
 const MAJOR_ARCANA = [
-    { name: '愚者', file: 'AgACAgQAAyEGAASpyGJZAAITqGiS46yuUoOt9_-8ga33lgeh_qYuAALsuDEbwuScUNCcH_fRkQMaAQADAgADcwADNgQ'},
-    { name: '魔术师', file: 'AgACAgQAAyEGAASpyGJZAAITp2iS42p5G7mjR5ise7lC5jwkmziIAAK1uDEb9EOcUDtnD1lPJ4znAQADAgADeQADNgQ' },
-    { name: '女祭司', file: 'AgACAgQAAyEGAASpyGJZAAITqGiS46yuUoOt9_-8ga33lgeh_qYuAALsuDEbwuScUNCcH_fRkQMaAQADAgADdwADNgQ' },
+    { name: '愚者', file: 'https://i1.hdslb.com/bfs/article/1d6f4752a08b137e3b7d9cac63022a61393662166.jpg'},
+    { name: '魔术师', file: 'https://i1.hdslb.com/bfs/article/c61b0b22820f4e6995c5d402cdab0f88393662166.jpg' },
+    { name: '女祭司', file: 'https://i1.hdslb.com/bfs/article/ed77e31b60e66e6918a82615eb5fd4af393662166.jpg' },
     /*  { name: '皇后', file: '3' },
       { name: '皇帝', file: '4' },
       { name: '教皇', file: '5' },
