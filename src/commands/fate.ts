@@ -75,24 +75,42 @@ export async function handleFate(msg, env) {
     console.log('🔍 [handleFate] isInterpret =', isInterpret);
 
     if (isInterpret) {
-        const firstName = msg.from.first_name || '';
+        const fromId = msg.from.id;
+        const fromName = msg.from.first_name || '';
+
+        // 查询并提示余额，准备扣费
+        const coinRaw = await env.COIN_KV.get(fromId.toString());
+        const coinBal = coinRaw ? parseInt(coinRaw, 10) : 0;
+        console.log(`💳 [handleFate] ${fromName} 当前余额 ${coinBal} 💰`);
+        if (coinBal < 5) {
+            return {
+                method: 'sendMessage',
+                chat_id: msg.chat.id,
+                text: `❌ ${fromName} 的余额不足，解析一次需要 5 💰，当前余额 ${coinBal} 💰。`,
+                parse_mode: 'HTML'
+            };
+        }
+        // 提示开始解析
+        await env.COIN_KV.put(fromId.toString(), (coinBal).toString()); // 暂不扣除，留待解析成功后
+        const notice = `🔰 ${fromName} 使用 5 💰 开始解析，当前余额 ${coinBal} 💰，请稍候...`;
+
+        // 发送解析开始提示
+        await env.TELEGRAM_API.sendMessage({
+            chat_id: msg.chat.id,
+            text: notice,
+            parse_mode: 'HTML'
+        });
 
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
-        // 系统层指令：定义解析角色和风格
         const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的对用户称呼。';
-        // 用户层指令：包含三张牌及对应位置
-        const userPrompt = `下面是一组 ${firstName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
-        console.log('📨 [handleFate] 调用 API 的 prompt:', userPrompt);
+        const userPrompt = `下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
 
-        // 构造 API 请求体
         const payload = {
             contents: [{ parts: [{ text: userPrompt }] }],
             systemInstruction: { parts: [{ text: systemInstruction }] },
             generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
         };
-        console.log('📤 [handleFate] 发送到 Gemini API 的 payload:', JSON.stringify(payload));
 
-        // 调用 Gemini Text API 生成解析内容
         const apiKeys = env.GOOGLE_API_KEYS;
         const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
         const res = await fetch(
@@ -106,28 +124,27 @@ export async function handleFate(msg, env) {
                 body: JSON.stringify(payload)
             }
         );
-
-        console.log('Gemini HTTP status:', res.status, res.statusText);
-
         const { candidates } = await res.json();
+        const textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-        let textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
-        console.log('✅ [handleFate] 解析完成，内容:', textOut);
+        // 仅在解析成功时扣除 5 💰
+        if (textOut) {
+            await env.COIN_KV.put(fromId.toString(), (coinBal - 5).toString());
+            console.log(`💰 [handleFate] 从 ${fromName} 扣除 5 💰，新余额 ${coinBal - 5}`);
+        }
 
-        // 返回文本消息
-        // 把 caption 的换行改成顿号或逗号，便于内嵌在一句话里
+        // 构建回复文本
         const cardList = cap
             .split('\n')
-            .map(line => line.split('：')[1])   // 提取每行的牌名部分
+            .map(line => line.split('：')[1])
             .filter(Boolean)
             .join('、');
-
+        const resultText = textOut || '解析失败，请稍后重试。';
         const replyText =
-            `${firstName} 你好，关于刚刚抽取的 ${cardList} 这三张牌的解读如下： <blockquote expandable>` +
-            textOut +
+            `${fromName} 消耗了 5 💰（新余额 ${coinBal - 5}），请骰娘为三张牌 ${cardList} 进行解析，解析如下： <blockquote expandable>` +
+            resultText +
             `</blockquote>`;
 
-        // 返回文本消息
         return {
             method: 'sendMessage',
             chat_id: msg.chat.id,
