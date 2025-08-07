@@ -93,13 +93,15 @@ export async function handleFate(msg, env) {
         console.log('📤 [handleFate] 发送到 Gemini API 的 payload:', JSON.stringify(payload));
 
         // 调用 Gemini Text API 生成解析内容
+        const apiKeys = env.GOOGLE_API_KEYS;
+        const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
         const res = await fetch(
             'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-goog-api-key': env.GOOGLE_API_KEY
+                    'x-goog-api-key': randomKey
                 },
                 body: JSON.stringify(payload)
             }
@@ -111,7 +113,7 @@ export async function handleFate(msg, env) {
 
         let textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '解析失败，请稍后重试。';
         console.log('✅ [handleFate] 解析完成，内容:', textOut);
-        
+
         // 返回文本消息
         // 把 caption 的换行改成顿号或逗号，便于内嵌在一句话里
         const cardList = cap
