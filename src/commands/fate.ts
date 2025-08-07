@@ -91,15 +91,15 @@ export async function handleFate(msg, env) {
             };
         }
         // 提示开始解析
-        await env.COIN_KV.put(fromId.toString(), (coinBal).toString()); // 暂不扣除，留待解析成功后
-        const notice = `🔰 ${fromName} 使用 5 💰 开始解析，当前余额 ${coinBal} 💰，请稍候...`;
+  //      await env.COIN_KV.put(fromId.toString(), (coinBal).toString()); // 暂不扣除，留待解析成功后
+  //      const notice = `🔰 ${fromName} 使用 5 💰 开始解析，当前余额 ${coinBal} 💰，请稍候...`;
 
         // 发送解析开始提示
-        await env.TELEGRAM_API.sendMessage({
-            chat_id: msg.chat.id,
-            text: notice,
-            parse_mode: 'HTML'
-        });
+ //       await env.TELEGRAM_API.sendMessage({
+  //          chat_id: msg.chat.id,
+  //          text: notice,
+  //          parse_mode: 'HTML'
+  //      });
 
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
         const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的对用户称呼。';
