@@ -107,6 +107,24 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   if (sub === "pay") {
 
+
+
+
+    // 查找配置，判断当前房间/主题是否允许 pay
+    const cfg = payConfigs.find((c) => {
+      if (c.chatId !== chatId) return false;
+      if (!c.threadIds || c.threadIds.length === 0) return true;
+      return c.threadIds.includes(threadId);
+    });
+
+    if (!cfg || cfg.enabled === false) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，此房间暂不支持投币 (pay)。`,
+        parse_mode: "HTML",
+      };
+    }
     const amount = parseInt(parts[2] || "", 10);
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
@@ -127,24 +145,6 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-
-
-    // 查找配置，判断当前房间/主题是否允许 pay
-    const cfg = payConfigs.find((c) => {
-      if (c.chatId !== chatId) return false;
-      if (!c.threadIds || c.threadIds.length === 0) return true;
-      return c.threadIds.includes(threadId);
-    });
-
-    if (!cfg || cfg.enabled === false) {
-      return {
-        method: "sendMessage",
-        chat_id: chatId,
-        text: `❌ ${userName}，此房间暂不支持投币 (pay)。`,
-        parse_mode: "HTML",
-      };
-    }
-
     // 检查并扣除用户余额
     const senderBal = await getBalance(userId);
     if (senderBal < amount) {
