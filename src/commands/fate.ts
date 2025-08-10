@@ -67,16 +67,44 @@ export async function handleFate(msg, env) {
     const isInterpret = (
         // 以 /fate 开头，或以 @BotUsername /fate 开头
         /^(?:\/fate(?:@\w+)?|@\w+\s*\/fate(?:@\w+)?)/i.test(text)
-        && replied
-        && cap.includes('昨天')
+        && replied);
+    const hasCap = (
+        cap.includes('昨天')
         && cap.includes('今天')
         && cap.includes('明天')
     );
+
+
+
     console.log('🔍 [handleFate] isInterpret =', isInterpret);
 
     if (isInterpret) {
         const fromId = msg.from.id;
         const fromName = msg.from.first_name || '';
+        const chatId = msg.chat.id;
+        const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
+
+        const allowed =
+            (chatId === -1002848481881 && [66].includes(threadId)) ||
+            (chatId === -1002742074355 && [345].includes(threadId));
+        if (!allowed) {
+            return {
+                method: "sendMessage",
+                chat_id: chatId,
+                text:
+                    `✨这里的魔力有些稀薄……要不要回到莉莉的故乡，让占卜的力量更完整地展现呢？...`,
+                parse_mode: "HTML",
+            };
+        }
+                if (!hasCap) {
+            return {
+                method: "sendMessage",
+                chat_id: chatId,
+                text:
+                    `✨ 请直接回复那条包含你抽牌结果的消息，不要单独回复某张卡牌，这样莉莉才能准确读取你的命运~`,
+                parse_mode: "HTML",
+            };
+        }
 
         // 查询并提示余额，准备扣费
         const coinRaw = await env.COIN_KV.get(fromId.toString());
@@ -90,19 +118,9 @@ export async function handleFate(msg, env) {
                 parse_mode: 'HTML'
             };
         }
-        // 提示开始解析
-  //      await env.COIN_KV.put(fromId.toString(), (coinBal).toString()); // 暂不扣除，留待解析成功后
-  //      const notice = `🔰 ${fromName} 使用 5 💰 开始解析，当前余额 ${coinBal} 💰，请稍候...`;
-
-        // 发送解析开始提示
- //       await env.TELEGRAM_API.sendMessage({
-  //          chat_id: msg.chat.id,
-  //          text: notice,
-  //          parse_mode: 'HTML'
-  //      });
 
         console.log('📝 [handleFate] 开始解析回复消息的牌义，caption:', cap);
-        const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的对用户称呼。';
+        const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘名叫莉莉，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。';
         const userPrompt = `下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
 
         const payload = {
