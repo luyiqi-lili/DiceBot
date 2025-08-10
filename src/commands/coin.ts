@@ -104,6 +104,8 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     };
   }
   if (sub === "pay") {
+    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
+
     const amount = parseInt(parts[2] || "", 10);
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
