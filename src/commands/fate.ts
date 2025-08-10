@@ -59,23 +59,19 @@ export async function handleFate(msg, env) {
 
     const text = msg.text || '';
     const replied = msg.reply_to_message;
-
-    const isRealReply = replied && !replied.is_topic_message && !replied.forum_topic_created;
-
     const cap = replied?.caption || '';
     console.log(`🔍 [handleFate] text = ${text}`);
     console.log(`🔍 [handleFate] replied = ${replied}`);
     console.log(`🔍 [handleFate] cap = ${cap}`);
+
+
     // 判断是否需要执行塔罗牌含义解析
     const isInterpret = (
         // 以 /fate 开头，或以 @BotUsername /fate 开头
         /^(?:\/fate(?:@\w+)?|@\w+\s*\/fate(?:@\w+)?)/i.test(text)
-        && isRealReply);
-    const hasCap = (
-        cap.includes('昨天')
+        && cap.includes('昨天')
         && cap.includes('今天')
-        && cap.includes('明天')
-    );
+        && cap.includes('明天'));
 
 
 
@@ -96,15 +92,6 @@ export async function handleFate(msg, env) {
                 chat_id: chatId,
                 text:
                     `✨这里的魔力有些稀薄……要不要回到莉莉的故乡，让占卜的力量更完整地展现呢？...`,
-                parse_mode: "HTML",
-            };
-        }
-                if (!hasCap) {
-            return {
-                method: "sendMessage",
-                chat_id: chatId,
-                text:
-                    `✨ 请直接回复那条包含你抽牌结果的消息，不要单独回复某张卡牌，这样莉莉才能准确读取你的命运~`,
                 parse_mode: "HTML",
             };
         }
