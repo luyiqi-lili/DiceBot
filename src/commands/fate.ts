@@ -91,7 +91,7 @@ export async function handleFate(msg, env) {
                 method: "sendMessage",
                 chat_id: chatId,
                 text:
-                    `✨这里的魔力有些稀薄……要不要回到莉莉的故乡，让占卜的力量更完整地展现呢？...`,
+                    `✨这里的魔力有些稀薄……要不要回到莉莉熟悉的地方，让占卜的力量更完整地展现呢？...`,
                 parse_mode: "HTML",
             };
         }
