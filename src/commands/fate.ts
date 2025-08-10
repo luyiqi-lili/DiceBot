@@ -59,6 +59,9 @@ export async function handleFate(msg, env) {
 
     const text = msg.text || '';
     const replied = msg.reply_to_message;
+
+    const isRealReply = replied && !replied.is_topic_message && !replied.forum_topic_created;
+
     const cap = replied?.caption || '';
     console.log(`🔍 [handleFate] text = ${text}`);
     console.log(`🔍 [handleFate] replied = ${replied}`);
@@ -67,7 +70,7 @@ export async function handleFate(msg, env) {
     const isInterpret = (
         // 以 /fate 开头，或以 @BotUsername /fate 开头
         /^(?:\/fate(?:@\w+)?|@\w+\s*\/fate(?:@\w+)?)/i.test(text)
-        && replied);
+        && isRealReply);
     const hasCap = (
         cap.includes('昨天')
         && cap.includes('今天')
