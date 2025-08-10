@@ -103,8 +103,9 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       parse_mode: "HTML",
     };
   }
+  const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id ?? 0;
+
   if (sub === "pay") {
-    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
 
     const amount = parseInt(parts[2] || "", 10);
     if (isNaN(amount)) {
@@ -127,7 +128,6 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       };
     }
 
-    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id ?? 0;
 
     // 查找配置，判断当前房间/主题是否允许 pay
     const cfg = payConfigs.find((c) => {
