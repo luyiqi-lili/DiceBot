@@ -105,6 +105,17 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   }
   if (sub === "pay") {
     const amount = parseInt(parts[2] || "", 10);
+    if (isNaN(amount)) {
+      const roomKey = `${chatId}||${threadId ?? 0}`;
+      const roomBal = await getBalance(roomKey);
+      const place = cfg?.placeName || `房间 ${threadId}`;
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `📥 ${place} 当前有 ${roomBal} 💰。`,
+        parse_mode: "HTML",
+      };
+    }
     if (isNaN(amount) || amount <= 0) {
       return {
         method: "sendMessage",
