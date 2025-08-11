@@ -100,9 +100,11 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       };
     }
     // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
-    const promoStart = "2025-08-12";
-    const promoEnd = "2025-08-17";
-    const gain = (today >= promoStart && today <= promoEnd)
+    const todayD = new Date();
+    const promoStart = new Date("2025-08-12");
+    const promoEnd = new Date("2025-08-17");
+    
+    const gain = (todayD >= promoStart && todayD <= promoEnd)
       ? randomInt(11, 20)
       : randomInt(1, 10);
     const bal = await getBalance(userId);
