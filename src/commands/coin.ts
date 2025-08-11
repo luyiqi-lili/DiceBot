@@ -23,7 +23,14 @@ const payConfigs = [
     "threadIds": [62],
     "placeName": "教堂的喷泉",
     "enabled": true,
-    "successMessage": "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。"
+    "successMessage": "${userName} 往${place}投入 ${amount} 💰，荡起一圈涟漪。${place}现在有 ${total} 💰。"
+  },
+  {
+    "chatId": -1002742074355,
+    "threadIds": [345],
+    "placeName": "桌游室的收银台",
+    "enabled": true,
+    "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
   }
 ]
 
@@ -91,7 +98,12 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-    const gain = randomInt(1, 10);
+    // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
+    const promoStart = "2025-08-11";
+    const promoEnd = "2025-08-17";
+    const gain = (today >= promoStart && today <= promoEnd)
+      ? randomInt(11, 20)
+      : randomInt(1, 10);
     const bal = await getBalance(userId);
     const newBal = bal + gain;
     await setBalance(userId, newBal);
