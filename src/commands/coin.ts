@@ -9,6 +9,32 @@ interface CoinResponse {
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+const payConfigs = [
+/*
+  {
+    "chatId": -1002742074355,
+    "threadIds": [62],
+    "placeName": "教堂的喷泉",
+    "enabled": true,
+    "successMessage": "${userName} 往${place}投入 ${amount} 💰，荡起一圈涟漪。${place}现在有 ${total} 💰。"
+  },
+  {
+    "chatId": -1002742074355,
+    "threadIds": [345],
+    "placeName": "桌游室的收银台",
+    "enabled": true,
+    "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
+  },
+  */
+  {
+    "chatId": -1002848481881,
+    "threadIds": [66],
+    "placeName": "骰娘调校房的黑箱子",
+    "enabled": true,
+    "successMessage": "${userName} 向${place}投了 ${amount} 💰，现在累计 ${total} 💰。"
+  }
+]
+
 
 export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinResponse>> {
   const chatId = msg.chat.id;
@@ -73,7 +99,14 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         parse_mode: "HTML",
       };
     }
-    const gain = randomInt(1, 10);
+    // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
+    const todayD = new Date();
+    const promoStart = new Date("2025-08-12");
+    const promoEnd = new Date("2025-08-17");
+    
+    const gain = (todayD >= promoStart && todayD <= promoEnd)
+      ? randomInt(11, 20)
+      : randomInt(1, 10);
     const bal = await getBalance(userId);
     const newBal = bal + gain;
     await setBalance(userId, newBal);
@@ -82,6 +115,85 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       method: "sendMessage",
       chat_id: chatId,
       text: `✨ ${userName}，你祈福获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      parse_mode: "HTML",
+    };
+  }
+  const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id ?? 0;
+
+  if (sub === "pay") {
+
+
+
+
+    // 查找配置，判断当前房间/主题是否允许 pay
+    const cfg = payConfigs.find((c) => {
+      if (c.chatId !== chatId) return false;
+      if (!c.threadIds || c.threadIds.length === 0) return true;
+      return c.threadIds.includes(threadId);
+    });
+
+    if (!cfg || cfg.enabled === false) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，此房间暂不支持投币 (pay)。`,
+        parse_mode: "HTML",
+      };
+    }
+    const amount = parseInt(parts[2] || "", 10);
+    if (isNaN(amount)) {
+      const roomKey = `${chatId}||${threadId ?? 0}`;
+      const roomBal = await getBalance(roomKey);
+      const place = cfg?.placeName || `房间 ${threadId}`;
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `📥 ${place} 当前有 ${roomBal} 💰。`,
+        parse_mode: "HTML",
+      };
+    }
+    if (isNaN(amount) || amount <= 0) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，请指定正确的投币数量，例如：<code>/coin pay 1</code>。`,
+        parse_mode: "HTML",
+      };
+    }
+    // 检查并扣除用户余额
+    const senderBal = await getBalance(userId);
+    if (senderBal < amount) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
+        parse_mode: "HTML",
+      };
+    }
+    const newSenderBal = senderBal - amount;
+    await setBalance(userId, newSenderBal);
+
+    // 更新房间余额（只计数，无法取出），使用通用的 getBalance/setBalance，key 为 chatId||threadId
+    const roomKey = `${chatId}||${threadId ?? 0}`;
+    const oldRoomBal = await getBalance(roomKey);
+    const newRoomBal = oldRoomBal + amount;
+    await setBalance(roomKey, newRoomBal);
+
+    const place = cfg.placeName || `房间 ${threadId}`;
+
+    // 成功文案支持预设模板变量：${userName}, ${place}, ${amount}, ${total}, ${threadId}
+    const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
+    const textOut = template
+      .replace(/\$\{userName\}/g, userName)
+      .replace(/\$\{place\}/g, place)
+      .replace(/\$\{amount\}/g, String(amount))
+      .replace(/\$\{total\}/g, String(newRoomBal))
+      .replace(/\$\{threadId\}/g, String(threadId));
+
+    return {
+      method: "sendMessage",
+      chat_id: chatId,
+      text: textOut,
       parse_mode: "HTML",
     };
   }
