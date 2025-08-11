@@ -10,14 +10,7 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 const payConfigs = [
-
-  {
-    "chatId": -1002848481881,
-    "threadIds": [66],
-    "placeName": "骰娘调校房的黑箱子",
-    "enabled": true,
-    "successMessage": "${userName} 向${place}投了 ${amount} 💰，现在累计 ${total} 💰。"
-  },
+/*
   {
     "chatId": -1002742074355,
     "threadIds": [62],
@@ -31,6 +24,14 @@ const payConfigs = [
     "placeName": "桌游室的收银台",
     "enabled": true,
     "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
+  },
+  */
+  {
+    "chatId": -1002848481881,
+    "threadIds": [66],
+    "placeName": "骰娘调校房的黑箱子",
+    "enabled": true,
+    "successMessage": "${userName} 向${place}投了 ${amount} 💰，现在累计 ${total} 💰。"
   }
 ]
 
