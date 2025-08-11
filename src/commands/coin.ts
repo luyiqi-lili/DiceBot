@@ -101,7 +101,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     }
     // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
     const todayD = new Date();
-    const promoStart = new Date("2025-08-12");
+    const promoStart = new Date("2025-08-11");
     const promoEnd = new Date("2025-08-17");
     
     const gain = (todayD >= promoStart && todayD <= promoEnd)
