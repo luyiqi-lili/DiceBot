@@ -41,23 +41,92 @@ export function handleFish(msg: any, env: any): Record<string, any> {
         const score = Math.floor(rawScore);
 
         // 根据 score 决定鱼获（你可以按需改这个映射）
+        if (score < 100) {
+            const resultText =
+                `${getId(msg.from)} 拉杆！\n` +
+                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `😢 没有咬钩，什么都没钓上。`;
+            return {
+                method: "editMessageText",
+                chat_id,
+                message_id: msg.message.message_id,
+                parse_mode: "HTML",
+                text: resultText,
+                reply_markup: { inline_keyboard: [] }
+            };
+        }
+
+        if (score > 1000) {
+            const resultText =
+                `${getId(msg.from)} 拉杆！\n\n` +
+ //               `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `💥 太猛了！鱼挣脱钩子逃走了（脱钩失败）。`;
+            return {
+                method: "editMessageText",
+                chat_id,
+                message_id: msg.message.message_id,
+                parse_mode: "HTML",
+                text: resultText,
+                reply_markup: { inline_keyboard: [] }
+            };
+        }
+
+        // 100 <= score <= 1000：决定鱼获（概率分布随 score 升高向高品质偏移）
+        // 归一化 t ∈ [0,1]
+        const t = (score - 100) / (1000 - 100);
+
+        // 动态权重（随 t 调整，t 越大，高品质权重越高）
+        // 这些常数可以根据你想要的稀有度再调整
+        let w0 = (1 - t) * 50;           // 小渔获（最常见）
+        let w1 = (1 - t) * 30 + t * 10; // 小鲫鱼
+        let w2 = 20 + t * 40;           // 鲤鱼（中等）
+        let w3 = 5 + t * 30;            // 海鲈（罕见）
+        let w4 = 5 + t * 30;            // 巨型鱼（传说级）
+
+        // 避免极端数值，确保非负
+        w0 = Math.max(0, w0);
+        w1 = Math.max(0, w1);
+        w2 = Math.max(0, w2);
+        w3 = Math.max(0, w3);
+        w4 = Math.max(0, w4);
+
+        // 随机抽取一个鱼种
+        const weights = [w0, w1, w2, w3, w4];
+        const sum = weights.reduce((a, b) => a + b, 0);
+        let rnd = Math.random() * sum;
+        let chosenIndex = 0;
+        for (let i = 0; i < weights.length; i++) {
+            if (rnd < weights[i]) {
+                chosenIndex = i;
+                break;
+            }
+            rnd -= weights[i];
+        }
+
         let catchText = "";
-        if (score < 50) {
-            catchText = "🪱 一条小虾（小渔获）";
-        } else if (score < 200) {
-            catchText = "🐟 一条小鲫鱼";
-        } else if (score < 500) {
-            catchText = "🐠 一条鲤鱼";
-        } else if (score < 1000) {
-            catchText = "🦈 一条海鲈（罕见）";
-        } else {
-            catchText = "🐋 传说中的巨型鱼获！你太幸运了！";
+        switch (chosenIndex) {
+            case 0:
+                catchText = "🪱 一条小虾（小渔获）";
+                break;
+            case 1:
+                catchText = "🐟 一条小鲫鱼";
+                break;
+            case 2:
+                catchText = "🐠 一条鲤鱼";
+                break;
+            case 3:
+                catchText = "🦈 一条海鲈（罕见）";
+                break;
+            case 4:
+                catchText = "🐋 传说中的巨型鱼获！你太幸运了！";
+                break;
         }
 
         const resultText =
-            `${getId(msg.from)} 拉杆！\n` +
-            `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+            `${getId(msg.from)} 拉杆！\n\n` +
+        //    `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
             `🎉 获得：${catchText}`;
+
 
         return {
             method: "editMessageText",
@@ -81,7 +150,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
             if (strength <= 10) {
                 return "轻轻一抛，水面只泛起细碎涟漪，仿佛在对你低声耳语。";
             } else if (strength <= 20) {
-                return "抛出一线，浮漂微颤，风中夹着松香与海盐的气息。";
+                return "划出一道优雅的弧线，浮漂微颤，风中夹着松香与海盐的气息。";
             } else if (strength <= 30) {
                 return "动作稳健，鱼线划破空气，落点处闪过一丝银色光芒。";
             } else if (strength <= 40) {
@@ -103,7 +172,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
 
         const initText =
             `${userName} 抛出渔线，${castDesc}\n\n` +
-            `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响（仅 ${userName} 本人可操作）。`;
+            `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
         // callback_data 里存 ownerId 和 strength，实际计算时使用 msg.message.date（由 Telegram 提供）
         const callbackData = `fish_pull:${ownerId}:${strength}`;
