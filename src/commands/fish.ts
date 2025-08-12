@@ -45,7 +45,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
             const resultText =
                 `${getId(msg.from)} 拉杆！\n` +
                 `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `😢 没有咬钩，什么都没钓上。`;
+                `😕 没有咬钩……这次空手而归。`;
             return {
                 method: "editMessageText",
                 chat_id,
@@ -58,9 +58,9 @@ export function handleFish(msg: any, env: any): Record<string, any> {
 
         if (score > 1000) {
             const resultText =
-                `${getId(msg.from)} 拉杆！\n\n` +
- //               `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `💥 太猛了！鱼挣脱钩子逃走了（脱钩失败）。`;
+                `${getId(msg.from)} 用力过猛！\n` +
+                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `💥 力道太大，鱼线断了（脱钩失败）。下次小心点～`;
             return {
                 method: "editMessageText",
                 chat_id,
@@ -71,61 +71,60 @@ export function handleFish(msg: any, env: any): Record<string, any> {
             };
         }
 
-        // 100 <= score <= 1000：决定鱼获（概率分布随 score 升高向高品质偏移）
-        // 归一化 t ∈ [0,1]
-        const t = (score - 100) / (1000 - 100);
+        // 介于 100 和 1000：两步判定
+        // 1) 定义 10 种鱼（从常见到稀有），并设置稀有鱼更难上钩的 hookRate
+        const fishList = [
+            { name: "🪱 小虾", hookRate: 0.95, value: 1 },
+            { name: "🐟 小鲫鱼", hookRate: 0.90, value: 2 },
+            { name: "🐠 鲤鱼", hookRate: 0.85, value: 3 },
+            { name: "🐡 黄花鱼", hookRate: 0.75, value: 4 },
+            { name: "🐟 鲈鱼", hookRate: 0.65, value: 5 },
+            { name: "🦈 海鲈", hookRate: 0.50, value: 6 },
+            { name: "🐟 石斑鱼", hookRate: 0.35, value: 7 },
+            { name: "🐋 金枪鱼", hookRate: 0.20, value: 8 },
+            { name: "🦈 大白鲨", hookRate: 0.10, value: 9 },
+            { name: "🐳 传说之鲸", hookRate: 0.03, value: 10 }
+        ];
 
-        // 动态权重（随 t 调整，t 越大，高品质权重越高）
-        // 这些常数可以根据你想要的稀有度再调整
-        let w0 = (1 - t) * 50;           // 小渔获（最常见）
-        let w1 = (1 - t) * 30 + t * 10; // 小鲫鱼
-        let w2 = 20 + t * 40;           // 鲤鱼（中等）
-        let w3 = 5 + t * 30;            // 海鲈（罕见）
-        let w4 = 5 + t * 30;            // 巨型鱼（传说级）
+        // 将 score 归一到 0..1，100 -> 0, 1000 -> 1
+        const norm = (score - 100) / (1000 - 100);
+        const center = norm * (fishList.length - 1); // 期望索引中心（0..9）
 
-        // 避免极端数值，确保非负
-        w0 = Math.max(0, w0);
-        w1 = Math.max(0, w1);
-        w2 = Math.max(0, w2);
-        w3 = Math.max(0, w3);
-        w4 = Math.max(0, w4);
-
-        // 随机抽取一个鱼种
-        const weights = [w0, w1, w2, w3, w4];
-        const sum = weights.reduce((a, b) => a + b, 0);
-        let rnd = Math.random() * sum;
-        let chosenIndex = 0;
+        // 使用高斯式权重，使得 score 越高越偏向稀有鱼（索引越大）
+        const sigma = 2.0; // 控制分布宽度，值越小越集中（可调）
+        const weights = fishList.map((_, i) => Math.exp(-Math.pow(i - center, 2) / (2 * sigma * sigma)));
+        const weightSum = weights.reduce((a, b) => a + b, 0);
+        const pick = Math.random() * weightSum;
+        let acc = 0;
+        let pickIndex = 0;
         for (let i = 0; i < weights.length; i++) {
-            if (rnd < weights[i]) {
-                chosenIndex = i;
+            acc += weights[i];
+            if (pick <= acc) {
+                pickIndex = i;
                 break;
             }
-            rnd -= weights[i];
+        }
+        const chosen = fishList[pickIndex];
+
+        // 2) 钩上判定：根据 chosen.hookRate 再做一次随机判定
+        // 我们可以加入一点微扰（±10%）让体验更随机
+        const jitter = 0.9 + Math.random() * 0.2; // 0.9 ~ 1.1
+        const finalHookProb = Math.max(0, Math.min(1, chosen.hookRate * jitter));
+        const hooked = Math.random() < finalHookProb;
+
+        let resultText = `${getId(msg.from)} 拉杆！\n` +
+            `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n`;
+
+        if (hooked) {
+            resultText += `🎉 成功钓上：<b>${chosen.name}</b>（价值 ${chosen.value}，稀有度索引 ${pickIndex + 1}）\n` +
+                `（上钩概率约 ${Math.round(finalHookProb * 100)}%）`;
+        } else {
+            // 失败：鱼挣脱（稀有鱼更容易挣脱）
+            resultText += `😣 有鱼咬住了，但它挣脱了！想想看是因为运气还是力度～\n` +
+                `（目标：<b>${chosen.name}</b>，上钩概率约 ${Math.round(finalHookProb * 100)}%）`;
         }
 
-        let catchText = "";
-        switch (chosenIndex) {
-            case 0:
-                catchText = "🪱 一条小虾（小渔获）";
-                break;
-            case 1:
-                catchText = "🐟 一条小鲫鱼";
-                break;
-            case 2:
-                catchText = "🐠 一条鲤鱼";
-                break;
-            case 3:
-                catchText = "🦈 一条海鲈（罕见）";
-                break;
-            case 4:
-                catchText = "🐋 传说中的巨型鱼获！你太幸运了！";
-                break;
-        }
 
-        const resultText =
-            `${getId(msg.from)} 拉杆！\n\n` +
-        //    `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-            `🎉 获得：${catchText}`;
 
 
         return {
