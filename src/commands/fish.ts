@@ -105,7 +105,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
   // 默认：命令格式错误提示
   return {
     chat_id,
-    text: `命令格式不正确。\n正确用法：@${botName} /fish <力度（正整数）>\n例如：@${botName} /fish 50`,
+    text: `命令格式不正确。\n正确用法：@${botName} /fish 【力度（正整数）】\n例如：@${botName} /fish 50`,
     parse_mode: "HTML"
   };
 }
