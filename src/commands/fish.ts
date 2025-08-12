@@ -1,7 +1,7 @@
 // src/commands/fish.ts
 export function handleFish(msg: any, env: any): Record<string, any> {
   const botName = env.BOT_USERNAME;
-  const getId = (u: any) => u.username || u.first_name || "钓鱼者";
+  const getId = (u: any) =>  u.first_name || "钓鱼者";
 
   // 兼容 message 和 callback_query
   const chat_id = msg.chat?.id ?? msg.message.chat.id;
