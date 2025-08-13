@@ -1,5 +1,14 @@
 // src/commands/fish.ts
-export function handleFish(msg: any, env: any): Record<string, any> {
+export async function handleFish(msg: any, env: any): Record<string, any> {
+    // 余额读写
+    async function getBalance(id: string): Promise<number> {
+        const raw = await env.COIN_KV.get(id);
+        return raw ? parseInt(raw, 10) : 0;
+    }
+    async function setBalance(id: string, bal: number) {
+        await env.COIN_KV.put(id, bal.toString());
+    }
+
     const botName = env.BOT_USERNAME;
     const getId = (u: any) => u.first_name || "钓鱼者";
 
@@ -148,9 +157,20 @@ export function handleFish(msg: any, env: any): Record<string, any> {
     const m = msg.text?.match(new RegExp(`@${botName}\\s+/fish\\s+(\\d+)`, "i"));
     if (m) {
         const strength = Math.floor(Math.random() * 100) + 1;
-        const baitCost  = Math.max(1, parseInt(m[1], 10) || 1);
+        const baitCost = Math.max(1, parseInt(m[1], 10) || 1);
         const userName = getId(msg.from);
         const ownerId = msg.from.id;
+        const currentBal = await getBalance(ownerId);
+        if (currentBal < baitCost) {
+            return {
+                method: "sendMessage",
+                chat_id: chat_id,
+                text: `❌ ${userName}，你的余额不足，当前只有 ${currentBal} 💰。`,
+                parse_mode: "HTML",
+            };
+        }
+        const newBal = currentBal - baitCost;
+        await setBalance(ownerId, newBal);
 
         const castDesc = (() => {
             if (strength <= 10) {
@@ -177,7 +197,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
         })();
 
         const initText =
-            `${userName} 抛出渔线，${castDesc}\n\n` +
+            `${userName} 花费${baitCost}💰的鱼饵后， 抛出渔线，${castDesc}\n\n` +
             `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
         // callback_data 里存 ownerId 和 strength，实际计算时使用 msg.message.date（由 Telegram 提供）
