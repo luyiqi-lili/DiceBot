@@ -46,7 +46,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             fishingRecord.results.forEach((result: any, index: number) => {
                 resultText += `<b>第 ${index + 1} 次：</b> 花费 ${result.baitCost}💰 ，`;
                 if (result.hooked) {
-                    resultText += `钓到 ${result.fishValue}💰。`;
+                    resultText += `钓到 ${result.fishValue}。`;
                 } else {
                     resultText += `未钓到鱼。`;
                 }
@@ -223,7 +223,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         fishingRecord.results.push({
             baitCost,
             hooked,
-            fishValue: hooked ? chosen.value : 0,
+            fishValue: hooked ? chosen.name : 0,
         });
         fishingRecord.count += 1;
         await setFishingRecord(ownerIdStr, fishingRecord);
