@@ -72,7 +72,7 @@ export default {
       ) {
         payload = handle21(cq, env);
       } else if (cq.data?.startsWith("fish_pull:")) {
-        payload = handleFish(cq, env);
+        payload = await handleFish(cq, env);
       }
       else if (cq.data === "delete_message") {
         payload = await handleDeleteMessage(cq, env);
