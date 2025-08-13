@@ -7,15 +7,17 @@ export function handleFish(msg: any, env: any): Record<string, any> {
     const chat_id = msg.chat?.id ?? msg.message.chat.id;
     const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
 
-    // —— Callback 阶段：用户点了拉杆按钮，callback_data 格式： "fish_pull:<ownerId>:<strength>" ——
+    // —— Callback 阶段：用户点了拉杆按钮，callback_data 格式： "fish_pull:<ownerId>:<strength>:<baitCost>" ——
     if (msg.data?.startsWith("fish_pull:")) {
         const parts = msg.data.split(":");
         // parts[0] = "fish_pull"
         const ownerIdStr = parts[1];
         const strengthStr = parts[2] || "1";
+        const baitCostStr = parts[3] || "1";
 
         const ownerId = parseInt(ownerIdStr, 10);
         const strength = Math.max(1, parseInt(strengthStr, 10) || 1);
+        const baitCost = Math.max(1, parseInt(baitCostStr, 10) || 1);
 
         const clickerId = msg.from?.id;
         const clickerName = getId(msg.from);
@@ -107,9 +109,13 @@ export function handleFish(msg: any, env: any): Record<string, any> {
         const chosen = fishList[pickIndex];
 
         // 2) 钩上判定：根据 chosen.hookRate 再做一次随机判定
-        // 我们可以加入一点微扰（±10%）让体验更随机
-        const jitter = 0.9 + Math.random() * 0.2; // 0.9 ~ 1.1
-        const finalHookProb = Math.max(0, Math.min(1, chosen.hookRate * jitter));
+        const jitter = 0.1 * baitCost;
+        console.log("鱼饵提供的概率:", jitter);
+        console.log("鱼本身的概率:", chosen.hookRate);
+
+        const finalHookProb = Math.max(0, Math.min(1, chosen.hookRate + jitter));
+        console.log("实际生效的概率:", finalHookProb);
+
         const hooked = Math.random() < finalHookProb;
 
         let resultText = `${getId(msg.from)} 拉杆！\n` +
@@ -137,11 +143,12 @@ export function handleFish(msg: any, env: any): Record<string, any> {
         };
     }
 
-    // —— 发起阶段：@Bot /fish 50 —— 
-    // 支持写法：@BOT_USERNAME /fish 50
+    // —— 发起阶段：@Bot /fish 3 —— 
+    // 支持写法：@BOT_USERNAME /fish 3
     const m = msg.text?.match(new RegExp(`@${botName}\\s+/fish\\s+(\\d+)`, "i"));
     if (m) {
-        const strength = Math.max(1, parseInt(m[1], 10) || 1);
+        const strength = Math.floor(Math.random() * 100) + 1;
+        const baitCost  = Math.max(1, parseInt(m[1], 10) || 1);
         const userName = getId(msg.from);
         const ownerId = msg.from.id;
 
@@ -174,7 +181,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
             `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
         // callback_data 里存 ownerId 和 strength，实际计算时使用 msg.message.date（由 Telegram 提供）
-        const callbackData = `fish_pull:${ownerId}:${strength}`;
+        const callbackData = `fish_pull:${ownerId}:${strength}:${baitCost}`;
 
         return {
             chat_id,
@@ -197,7 +204,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
     // 默认：命令格式错误提示
     return {
         chat_id,
-        text: `命令格式不正确。\n正确用法：@${botName} /fish 【力度（正整数）】\n例如：@${botName} /fish 50`,
+        text: `命令格式不正确。\n正确用法：@${botName} /fish 【鱼饵花费💰（正整数）】\n例如：@${botName} /fish 3`,
         parse_mode: "HTML"
     };
 }
