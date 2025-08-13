@@ -30,6 +30,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
         const clickerId = msg.from?.id;
         const clickerName = getId(msg.from);
+        const currentBal = await getBalance(ownerIdStr);
 
         // 只有发起者本人可以拉杆
         if (clickerId !== ownerId) {
@@ -55,8 +56,8 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         if (score < 100) {
             const resultText =
                 `${getId(msg.from)} 拉杆！\n` +
-                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `😕 没有咬钩……这次空手而归。`;
+                //                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `😕 没有咬钩……这次空手而归。/n/n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
             return {
                 method: "editMessageText",
                 chat_id,
@@ -69,9 +70,9 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
         if (score > 1000) {
             const resultText =
-                `${getId(msg.from)} 用力过猛！\n` +
-                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `💥 力道太大，鱼线断了（脱钩失败）。下次小心点～`;
+                `${getId(msg.from)} 鱼跑了！\n` +
+                //              `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `💥 力道太大/时间太久。下次小心点～/n/n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
             return {
                 method: "editMessageText",
                 chat_id,
@@ -127,16 +128,16 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
         const hooked = Math.random() < finalHookProb;
 
-        let resultText = `${getId(msg.from)} 拉杆！\n` +
-            `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n`;
+        let resultText = `${getId(msg.from)} 拉杆！\n`
+        //        +`拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n`;
 
         if (hooked) {
-            resultText += `🎉 成功钓上：<b>${chosen.name}</b>（价值 ${chosen.value}，稀有度索引 ${pickIndex + 1}）\n` +
-                `（上钩概率约 ${Math.round(finalHookProb * 100)}%）`;
+            const newBal = currentBal + chosen.value;
+            await setBalance(ownerIdStr, newBal);
+            resultText += `🎉 成功钓上：<b>${chosen.name}</b> 💰，本次花费 ${baitCost}💰鱼饵，获得${chosen.value}💰渔获，最新余额 ${newBal}💰 `
         } else {
             // 失败：鱼挣脱（稀有鱼更容易挣脱）
-            resultText += `😣 有鱼咬住了，但它挣脱了！想想看是因为运气还是力度～\n` +
-                `（目标：<b>${chosen.name}</b>，上钩概率约 ${Math.round(finalHookProb * 100)}%）`;
+            resultText += `😣 有鱼咬住了，但它挣脱了！想想看是因为运气还是力度～/n/n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
         }
 
 
