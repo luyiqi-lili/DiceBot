@@ -218,7 +218,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             resultText += `🎉 成功钓上：<b>${chosen.name}</b> 💰，本次花费 ${baitCost}💰鱼饵，获得${chosen.value}💰渔获，最新余额 ${newBal}💰 `
         } else {
             // 失败：鱼挣脱（稀有鱼更容易挣脱）
-            resultText += `😣 有鱼咬住了，但它挣脱了！想想看是因为运气还是力度～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
+            resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
         }
         fishingRecord.results.push({
             baitCost,
