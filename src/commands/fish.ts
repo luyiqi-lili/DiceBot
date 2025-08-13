@@ -9,6 +9,15 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         await env.COIN_KV.put(id, bal.toString());
     }
 
+    async function getFishingRecord(id: string): Promise<any> {
+        const record = await env.FISHING_RECORD_KV.get(id);
+        return record ? JSON.parse(record) : { count: 0, results: [] };
+    }
+
+    async function setFishingRecord(id: string, record: any) {
+        await env.FISHING_RECORD_KV.put(id, JSON.stringify(record));
+    }
+
     const botName = env.BOT_USERNAME;
     const getId = (u: any) => u.first_name || "钓鱼者";
 
@@ -31,6 +40,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         const clickerId = msg.from?.id;
         const clickerName = getId(msg.from);
         const currentBal = await getBalance(ownerIdStr);
+        const fishingRecord = await getFishingRecord(ownerIdStr);
 
         // 只有发起者本人可以拉杆
         if (clickerId !== ownerId) {
@@ -58,6 +68,15 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
                 `${getId(msg.from)} 拉杆！\n` +
                 //                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
                 `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
+
+            fishingRecord.results.push({
+                baitCost,
+                hooked: false,
+                fishValue: 0,
+            });
+
+            await setFishingRecord(ownerIdStr, fishingRecord);
+
             return {
                 method: "editMessageText",
                 chat_id,
@@ -73,6 +92,13 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
                 `${getId(msg.from)} 鱼跑了！\n` +
                 //              `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
                 `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
+            fishingRecord.results.push({
+                baitCost,
+                hooked: false,
+                fishValue: 0,
+            });
+
+            await setFishingRecord(ownerIdStr, fishingRecord);
             return {
                 method: "editMessageText",
                 chat_id,
@@ -139,7 +165,13 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             // 失败：鱼挣脱（稀有鱼更容易挣脱）
             resultText += `😣 有鱼咬住了，但它挣脱了！想想看是因为运气还是力度～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
         }
+        fishingRecord.results.push({
+            baitCost,
+            hooked,
+            fishValue: hooked ? chosen.value : 0,
+        });
 
+        await setFishingRecord(ownerIdStr, fishingRecord);
 
 
 
@@ -161,6 +193,20 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         const baitCost = Math.max(1, parseInt(m[1], 10) || 1);
         const userName = getId(msg.from);
         const ownerId = msg.from.id;
+
+
+        const fishingRecord = await getFishingRecord(ownerId);
+        if (fishingRecord.count >= 20) {
+            return {
+                method: "sendMessage",
+                chat_id: chat_id,
+                text: `❌ ${getId(msg.from)}，今天已经钓了20次，不能再钓了。`,
+                parse_mode: "HTML",
+            };
+        }
+        fishingRecord.count += 1;
+
+
         const currentBal = await getBalance(ownerId);
         if (currentBal < baitCost) {
             return {
