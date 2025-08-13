@@ -86,14 +86,14 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         // 介于 100 和 1000：两步判定
         // 1) 定义 10 种鱼（从常见到稀有），并设置稀有鱼更难上钩的 hookRate
         const fishList = [
-            { name: "🪱 小虾", hookRate: 0.85, value: 1 },
-            { name: "🐟 小鲫鱼", hookRate: 0.80, value: 2 },
-            { name: "🐠 鲤鱼", hookRate: 0.75, value: 3 },
-            { name: "🐡 黄花鱼", hookRate: 0.65, value: 4 },
-            { name: "🐟 鲈鱼", hookRate: 0.55, value: 5 },
-            { name: "🦈 海鲈", hookRate: 0.40, value: 6 },
-            { name: "🐟 石斑鱼", hookRate: 0.35, value: 7 },
-            { name: "🐋 金枪鱼", hookRate: 0.20, value: 8 },
+            { name: "🪱 小虾", hookRate: 0.50, value: 1 },
+            { name: "🐟 小鲫鱼", hookRate: 0.45, value: 2 },
+            { name: "🐠 鲤鱼", hookRate: 0.40, value: 3 },
+            { name: "🐡 黄花鱼", hookRate: 0.35, value: 4 },
+            { name: "🐟 鲈鱼", hookRate: 0.30, value: 5 },
+            { name: "🦈 海鲈", hookRate: 0.25, value: 6 },
+            { name: "🐟 石斑鱼", hookRate: 0.20, value: 7 },
+            { name: "🐋 金枪鱼", hookRate: 0.15, value: 8 },
             { name: "🦈 大白鲨", hookRate: 0.10, value: 9 },
             { name: "🐳 传说之鲸", hookRate: 0.03, value: 10 }
         ];
