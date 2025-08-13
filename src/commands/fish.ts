@@ -44,7 +44,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         let resultText = ` <blockquote expandable><b>今日钓鱼记录</b>：\n`;
         if (fishingRecord.results.length > 0) {
             fishingRecord.results.reverse().forEach((result: any, index: number) => {
-                const displayIndex = fishingRecord.results.length - index;
+                const displayIndex = fishingRecord.results.length - index - 1;
                 resultText += `<b>第${displayIndex + 1}次:</b>花费${result.baitCost}💰,`;
                 if (result.hooked) {
                     resultText += `钓到${result.fishValue}`;
