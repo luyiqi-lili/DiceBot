@@ -37,7 +37,7 @@
 					"id": "f46b32828f934342b2dbc61519ee4e0d"
 				},
 				{
-					"binding": "FISHING_RECORD", // 钓鱼记录 KV
+					"binding": "FISHING_RECORD_KV", // 钓鱼记录 KV
 					"id": "1608b698ec774932b5a3128074d55147"
 				},
 				{
@@ -89,7 +89,7 @@
 					"id": "f16bb535b489446f953995a79fb6532a"
 				},
 				{
-					"binding": "FISHING_RECORD", // 钓鱼记录 KV
+					"binding": "FISHING_RECORD_KV", // 钓鱼记录 KV
 					"id": "b638e269b96d487e93f26db0a89ad553"
 				},
 				{
