@@ -41,7 +41,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         const todayCount = fishingRecord.count;
 
         // 渔获记录
-        let resultText = `<b>今日钓鱼记录</b>：\n`;
+        let resultText = ` <blockquote expandable><b>今日钓鱼记录</b>：\n`;
         if (fishingRecord.results.length > 0) {
             fishingRecord.results.forEach((result: any, index: number) => {
                 resultText += `<b>第 ${index + 1} 次钓鱼：</b> 花费 ${result.baitCost}💰 鱼饵，`;
@@ -57,7 +57,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         }
 
         // 显示今日钓鱼次数
-        resultText += `\n今日已钓次数：<b>${todayCount}</b>次（最多 20 次）`;
+        resultText += `\n今日已钓次数：<b>${todayCount}</b>次（最多 20 次）</blockquote>`;
 
         return resultText;
     }
@@ -118,7 +118,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
                 hooked: false,
                 fishValue: 0,
             });
-
+            fishingRecord.count += 1;
             await setFishingRecord(ownerIdStr, fishingRecord);
             const fishingRecordText = showFishingRecord(fishingRecord);
             const resultText =
@@ -144,7 +144,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
                 hooked: false,
                 fishValue: 0,
             });
-
+            fishingRecord.count += 1;
             await setFishingRecord(ownerIdStr, fishingRecord);
             const fishingRecordText = showFishingRecord(fishingRecord);
 
@@ -225,7 +225,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             hooked,
             fishValue: hooked ? chosen.value : 0,
         });
-
+        fishingRecord.count += 1;
         await setFishingRecord(ownerIdStr, fishingRecord);
         const fishingRecordText = showFishingRecord(fishingRecord);
         resultText += `\n\n${fishingRecordText}`;
@@ -263,7 +263,6 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
                 parse_mode: "HTML",
             };
         }
-        fishingRecord.count += 1;
 
 
         const currentBal = await getBalance(ownerId);
