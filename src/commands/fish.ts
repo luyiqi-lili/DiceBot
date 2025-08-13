@@ -11,8 +11,57 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
     async function getFishingRecord(id: string): Promise<any> {
         const record = await env.FISHING_RECORD_KV.get(id);
-        return record ? JSON.parse(record) : { count: 0, results: [] };
+        const currentDate = new Date().toISOString().split('T')[0];  // 获取当前日期，格式：YYYY-MM-DD
+
+        if (record) {
+            const parsedRecord = JSON.parse(record);
+
+            // 如果记录中的日期与今天不一致，重置次数
+            if (parsedRecord.date !== currentDate) {
+                parsedRecord.date = currentDate;  // 更新日期
+                parsedRecord.count = 0;           // 重置次数
+                parsedRecord.results = [];        // 清空历史记录
+            }
+
+            return parsedRecord;
+        }
+
+        // 如果没有记录，返回一个新的记录
+        return {
+            date: currentDate,
+            count: 0,
+            results: []
+        };
+
     }
+
+    // 新建函数：返回用户的钓鱼情况（包括次数、渔获记录）
+    function showFishingRecord(fishingRecord: any): string {
+        // 今日已钓次数
+        const todayCount = fishingRecord.count;
+
+        // 渔获记录
+        let resultText = `<b>今日钓鱼记录</b>：\n`;
+        if (fishingRecord.results.length > 0) {
+            fishingRecord.results.forEach((result: any, index: number) => {
+                resultText += `<b>第 ${index + 1} 次钓鱼：</b> 花费 ${result.baitCost}💰 鱼饵，`;
+                if (result.hooked) {
+                    resultText += `钓到 ${result.fishValue}💰。`;
+                } else {
+                    resultText += `未钓到鱼。`;
+                }
+                resultText += `\n`;
+            });
+        } else {
+            resultText += `今天还没有任何渔获哦~\n`;
+        }
+
+        // 显示今日钓鱼次数
+        resultText += `\n今日已钓次数：<b>${todayCount}</b>次（最多 20 次）`;
+
+        return resultText;
+    }
+
 
     async function setFishingRecord(id: string, record: any) {
         await env.FISHING_RECORD_KV.put(id, JSON.stringify(record));
@@ -64,11 +113,6 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
         // 根据 score 决定鱼获（你可以按需改这个映射）
         if (score < 100) {
-            const resultText =
-                `${getId(msg.from)} 拉杆！\n` +
-                //                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
-
             fishingRecord.results.push({
                 baitCost,
                 hooked: false,
@@ -76,6 +120,13 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             });
 
             await setFishingRecord(ownerIdStr, fishingRecord);
+            const fishingRecordText = showFishingRecord(fishingRecord);
+            const resultText =
+                `${getId(msg.from)} 拉杆！\n` +
+                //                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `
+                + fishingRecordText;
+
 
             return {
                 method: "editMessageText",
@@ -88,10 +139,6 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         }
 
         if (score > 1000) {
-            const resultText =
-                `${getId(msg.from)} 鱼跑了！\n` +
-                //              `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
-                `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
             fishingRecord.results.push({
                 baitCost,
                 hooked: false,
@@ -99,6 +146,14 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             });
 
             await setFishingRecord(ownerIdStr, fishingRecord);
+            const fishingRecordText = showFishingRecord(fishingRecord);
+
+            const resultText =
+                `${getId(msg.from)} 鱼跑了！\n` +
+                //              `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `
+                + fishingRecordText;
+
             return {
                 method: "editMessageText",
                 chat_id,
@@ -172,6 +227,10 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         });
 
         await setFishingRecord(ownerIdStr, fishingRecord);
+        const fishingRecordText = showFishingRecord(fishingRecord);
+        resultText += `\n\n${fishingRecordText}`;
+
+
 
 
 
