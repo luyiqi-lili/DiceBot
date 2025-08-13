@@ -119,7 +119,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         const chosen = fishList[pickIndex];
 
         // 2) 钩上判定：根据 chosen.hookRate 再做一次随机判定
-        const jitter = 0.1 * (baitCost-1);
+        const jitter = 0.1 * (baitCost);
         console.log("鱼饵提供的概率:", jitter);
         console.log("鱼本身的概率:", chosen.hookRate);
 
