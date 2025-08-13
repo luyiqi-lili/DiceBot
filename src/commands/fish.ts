@@ -91,7 +91,7 @@ export function handleFish(msg: any, env: any): Record<string, any> {
         const center = norm * (fishList.length - 1); // 期望索引中心（0..9）
 
         // 使用高斯式权重，使得 score 越高越偏向稀有鱼（索引越大）
-        const sigma = 2.0; // 控制分布宽度，值越小越集中（可调）
+        const sigma = 1.0; // 控制分布宽度，值越小越集中（可调）
         const weights = fishList.map((_, i) => Math.exp(-Math.pow(i - center, 2) / (2 * sigma * sigma)));
         const weightSum = weights.reduce((a, b) => a + b, 0);
         const pick = Math.random() * weightSum;
