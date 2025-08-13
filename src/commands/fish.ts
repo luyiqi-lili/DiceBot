@@ -44,7 +44,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         let resultText = ` <blockquote expandable><b>今日钓鱼记录</b>：\n`;
         if (fishingRecord.results.length > 0) {
             fishingRecord.results.forEach((result: any, index: number) => {
-                resultText += `<b>第 ${index + 1} 次钓鱼：</b> 花费 ${result.baitCost}💰 鱼饵，`;
+                resultText += `<b>第 ${index + 1} 次：</b> 花费 ${result.baitCost}💰 ，`;
                 if (result.hooked) {
                     resultText += `钓到 ${result.fishValue}💰。`;
                 } else {
@@ -228,7 +228,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         fishingRecord.count += 1;
         await setFishingRecord(ownerIdStr, fishingRecord);
         const fishingRecordText = showFishingRecord(fishingRecord);
-        resultText += `\n\n${fishingRecordText}`;
+        resultText += `${fishingRecordText}`;
 
 
 
