@@ -1,0 +1,423 @@
+// src/commands/fish.ts
+export async function handleFish(msg: any, env: any): Record<string, any> {
+    // 余额读写
+    async function getBalance(id: string): Promise<number> {
+        const raw = await env.COIN_KV.get(id);
+        return raw ? parseInt(raw, 10) : 0;
+    }
+    async function setBalance(id: string, bal: number) {
+        await env.COIN_KV.put(id, bal.toString());
+    }
+
+    async function getFishingRecord(id: string): Promise<any> {
+        const record = await env.FISHING_RECORD_KV.get(id);
+        const currentDate = new Date().toISOString().split('T')[0];  // 获取当前日期，格式：YYYY-MM-DD
+
+        if (record) {
+            const parsedRecord = JSON.parse(record);
+
+            // 如果记录中的日期与今天不一致，重置次数
+            if (parsedRecord.date !== currentDate) {
+                parsedRecord.date = currentDate;  // 更新日期
+                parsedRecord.count = 0;           // 重置次数
+                parsedRecord.results = [];        // 清空历史记录
+            }
+
+            return parsedRecord;
+        }
+
+        // 如果没有记录，返回一个新的记录
+        return {
+            date: currentDate,
+            count: 0,
+            results: []
+        };
+
+    }
+
+    // 新建函数：返回用户的钓鱼情况（包括次数、渔获记录）
+    function showFishingRecord(fishingRecord: any): string {
+        // 今日已钓次数
+        const todayCount = fishingRecord.count;
+
+        // 渔获记录
+        let resultText = ` <blockquote expandable><b>今日钓鱼记录</b>：\n`;
+        if (fishingRecord.results.length > 0) {
+            fishingRecord.results.reverse().forEach((result: any, index: number) => {
+                const displayIndex = fishingRecord.results.length - index - 1;
+                resultText += `<b>第${displayIndex + 1}次:</b>花费${result.baitCost}💰,`;
+                if (result.hooked) {
+                    resultText += `钓到${result.fishValue}`;
+                } else {
+                    resultText += `未钓到鱼`;
+                }
+                resultText += `\n`;
+            });
+        } else {
+            resultText += `今天还没有任何渔获哦~\n`;
+        }
+
+        // 显示今日钓鱼次数
+        resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 20 次）`;
+
+        return resultText;
+    }
+
+
+    async function setFishingRecord(id: string, record: any) {
+        await env.FISHING_RECORD_KV.put(id, JSON.stringify(record));
+    }
+
+    const botName = env.BOT_USERNAME;
+    const getId = (u: any) => u.first_name || "钓鱼者";
+
+    // 兼容 message 和 callback_query
+    const chat_id = msg.chat?.id ?? msg.message.chat.id;
+    const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
+
+    const allowed =
+        (chat_id === -1002848481881 && [66].includes(thread_id)) ||
+        (chat_id === -1002742074355 && [454656].includes(thread_id));
+    if (!allowed) {
+        return {
+            method: "sendMessage",
+            chat_id: chat_id,
+            text:
+                `🎣 这里不适合钓鱼。或许前往群岛，才能收获渔获……`,
+            parse_mode: "HTML",
+        };
+    }
+
+
+
+    // —— Callback 阶段：用户点了拉杆按钮，callback_data 格式： "fish_pull:<ownerId>:<strength>:<baitCost>" ——
+    if (msg.data?.startsWith("fish_pull:")) {
+        const parts = msg.data.split(":");
+        // parts[0] = "fish_pull"
+        const ownerIdStr = parts[1];
+        const strengthStr = parts[2] || "1";
+        const baitCostStr = parts[3] || "1";
+
+        const ownerId = parseInt(ownerIdStr, 10);
+        const strength = Math.max(1, parseInt(strengthStr, 10) || 1);
+        const baitCost = Math.max(1, parseInt(baitCostStr, 10) || 1);
+
+        const clickerId = msg.from?.id;
+        const clickerName = getId(msg.from);
+        const currentBal = await getBalance(ownerIdStr);
+        const fishingRecord = await getFishingRecord(ownerIdStr);
+
+        // 只有发起者本人可以拉杆
+        if (clickerId !== ownerId) {
+            return {
+                method: "answerCallbackQuery",
+                callback_query_id: msg.id,
+                text: `只有发起者本人可以拉杆哦：${ownerId === clickerId ? clickerName : "不是你"}`,
+                show_alert: true
+            };
+        }
+
+        // 计算时间差（秒）：用 bot 原始消息的 date 字段作为起点
+        // msg.message.date 是机器人发送那条“抛竿中”消息的 Unix 时间（秒）
+        const startTs = msg.message?.date ?? Math.floor(Date.now() / 1000);
+        const nowTs = Math.floor(Date.now() / 1000);
+        let seconds = nowTs - startTs;
+        if (seconds < 0) seconds = 0;
+
+        const rawScore = seconds * strength;
+        const score = Math.floor(rawScore);
+
+        // 根据 score 决定鱼获（你可以按需改这个映射）
+        if (score < 100) {
+            fishingRecord.results.push({
+                baitCost,
+                hooked: false,
+                fishValue: 0,
+            });
+            fishingRecord.count += 1;
+            await setFishingRecord(ownerIdStr, fishingRecord);
+            const fishingRecordText = showFishingRecord(fishingRecord);
+            const resultText =
+                `${getId(msg.from)} 拉杆！\n` +
+                //                `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `
+                + fishingRecordText;
+
+
+            return {
+                method: "editMessageText",
+                chat_id,
+                message_id: msg.message.message_id,
+                parse_mode: "HTML",
+                text: resultText,
+                reply_markup: { inline_keyboard: [] }
+            };
+        }
+
+        if (score > 1000) {
+            fishingRecord.results.push({
+                baitCost,
+                hooked: false,
+                fishValue: 0,
+            });
+            fishingRecord.count += 1;
+            await setFishingRecord(ownerIdStr, fishingRecord);
+            const fishingRecordText = showFishingRecord(fishingRecord);
+
+            const resultText =
+                `${getId(msg.from)} 鱼跑了！\n` +
+                //              `拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n` +
+                `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `
+                + fishingRecordText;
+
+            return {
+                method: "editMessageText",
+                chat_id,
+                message_id: msg.message.message_id,
+                parse_mode: "HTML",
+                text: resultText,
+                reply_markup: { inline_keyboard: [] }
+            };
+        }
+
+        // 介于 100 和 1000：两步判定
+        // 1) 定义 10 种鱼（从常见到稀有），并设置稀有鱼更难上钩的 hookRate
+        const fishList = [
+            { name: "🍾破损漂流瓶", hookRate: 0.60, value: 0 },
+            { name: "🪵浮木", hookRate: 0.60, value: 0 },
+            { name: "👢没用的靴子", hookRate: 0.60, value: 0 },
+            { name: "🌿绿海草", hookRate: 0.60, value: 0 },
+            { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 0 },
+
+            { name: "🐚回音海螺", hookRate: 0.40, value: 1 },
+            { name: "🦀三钳蟹", hookRate: 0.40, value: 1 },
+            { name: "🦐樱花虾", hookRate: 0.40, value: 1 },
+            { name: "🌿蓝海草", hookRate: 0.40, value: 1 },
+            { name: "🐟沙丁鱼", hookRate: 0.40, value: 1 },
+            { name: "<tg-spoiler>🔵跳蛋</tg-spoiler>", hookRate: 0.40, value: 1 },
+
+            { name: "🐡红刺豚", hookRate: 0.35, value: 2 },
+            { name: "🐟蓝鳍鱼", hookRate: 0.35, value: 2 },
+            { name: "🐠带刺石斑", hookRate: 0.35, value: 2 },
+            { name: "🐟石楠花鱼", hookRate: 0.35, value: 2 },
+            { name: "🐟穴鱼", hookRate: 0.35, value: 2 },
+            { name: "🐡球绒鱼", hookRate: 0.35, value: 2 },
+            { name: "🐟芒果鱼", hookRate: 0.35, value: 2 },
+            { name: "<tg-spoiler>📿项圈</tg-spoiler>", hookRate: 0.35, value: 2 },
+
+            { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
+            { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
+            { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
+            { name: "<tg-spoiler>⚡震动棒</tg-spoiler>", hookRate: 0.30, value: 3 },
+            { name: "<tg-spoiler>🍆假阳具</tg-spoiler>", hookRate: 0.30, value: 3 },
+
+            { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
+            { name: "<tg-spoiler>🛏️充气娃娃</tg-spoiler>", hookRate: 0.25, value: 5 },
+            { name: "🦑毒刺乌贼", hookRate: 0.25, value: 5 },
+            { name: "🐝海蜻蜓", hookRate: 0.25, value: 5 },
+            { name: "🦭尖牙海豹", hookRate: 0.25, value: 5 },
+            { name: "🐟双塔金枪鱼", hookRate: 0.25, value: 5 },
+            { name: "🦐猎人巨虾", hookRate: 0.25, value: 5 },
+            { name: "🌭深海肉茎", hookRate: 0.25, value: 5 },
+            { name: "🪼黏液海触手", hookRate: 0.25, value: 5 },
+            { name: "🦑骆驼乌贼", hookRate: 0.25, value: 5 },
+            { name: "🪙金币鱼", hookRate: 0.25, value: 5 },
+            { name: "🐟巨嘴金鱼", hookRate: 0.25, value: 5 },
+
+            { name: "🐬彩虹海豚", hookRate: 0.20, value: 7 },
+            { name: "🌊风暴海鲈", hookRate: 0.20, value: 7 },
+            { name: "🌹玫瑰海胆", hookRate: 0.20, value: 7 },
+            { name: "🐟冰原鲳", hookRate: 0.20, value: 7 },
+            { name: "🪸珊瑚海马", hookRate: 0.20, value: 7 },
+            { name: "🛡️骑士鱼", hookRate: 0.20, value: 7 },
+            { name: "💖爱心鱼", hookRate: 0.20, value: 7 },
+            { name: "🐠阴蒂鱼", hookRate: 0.20, value: 7 },
+
+            { name: "🐉红蛟", hookRate: 0.15, value: 11 },
+            { name: "🧬远古海马", hookRate: 0.15, value: 11 },
+            { name: "☯️阴阳鱼", hookRate: 0.15, value: 11 },
+            { name: "🌺牡丹海参", hookRate: 0.15, value: 11 },
+            { name: "🐢银龟", hookRate: 0.15, value: 11 },
+            { name: "☀️太阳鲨鱼", hookRate: 0.15, value: 11 },
+            { name: "🌋岩浆鳗鱼", hookRate: 0.15, value: 11 },
+            { name: "⚡雷电鮟鱇鱼", hookRate: 0.15, value: 11 },
+            { name: "🌊潮汐鱼人", hookRate: 0.15, value: 11 },
+            { name: "🦑黄金乌贼", hookRate: 0.15, value: 11 },
+            { name: "🐋触须鲸", hookRate: 0.15, value: 11 },
+
+            { name: "🦈龙牙鲨", hookRate: 0.15, value: 13 },
+            { name: "🐍巨角蟒", hookRate: 0.15, value: 13 },
+            { name: "🦏海犀牛", hookRate: 0.15, value: 13 },
+            { name: "🦑大王乌贼", hookRate: 0.15, value: 13 },
+
+            { name: "🧜‍♀️七彩美人鱼", hookRate: 0.10, value: 19 },
+            { name: "👑皇后利刃鲨", hookRate: 0.10, value: 19 },
+
+            { name: "👑深海领主", hookRate: 0.05, value: 23 },
+            { name: "🐉海皇利维坦", hookRate: 0.05, value: 23 },
+
+            { name: "💎时光紫罗兰碎片", hookRate: -0.05, value: 29 },
+
+            { name: "<tg-spoiler>🩲酥酥的白色内裤</tg-spoiler>", hookRate: -0.15, value: 31 },
+            { name: "<tg-spoiler>🥚龙蛋</tg-spoiler>", hookRate: -0.15, value: 31 },
+            { name: "<tg-spoiler>📖可柔年鉴拓本</tg-spoiler>", hookRate: -0.15, value: 31 },
+            { name: "<tg-spoiler>👙fufu的胸罩</tg-spoiler>", hookRate: -0.15, value: 31 },
+            { name: "<tg-spoiler>✈️勇菈的人格飞机杯</tg-spoiler>", hookRate: -0.15, value: 31 },
+            { name: "<tg-spoiler>🥕闪闪的黄金萝卜</tg-spoiler>", hookRate: -0.15, value: 31 }
+
+        ];
+
+        // 将 score 归一到 0..1，100 -> 0, 1000 -> 1
+        const norm = (score - 100) / (1000 - 100);
+        const center = norm * (fishList.length - 1); // 期望索引中心（0..9）
+
+        // 使用高斯式权重，使得 score 越高越偏向稀有鱼（索引越大）
+        const sigma = 1.0; // 控制分布宽度，值越小越集中（可调）
+        const weights = fishList.map((_, i) => Math.exp(-Math.pow(i - center, 2) / (2 * sigma * sigma)));
+        const weightSum = weights.reduce((a, b) => a + b, 0);
+        const pick = Math.random() * weightSum;
+        let acc = 0;
+        let pickIndex = 0;
+        for (let i = 0; i < weights.length; i++) {
+            acc += weights[i];
+            if (pick <= acc) {
+                pickIndex = i;
+                break;
+            }
+        }
+        const chosen = fishList[pickIndex];
+
+        // 2) 钩上判定：根据 chosen.hookRate 再做一次随机判定
+        const jitter = 0.1 * (baitCost);
+        console.log("鱼饵提供的概率:", jitter);
+        console.log("鱼本身的概率:", chosen.hookRate);
+
+        const finalHookProb = Math.max(0, Math.min(1, chosen.hookRate + jitter));
+        console.log("实际生效的概率:", finalHookProb);
+
+        const hooked = Math.random() < finalHookProb;
+
+        let resultText = `${getId(msg.from)} 拉杆！\n`
+        //        +`拉杆用时：<b>${seconds}</b> 秒 × 力度 <b>${strength}</b> = 得分 <b>${score}</b>\n\n`;
+
+        if (hooked) {
+            const newBal = currentBal + chosen.value;
+            await setBalance(ownerIdStr, newBal);
+            resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得${chosen.value}💰渔获，最新余额 ${newBal}💰 `
+        } else {
+            // 失败：鱼挣脱（稀有鱼更容易挣脱）
+            resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 `;
+        }
+        fishingRecord.results.push({
+            baitCost,
+            hooked,
+            fishValue: hooked ? chosen.name : 0,
+        });
+        fishingRecord.count += 1;
+        await setFishingRecord(ownerIdStr, fishingRecord);
+        const fishingRecordText = showFishingRecord(fishingRecord);
+        resultText += `${fishingRecordText}`;
+
+
+
+
+
+        return {
+            method: "editMessageText",
+            chat_id,
+            message_id: msg.message.message_id,
+            parse_mode: "HTML",
+            text: resultText,
+            reply_markup: { inline_keyboard: [] } // 移除按钮
+        };
+    }
+
+    // —— 发起阶段：@Bot /fish 3 —— 
+    // 支持写法：@BOT_USERNAME /fish 3
+    const m = msg.text?.match(new RegExp(`@${botName}\\s+/fish\\s+(\\d+)`, "i"));
+    if (m) {
+        const strength = Math.floor(Math.random() * 100) + 1;
+        const baitCost = Math.max(1, parseInt(m[1], 10) || 1);
+        const userName = getId(msg.from);
+        const ownerId = msg.from.id;
+
+
+        const fishingRecord = await getFishingRecord(ownerId);
+        if (fishingRecord.count >= 20) {
+            return {
+                method: "sendMessage",
+                chat_id: chat_id,
+                text: `❌ ${getId(msg.from)}，今天已经钓了20次，不能再钓了。`,
+                parse_mode: "HTML",
+            };
+        }
+
+
+        const currentBal = await getBalance(ownerId);
+        if (currentBal < baitCost) {
+            return {
+                method: "sendMessage",
+                chat_id: chat_id,
+                text: `❌ ${userName}，你的余额不足，当前只有 ${currentBal} 💰。`,
+                parse_mode: "HTML",
+            };
+        }
+        const newBal = currentBal - baitCost;
+        await setBalance(ownerId, newBal);
+
+        const castDesc = (() => {
+            if (strength <= 10) {
+                return "轻轻一抛，水面只泛起细碎涟漪，仿佛在对你低声耳语。";
+            } else if (strength <= 20) {
+                return "划出一道优雅的弧线，浮漂微颤，风中夹着松香与海盐的气息。";
+            } else if (strength <= 30) {
+                return "动作稳健，鱼线划破空气，落点处闪过一丝银色光芒。";
+            } else if (strength <= 40) {
+                return "一记有力的抛投，水面溅起弧形水花，仿佛惊动了湖底的守护灵。";
+            } else if (strength <= 50) {
+                return "力道十足，鱼线如弓弦绷直，周遭的空气也为之一振。";
+            } else if (strength <= 60) {
+                return "蛮力与技巧并存，抛出之处泛起层层涟漪，似乎呼唤着深处巨影。";
+            } else if (strength <= 70) {
+                return "这一抛带着烈风，鱼线像流星穿过晨雾，远方水域开始不安。";
+            } else if (strength <= 80) {
+                return "宛如英雄挥矛，鱼线直刺深海，水下传来低沉的回应。";
+            } else if (strength <= 100) {
+                return "强势一挥，几乎卷起周遭的风声，水面裂出一道光缝，古老鱼群被惊起。";
+            } else {
+                return "以超凡之力甩出渔线！饵远飞天际！";
+            }
+        })();
+
+        const initText =
+            `${userName} 花费${baitCost}💰的鱼饵后， 抛出渔线，${castDesc}\n\n` +
+            `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
+
+        // callback_data 里存 ownerId 和 strength，实际计算时使用 msg.message.date（由 Telegram 提供）
+        const callbackData = `fish_pull:${ownerId}:${strength}:${baitCost}`;
+
+        return {
+            chat_id,
+            text: initText,
+            parse_mode: "HTML",
+            ...(thread_id && { message_thread_id: thread_id }),
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {
+                            text: "🎣 拉杆",
+                            callback_data: callbackData
+                        }
+                    ]
+                ]
+            }
+        };
+    }
+
+    // 默认：命令格式错误提示
+    return {
+        chat_id,
+        text: `命令格式不正确。\n正确用法：@${botName} /fish 【鱼饵花费💰（正整数）】\n例如：@${botName} /fish 3`,
+        parse_mode: "HTML"
+    };
+}

@@ -37,6 +37,10 @@
 					"id": "f46b32828f934342b2dbc61519ee4e0d"
 				},
 				{
+					"binding": "FISHING_RECORD_KV", // 钓鱼记录 KV
+					"id": "1608b698ec774932b5a3128074d55147"
+				},
+				{
 					"binding": "COIN_KV", // 货币 KV
 					"id": "8d91b0d1ec1d4625be3e68ec2c63efc6"
 				}
@@ -83,6 +87,10 @@
 				{
 					"binding": "TOPIC_KV", // 房间标题 KV
 					"id": "f16bb535b489446f953995a79fb6532a"
+				},
+				{
+					"binding": "FISHING_RECORD_KV", // 钓鱼记录 KV
+					"id": "b638e269b96d487e93f26db0a89ad553"
 				},
 				{
 					"binding": "COIN_KV", // 货币 KV
