@@ -18,6 +18,16 @@ const payConfigs = [
     "enabled": true,
     "successMessage": "${userName}轻轻摇响供奉台上的铃铛，清脆声响在天狐宫回荡。他将 ${amount} 💰投入${place}，随后闭上双眼，双手合十，心中默念祈愿。${place}现已汇聚 ${total} 💰的祈愿之力。"
   },
+  {
+    "chatId": -1002848481881,
+    "threadIds": [66],
+    "placeName": "天狐宫的祈愿箱",
+    "enabled": true,
+    "successMessage": "${userName}轻轻摇响供奉台上的铃铛，清脆声响在天狐宫回荡。他将 ${amount} 💰投入${place}，随后闭上双眼，双手合十，心中默念祈愿。${place}现已汇聚 ${total} 💰的祈愿之力。"
+    +"铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。<br/>铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。<br/>拉动铃绳，铃"
+    +"铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。<br/>双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。<br/>心跳与手心的温度，似乎"+
+    "与远处的狐火呼应，燃成一点点无形的光。<br/>最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。<br/>临走时，不起眼的小狐灵悄悄的跟了过去守护着。"
+  }
   /*  {
       "chatId": -1002742074355,
       "threadIds": [345],
@@ -25,14 +35,14 @@ const payConfigs = [
       "enabled": true,
       "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
     },
-    */
+    
   {
     "chatId": -1002848481881,
     "threadIds": [66],
     "placeName": "骰娘调校房的黑箱子",
     "enabled": true,
     "successMessage": "${userName} 向${place}投了 ${amount} 💰，现在累计 ${total} 💰。"
-  }
+  }*/
 ]
 
 
@@ -51,7 +61,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   const sub = parts[1]?.toLowerCase();
 
   const todayD = new Date();
-  
+
   const duringEvent = (todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17"));
   const duringTrans = (todayD >= new Date("2025-08-15") && todayD <= new Date("2025-08-17"));
 
