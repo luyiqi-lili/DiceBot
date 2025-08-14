@@ -14,9 +14,9 @@ const payConfigs = [
   {
     "chatId": -1002742074355,
     "threadIds": [182],
-    "placeName": "天狐宫的祈福箱",
+    "placeName": "天狐宫的祈愿箱",
     "enabled": true,
-    "successMessage": "${userName} 往${place}投入 ${amount} 💰，似乎有好运到来。${place}现在有 ${total} 💰。"
+    "successMessage": "${userName}轻轻摇响供奉台上的铃铛，清脆声响在天狐宫回荡。他将 ${amount} 💰投入${place}，随后闭上双眼，双手合十，心中默念祈愿。${place}现已汇聚 ${total} 💰的祈愿之力。"
   },
   /*  {
       "chatId": -1002742074355,
