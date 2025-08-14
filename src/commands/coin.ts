@@ -10,22 +10,22 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 const payConfigs = [
-/*
+
   {
     "chatId": -1002742074355,
-    "threadIds": [62],
-    "placeName": "教堂的喷泉",
+    "threadIds": [182],
+    "placeName": "天狐宫的祈愿箱",
     "enabled": true,
-    "successMessage": "${userName} 往${place}投入 ${amount} 💰，荡起一圈涟漪。${place}现在有 ${total} 💰。"
+    "successMessage": "${userName}轻轻摇响供奉台上的铃铛，清脆声响在天狐宫回荡。他将 ${amount} 💰投入${place}，随后闭上双眼，双手合十，心中默念祈愿。${place}现已汇聚 ${total} 💰的祈愿之力。"
   },
-  {
-    "chatId": -1002742074355,
-    "threadIds": [345],
-    "placeName": "桌游室的收银台",
-    "enabled": true,
-    "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
-  },
-  */
+  /*  {
+      "chatId": -1002742074355,
+      "threadIds": [345],
+      "placeName": "桌游室的收银台",
+      "enabled": true,
+      "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
+    },
+    */
   {
     "chatId": -1002848481881,
     "threadIds": [66],
@@ -49,6 +49,12 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   if (parts[0] !== "/coin") return {};
 
   const sub = parts[1]?.toLowerCase();
+
+  const todayD = new Date();
+  
+  const duringEvent = (todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17"));
+  const duringTrans = (todayD >= new Date("2025-08-15") && todayD <= new Date("2025-08-17"));
+
 
   // 余额读写
   async function getBalance(id: string): Promise<number> {
@@ -100,11 +106,9 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       };
     }
     // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
-    const todayD = new Date();
-    const promoStart = new Date("2025-08-12");
-    const promoEnd = new Date("2025-08-17");
-    
-    const gain = (todayD >= promoStart && todayD <= promoEnd)
+
+
+    const gain = (duringEvent)
       ? randomInt(11, 20)
       : randomInt(1, 10);
     const bal = await getBalance(userId);
@@ -200,7 +204,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   // ——— 转账，并由接收者支付阶梯手续费 ———
   if (sub === "send") {
-    if (1 == 1) {
+    if (!duringTrans) {
       return {
         method: "sendMessage",
         chat_id: chatId,
@@ -247,12 +251,12 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
     // 3. 确定阶梯费率（示例）
     let rate: number;
-    if (oldBal < 10) rate = 0.1;        // 10%
-    else if (oldBal < 30) rate = 0.2;   // 30%
-    else if (oldBal < 50) rate = 0.5;  // 50%
-    else if (oldBal < 70) rate = 0.7;  // 70%
-    else if (oldBal < 90) rate = 0.9;  // 90%
-    else rate = 0.99;                       // 99%
+    if (oldBal < 10) rate = 0;        // 0%
+    else if (oldBal < 30) rate = 0.1;   // 10%
+    else if (oldBal < 50) rate = 0.3;  // 30%
+    else if (oldBal < 70) rate = 0.5;  // 50%
+    else if (oldBal < 90) rate = 0.7;  // 70%
+    else rate = 0.9;                       // 90%
 
     // 4. 计算手续费（向下取整）
     const fee = Math.floor(amount * rate);
