@@ -75,6 +75,21 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
     const chat_id = msg.chat?.id ?? msg.message.chat.id;
     const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
 
+    const allowed =
+      (chatId === -1002848481881 && [66].includes(threadId)) ||
+      (chatId === -1002742074355 && [454656].includes(threadId));
+    if (!allowed) {
+      return {
+        method: "sendMessage",
+        chat_id: chatId,
+        text:
+          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+        parse_mode: "HTML",
+      };
+    }
+
+
+
     // —— Callback 阶段：用户点了拉杆按钮，callback_data 格式： "fish_pull:<ownerId>:<strength>:<baitCost>" ——
     if (msg.data?.startsWith("fish_pull:")) {
         const parts = msg.data.split(":");
