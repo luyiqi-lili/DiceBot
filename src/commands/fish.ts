@@ -76,16 +76,16 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
     const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
 
     const allowed =
-      (chat_id === -1002848481881 && [66].includes(thread_id)) ||
-      (chat_id === -1002742074355 && [454656].includes(thread_id));
+        (chat_id === -1002848481881 && [66].includes(thread_id)) ||
+        (chat_id === -1002742074355 && [454656].includes(thread_id));
     if (!allowed) {
-      return {
-        method: "sendMessage",
-        chat_id: chat_id,
-        text:
-          `🎣 这里不适合钓鱼。或许前往群岛，才能收获渔获……`,
-        parse_mode: "HTML",
-      };
+        return {
+            method: "sendMessage",
+            chat_id: chat_id,
+            text:
+                `🎣 这里不适合钓鱼。或许前往群岛，才能收获渔获……`,
+            parse_mode: "HTML",
+        };
     }
 
 
@@ -183,16 +183,88 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         // 介于 100 和 1000：两步判定
         // 1) 定义 10 种鱼（从常见到稀有），并设置稀有鱼更难上钩的 hookRate
         const fishList = [
-            { name: "🪱 小虾", hookRate: 0.40, value: 1 },
-            { name: "🐟 小鲫鱼", hookRate: 0.35, value: 2 },
-            { name: "🐠 鲤鱼", hookRate: 0.30, value: 3 },
-            { name: "🐡 黄花鱼", hookRate: 0.25, value: 5 },
-            { name: "🐟 鲈鱼", hookRate: 0.20, value: 7 },
-            { name: "🦈 海鲈", hookRate: 0.15, value: 11 },
-            { name: "🐟 石斑鱼", hookRate: 0.10, value: 13 },
-            { name: "🐋 金枪鱼", hookRate: 0.05, value: 19 },
-            { name: "🦈 大白鲨", hookRate: 0.00, value: 23 },
-            { name: "🧜‍♀️ 美人鱼", hookRate: -0.05, value: 29 }
+            { name: "🍾破损漂流瓶", hookRate: 0.60, value: 0 },
+            { name: "🪵浮木", hookRate: 0.60, value: 0 },
+            { name: "👢没用的靴子", hookRate: 0.60, value: 0 },
+            { name: "🌿绿海草", hookRate: 0.60, value: 0 },
+            { name: "🩸用过的避孕套", hookRate: 0.60, value: 0 },
+
+            { name: "🐚回音海螺", hookRate: 0.40, value: 1 },
+            { name: "🦀三钳蟹", hookRate: 0.40, value: 1 },
+            { name: "🦐樱花虾", hookRate: 0.40, value: 1 },
+            { name: "🌿蓝海草", hookRate: 0.40, value: 1 },
+            { name: "🐟沙丁鱼", hookRate: 0.40, value: 1 },
+            { name: "🔵跳蛋", hookRate: 0.40, value: 1 },
+
+            { name: "🐡红刺豚", hookRate: 0.35, value: 2 },
+            { name: "🐟蓝鳍鱼", hookRate: 0.35, value: 2 },
+            { name: "🐠带刺石斑", hookRate: 0.35, value: 2 },
+            { name: "🐟石楠花鱼", hookRate: 0.35, value: 2 },
+            { name: "🐟穴鱼", hookRate: 0.35, value: 2 },
+            { name: "🐡球绒鱼", hookRate: 0.35, value: 2 },
+            { name: "🐟芒果鱼", hookRate: 0.35, value: 2 },
+            { name: "📿项圈", hookRate: 0.35, value: 2 },
+
+            { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
+            { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
+            { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
+            { name: "⚡震动棒", hookRate: 0.30, value: 3 },
+            { name: "🍆假阳具", hookRate: 0.30, value: 3 },
+
+            { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
+            { name: "🛏️充气娃娃", hookRate: 0.25, value: 5 },
+            { name: "🦑毒刺乌贼", hookRate: 0.25, value: 5 },
+            { name: "🐝海蜻蜓", hookRate: 0.25, value: 5 },
+            { name: "🦭尖牙海豹", hookRate: 0.25, value: 5 },
+            { name: "🐟双塔金枪鱼", hookRate: 0.25, value: 5 },
+            { name: "🦐猎人巨虾", hookRate: 0.25, value: 5 },
+            { name: "🌭深海肉茎", hookRate: 0.25, value: 5 },
+            { name: "🪼黏液海触手", hookRate: 0.25, value: 5 },
+            { name: "🦑骆驼乌贼", hookRate: 0.25, value: 5 },
+            { name: "🪙金币鱼", hookRate: 0.25, value: 5 },
+            { name: "🐟巨嘴金鱼", hookRate: 0.25, value: 5 },
+
+            { name: "🐬彩虹海豚", hookRate: 0.20, value: 7 },
+            { name: "🌊风暴海鲈", hookRate: 0.20, value: 7 },
+            { name: "🌹玫瑰海胆", hookRate: 0.20, value: 7 },
+            { name: "🐟冰原鲳", hookRate: 0.20, value: 7 },
+            { name: "🪸珊瑚海马", hookRate: 0.20, value: 7 },
+            { name: "🛡️骑士鱼", hookRate: 0.20, value: 7 },
+            { name: "💖爱心鱼", hookRate: 0.20, value: 7 },
+            { name: "🐠阴蒂鱼", hookRate: 0.20, value: 7 },
+
+            { name: "🐉红蛟", hookRate: 0.15, value: 11 },
+            { name: "🧬远古海马", hookRate: 0.15, value: 11 },
+            { name: "☯️阴阳鱼", hookRate: 0.15, value: 11 },
+            { name: "🌺牡丹海参", hookRate: 0.15, value: 11 },
+            { name: "🐢银龟", hookRate: 0.15, value: 11 },
+            { name: "☀️太阳鲨鱼", hookRate: 0.15, value: 11 },
+            { name: "🌋岩浆鳗鱼", hookRate: 0.15, value: 11 },
+            { name: "⚡雷电鮟鱇鱼", hookRate: 0.15, value: 11 },
+            { name: "🌊潮汐鱼人", hookRate: 0.15, value: 11 },
+            { name: "🦑黄金乌贼", hookRate: 0.15, value: 11 },
+            { name: "🐋触须鲸", hookRate: 0.15, value: 11 },
+
+            { name: "🦈龙牙鲨", hookRate: 0.15, value: 13 },
+            { name: "🐍巨角蟒", hookRate: 0.15, value: 13 },
+            { name: "🦏海犀牛", hookRate: 0.15, value: 13 },
+            { name: "🦑大王乌贼", hookRate: 0.15, value: 13 },
+
+            { name: "🧜‍♀️七彩美人鱼", hookRate: 0.10, value: 19 },
+            { name: "👑皇后利刃鲨", hookRate: 0.10, value: 19 },
+
+            { name: "👑深海领主", hookRate: 0.05, value: 23 },
+            { name: "🐉海皇利维坦", hookRate: 0.05, value: 23 },
+
+            { name: "💎时光紫罗兰碎片", hookRate: -0.05, value: 29 },
+
+            { name: "🩲酥酥的白色内裤", hookRate: -0.15, value: 31 },
+            { name: "🥚龙蛋", hookRate: -0.15, value: 31 },
+            { name: "📖可柔年鉴拓本", hookRate: -0.15, value: 31 },
+            { name: "👙fufu的胸罩", hookRate: -0.15, value: 31 },
+            { name: "✈️勇菈的人格飞机杯", hookRate: -0.15, value: 31 },
+            { name: "🥕闪闪的黄金萝卜", hookRate: -0.15, value: 31 }
+
         ];
 
         // 将 score 归一到 0..1，100 -> 0, 1000 -> 1
