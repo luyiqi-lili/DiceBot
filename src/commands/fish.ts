@@ -76,14 +76,14 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
     const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
 
     const allowed =
-      (chatId === -1002848481881 && [66].includes(threadId)) ||
-      (chatId === -1002742074355 && [454656].includes(threadId));
+      (chat_id === -1002848481881 && [66].includes(thread_id)) ||
+      (chat_id === -1002742074355 && [454656].includes(thread_id));
     if (!allowed) {
       return {
         method: "sendMessage",
-        chat_id: chatId,
+        chat_id: chat_id,
         text:
-          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+          `🎣 这里不适合钓鱼。或许前往群岛，才能收获渔获……`,
         parse_mode: "HTML",
       };
     }
