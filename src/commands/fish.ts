@@ -245,25 +245,25 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             { name: "🦑黄金乌贼", hookRate: 0.15, value: 11 },
             { name: "🐋触须鲸", hookRate: 0.15, value: 11 },
 
-            { name: "🦈龙牙鲨", hookRate: 0.15, value: 13 },
-            { name: "🐍巨角蟒", hookRate: 0.15, value: 13 },
-            { name: "🦏海犀牛", hookRate: 0.15, value: 13 },
-            { name: "🦑大王乌贼", hookRate: 0.15, value: 13 },
+            { name: "🦈龙牙鲨", hookRate: 0.10, value: 13 },
+            { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
+            { name: "🦏海犀牛", hookRate: 0.10, value: 13 },
+            { name: "🦑大王乌贼", hookRate: 0.10, value: 13 },
 
-            { name: "🧜‍♀️七彩美人鱼", hookRate: 0.10, value: 19 },
-            { name: "👑皇后利刃鲨", hookRate: 0.10, value: 19 },
+            { name: "🧜‍♀️七彩美人鱼", hookRate: 0.05, value: 19 },
+            { name: "👑皇后利刃鲨", hookRate: 0.05, value: 19 },
 
-            { name: "👑深海领主", hookRate: 0.05, value: 23 },
-            { name: "🐉海皇利维坦", hookRate: 0.05, value: 23 },
+            { name: "👑深海领主", hookRate: -0.05, value: 23 },
+            { name: "🐉海皇利维坦", hookRate: -0.05, value: 23 },
 
-            { name: "💎时光紫罗兰碎片", hookRate: -0.05, value: 29 },
+            { name: "💎时光紫罗兰碎片", hookRate: -0.15, value: 29 },
 
-            { name: "<tg-spoiler>🩲酥酥的白色内裤</tg-spoiler>", hookRate: -0.15, value: 31 },
-            { name: "<tg-spoiler>🥚龙蛋</tg-spoiler>", hookRate: -0.15, value: 31 },
-            { name: "<tg-spoiler>📖可柔年鉴拓本</tg-spoiler>", hookRate: -0.15, value: 31 },
-            { name: "<tg-spoiler>👙fufu的胸罩</tg-spoiler>", hookRate: -0.15, value: 31 },
-            { name: "<tg-spoiler>✈️勇菈的人格飞机杯</tg-spoiler>", hookRate: -0.15, value: 31 },
-            { name: "<tg-spoiler>🥕闪闪的黄金萝卜</tg-spoiler>", hookRate: -0.15, value: 31 }
+            { name: "<tg-spoiler>🩲酥酥的白色内裤</tg-spoiler>", hookRate: -0.25, value: 31 },
+            { name: "<tg-spoiler>🥚龙蛋</tg-spoiler>", hookRate: -0.25, value: 31 },
+            { name: "<tg-spoiler>📖可柔年鉴拓本</tg-spoiler>", hookRate: -0.25, value: 31 },
+            { name: "<tg-spoiler>👙fufu的胸罩</tg-spoiler>", hookRate: -0.25, value: 31 },
+            { name: "<tg-spoiler>✈️勇菈的人格飞机杯</tg-spoiler>", hookRate: -0.25, value: 31 },
+            { name: "<tg-spoiler>🥕闪闪的黄金萝卜</tg-spoiler>", hookRate: -0.25, value: 31 }
 
         ];
 
