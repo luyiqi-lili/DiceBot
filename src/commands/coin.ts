@@ -10,15 +10,15 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 const payConfigs = [
-  /*
-    {
-      "chatId": -1002742074355,
-      "threadIds": [62],
-      "placeName": "教堂的喷泉",
-      "enabled": true,
-      "successMessage": "${userName} 往${place}投入 ${amount} 💰，荡起一圈涟漪。${place}现在有 ${total} 💰。"
-    },
-    {
+
+  {
+    "chatId": -1002742074355,
+    "threadIds": [182],
+    "placeName": "天狐宫的祈福箱",
+    "enabled": true,
+    "successMessage": "${userName} 往${place}投入 ${amount} 💰，似乎有好运到来。${place}现在有 ${total} 💰。"
+  },
+  /*  {
       "chatId": -1002742074355,
       "threadIds": [345],
       "placeName": "桌游室的收银台",
@@ -54,6 +54,8 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   const promoStart = new Date("2025-08-12");
   const promoEnd = new Date("2025-08-17");
   const duringEvent = (todayD >= promoStart && todayD <= promoEnd);
+  const duringTrans = (todayD >= new Date("2025-08-14") && todayD <= new Date("2025-08-17"));
+
 
   // 余额读写
   async function getBalance(id: string): Promise<number> {
@@ -203,7 +205,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
   // ——— 转账，并由接收者支付阶梯手续费 ———
   if (sub === "send") {
-    if (1 == 1) {
+    if (!duringTrans) {
       return {
         method: "sendMessage",
         chat_id: chatId,
