@@ -14,6 +14,7 @@ import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
 import { handleDeleteMessage } from "./commands/deleteMessage";
 import { handleFate } from "./commands/fate";
+import { handleFish } from "./commands/fish";
 
 
 export default {
@@ -70,6 +71,8 @@ export default {
         cq.data.startsWith("21_next")
       ) {
         payload = handle21(cq, env);
+      } else if (cq.data?.startsWith("fish_pull:")) {
+        payload = await handleFish(cq, env);
       }
       else if (cq.data === "delete_message") {
         payload = await handleDeleteMessage(cq, env);
@@ -282,6 +285,8 @@ export default {
     } else if (/\/duel\b/.test(text)) {
       console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
       payload = { ...payload, ...handleDuel(msg, env) };
+    } else if (/\/fish\b/.test(text)) {
+      payload = { ...payload, ...(await handleFish(msg, env)) };
     } else if (/\/like\b/.test(text)) {
       // 调用我们在下一步定义的 handleLike
       const res = await handleLike(msg, env);
