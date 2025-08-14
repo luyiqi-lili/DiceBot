@@ -51,10 +51,9 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
   const sub = parts[1]?.toLowerCase();
 
   const todayD = new Date();
-  const promoStart = new Date("2025-08-12");
-  const promoEnd = new Date("2025-08-17");
-  const duringEvent = (todayD >= promoStart && todayD <= promoEnd);
-  const duringTrans = (todayD >= new Date("2025-08-14") && todayD <= new Date("2025-08-17"));
+  
+  const duringEvent = (todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17"));
+  const duringTrans = (todayD >= new Date("2025-08-15") && todayD <= new Date("2025-08-17"));
 
 
   // 余额读写
