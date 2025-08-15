@@ -266,11 +266,11 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
 
     // 3. 确定阶梯费率（示例）
     let rate: number;
-    if (oldBal < 10) rate = 0;        // 0%
-    else if (oldBal < 30) rate = 0.1;   // 10%
-    else if (oldBal < 50) rate = 0.3;  // 30%
-    else if (oldBal < 70) rate = 0.5;  // 50%
-    else if (oldBal < 90) rate = 0.7;  // 70%
+    if (oldBal < 100) rate = 0;        // 0%
+    else if (oldBal < 300) rate = 0.1;   // 10%
+    else if (oldBal < 500) rate = 0.3;  // 30%
+    else if (oldBal < 700) rate = 0.5;  // 50%
+    else if (oldBal < 900) rate = 0.7;  // 70%
     else rate = 0.9;                       // 90%
 
     // 4. 计算手续费（向下取整）
