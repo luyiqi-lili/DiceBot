@@ -88,7 +88,7 @@ export async function handleNews(msg: any, env: Env) {
 
     const todayEntries = list.filter(e => e.invokerId === invokerId);
     const isVip = WHITE_LIST.has(invoker) || WHITE_LIST.has(invokerId);
-    const maxPerDay = isVip ? 99 : 5;
+    const maxPerDay = isVip ? 99 : 90;
     console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，${isVip ? "白名单" : "普通"}用户上限 ${maxPerDay}`);
 
     if (todayEntries.length >= maxPerDay) {
