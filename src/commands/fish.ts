@@ -58,7 +58,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         }
 
         // 显示今日钓鱼次数
-        resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 20 次）`;
+        resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 10 次）`;
 
         return resultText;
     }
@@ -343,11 +343,11 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
 
         const fishingRecord = await getFishingRecord(ownerId);
-        if (fishingRecord.count >= 20) {
+        if (fishingRecord.count >= 10) {
             return {
                 method: "sendMessage",
                 chat_id: chat_id,
-                text: `❌ ${getId(msg.from)}，今天已经钓了20次，不能再钓了。`,
+                text: `❌ ${getId(msg.from)}，今天已经钓了10次，不能再钓了。`,
                 parse_mode: "HTML",
             };
         }
