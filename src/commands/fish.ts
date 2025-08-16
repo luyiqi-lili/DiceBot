@@ -258,6 +258,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
             { name: "💎时光紫罗兰碎片", hookRate: -0.15, value: 29 },
 
+            { name: "<tg-spoiler>✉️紫色的信封</tg-spoiler>", hookRate: -0.25, value: 31 }
             { name: "<tg-spoiler>🩲酥酥的白色内裤</tg-spoiler>", hookRate: -0.25, value: 31 },
             { name: "<tg-spoiler>🥚龙蛋</tg-spoiler>", hookRate: -0.25, value: 31 },
             { name: "<tg-spoiler>📖可柔年鉴拓本</tg-spoiler>", hookRate: -0.25, value: 31 },
