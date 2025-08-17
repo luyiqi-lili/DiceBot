@@ -1,5 +1,5 @@
 // src/commands/fish.ts
-export async function handleFish(msg: any, env: any): Record<string, any> {
+export async function handleFish(msg: any, env: any): Promise<Record<string, any>> {
     // 余额读写
     async function getBalance(id: string): Promise<number> {
         const raw = await env.COIN_KV.get(id);
