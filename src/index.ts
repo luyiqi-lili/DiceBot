@@ -31,13 +31,11 @@ export default {
     }
 
     let update;
-
-    
-
     try {
       update = await request.json();
       const parsed = TgMessage.parseUpdate(update);
       console.log("✅ 解析请求 JSON 成功", update);
+      console.log("✅ 解析parsed:", parsed);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
