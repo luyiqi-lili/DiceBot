@@ -32,10 +32,11 @@ export default {
 
     let update;
 
-    const parsed = TgMessage.parseUpdate(update);
+    
 
     try {
       update = await request.json();
+      const parsed = TgMessage.parseUpdate(update);
       console.log("✅ 解析请求 JSON 成功", update);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
