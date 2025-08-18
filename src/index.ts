@@ -34,7 +34,7 @@ export default {
     let parsedMessage;
     try {
       update = await request.json();
-      parsedMessage = TgMessage.parseUpdate(await request.json());
+      parsedMessage = TgMessage.parseUpdate(update);
       console.log("✅ 解析请求 JSON 成功", parsedMessage);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
