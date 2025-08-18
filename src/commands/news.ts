@@ -69,7 +69,7 @@ export async function handleNews(msg: any, env: Env) {
     const reply_markup = {
       inline_keyboard: [
 
-        [{ text: "清理爆料痕迹~", callback_data: "delete_message" }]
+        [{ text: "清理爆料痕迹~", callback_data: JSON.stringify({ type: "delete_message" }) }]
       ]
     };
 
@@ -171,7 +171,7 @@ export async function handleNews(msg: any, env: Env) {
     const reply_markup = {
       inline_keyboard: [
 
-        [{ text: "烧了它！", callback_data: "delete_message" }]
+        [{ text: "烧了它！", callback_data: JSON.stringify({ type: "delete_message" }) }]
       ]
     };
     return {
