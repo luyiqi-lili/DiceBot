@@ -47,7 +47,7 @@ export default {
     let parsedMessage;
     try {
       update = await request.json();
-      parsedMessage = TgMessage.parseUpdate(update,env.BOT_USERNAME); 
+      parsedMessage = TgMessage.parseUpdate(update, env.BOT_USERNAME);
       console.log("index: 解析请求 JSON 成功");
     } catch (e) {
       console.error("index: 无法解析 JSON", e);
@@ -151,6 +151,7 @@ export default {
             case "news": {
               console.log(`index: 检查到news命令`);
               await handleNews(parsedMessage.message, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: news处理完成`);
               return new Response("OK", { status: 200 });
             }
