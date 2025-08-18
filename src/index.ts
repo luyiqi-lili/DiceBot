@@ -18,8 +18,6 @@ import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 
-
-
 export type Env = {
   TOKEN: string;
   BOT_USERNAME: string;
@@ -159,6 +157,7 @@ export default {
           switch (parsedMessage.command) {
             case "21": {
               console.log("index: 检测到 /21点 命令，进入 21 逻辑");
+              const { handle21Message } = await import("./commands/21");
               await handle21Message(parsedMessage.message, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: 21处理完成`);
