@@ -43,11 +43,14 @@ export default {
     try {
       update = await request.json();
       parsedMessage = TgMessage.parseUpdate(update);
+      console.log("✅ 解析请求 JSON 成功");
       console.log("✅ 解析请求 JSON 成功", parsedMessage);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
     }
+
+    console.log("main:callbackQuery", parsedMessage.callbackQuery);
 
     if (parsedMessage.callbackQuery) {
       const cq = parsedMessage.callbackQuery;
@@ -135,8 +138,11 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
+    console.log("main:isCommand", parsedMessage.isCommand);
+
     if (parsedMessage.isCommand) {
-      console.log(`检查到命令`,parsedMessage.command);
+    console.log("main:command", parsedMessage.command);
+
       switch (parsedMessage.command) {
         case "news": {
           console.log(`检查到news命令`);
