@@ -91,7 +91,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     };
   }
 
-  // ——— 每日祈祷 ———
+  // ——— 每日祈福 ———
   if (sub === "pray") {
     // —— 新增：仅允许在特定群组和主题中使用 pray —— 
     const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
@@ -103,7 +103,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         method: "sendMessage",
         chat_id: chatId,
         text:
-          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+          `✨ 这里的神圣气息过于微弱，女神未能听闻你的心愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
         parse_mode: "HTML",
       };
     }
@@ -116,11 +116,11 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
       return {
         method: "sendMessage",
         chat_id: chatId,
-        text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
+        text: `🙏 ${userName}，你今天已经祈福过了，明天再来吧！`,
         parse_mode: "HTML",
       };
     }
-    // 活动期间（2025-08-12 — 2025-08-17）提高祈祷奖励为 11-20
+    // 活动期间（2025-08-12 — 2025-08-17）提高祈福奖励为 11-20
 
 
     const gain = (duringEvent)
@@ -133,7 +133,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     return {
       method: "sendMessage",
       chat_id: chatId,
-      text: `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      text: `✨ ${userName}，你祈福获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
       parse_mode: "HTML",
     };
   }
@@ -299,7 +299,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     text:
       `❓ 不支持的子命令，请用：\n` +
       `<code>/coin</code> 查询余额\n` +
-      `<code>/coin pray</code> 今日祈祷\n` +
+      `<code>/coin pray</code> 今日祈福\n` +
       `<code>/coin send 50</code> 回复消息支付 50 💰`,
     parse_mode: "HTML",
   };
