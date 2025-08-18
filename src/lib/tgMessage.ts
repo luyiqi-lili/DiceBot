@@ -185,9 +185,41 @@ const TgMessage = {
       parsed.text = parsed.message.text ?? parsed.message.caption ?? undefined;
       parsed.textPreview = parsed.text ? parsed.text.slice(0, 200) : undefined;
 
-      // 判断是否为 reply
-      parsed.isReply = !!parsed.message.reply_to_message;
-      parsed.replyToMessage = parsed.message.reply_to_message;
+      // 判断是否为 reply —— 更严格的判断以避免把 forum topic 下的普通消息误判为 reply
+      parsed.isReply = false;
+      parsed.replyToMessage = undefined;
+
+      const rt = parsed.message.reply_to_message;
+      if (rt && typeof rt === 'object') {
+        // 启发式判断：只有当被回复的消息包含“实际内容”或明确的发送者信息时，才认定为 reply。
+        // 这能避免某些 forum/topic 场景下因为元信息或结构差异而误把普通发言当成 reply 的问题。
+        const hasContent =
+          (typeof rt.text === 'string' && rt.text.trim().length > 0) ||
+          (typeof rt.caption === 'string' && rt.caption.trim().length > 0) ||
+          Array.isArray(rt.photo) ||
+          rt.video ||
+          rt.sticker ||
+          rt.document ||
+          rt.voice ||
+          rt.audio ||
+          // 被回复消息有明确的发送者（用户或群组/频道）也是有效回复的证据
+          (rt.from && (rt.from.id || rt.from.username)) ||
+          (rt.sender_chat && (rt.sender_chat.id || rt.sender_chat.title));
+
+        // 额外保险判断：如果只有 message_id 且 message_id 与当前消息 id 明显不同，
+        // 也可认为是 reply（以防某些实现只包含 message_id 的情况）。
+        const hasValidMessageId = typeof rt.message_id === 'number' && typeof parsed.message.message_id === 'number' && rt.message_id !== parsed.message.message_id;
+
+        if (hasContent || hasValidMessageId) {
+          parsed.isReply = true;
+          parsed.replyToMessage = rt;
+        } else {
+          // 否则认定为非 reply（可能是 forum/topic 的元信息或占位）
+          parsed.isReply = false;
+          parsed.replyToMessage = undefined;
+        }
+      }
+
 
       // 判断是否为命令 / 是否定向给 bot（@BotUsername）
       if (parsed.text) {
