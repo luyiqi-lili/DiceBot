@@ -61,6 +61,7 @@ export default {
       //4.1 处理 callback_query
       case 'callback_query': {
 
+        const callbackQuery = parsedMessage.callbackQuery;
         const callbackData = parsedMessage.callbackData;
 
         // 处理回调命令
@@ -71,8 +72,8 @@ export default {
           switch (callbackData.type) {
             case "delete_message":
               {
-                const chat_id = callbackData.message.chat_id;
-                const message_id = callbackData.message.message_id;
+                const chat_id = callbackQuery.message.chat_id;
+                const message_id = callbackQuery.message.message_id;
 
                 await TgMessage.deleteMessage(env, chat_id, message_id);
                 await TgMessage.answerCallbackQuery(env, callbackData.id, {
@@ -158,7 +159,7 @@ export default {
       }
     }
 
-    
+
     try {
       const editResponse = await handleTopicEdited(update, env);
       if (editResponse) return editResponse;
