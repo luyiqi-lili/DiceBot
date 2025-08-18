@@ -31,18 +31,18 @@ export default {
     }
 
     let update;
+    let parsedMessage;
     try {
       update = await request.json();
-      const parsed = TgMessage.parseUpdate(update);
+      parsedMessage = TgMessage.parseUpdate(update);
       console.log("✅ 解析请求 JSON 成功", update);
-      console.log("✅ 解析parsed:", parsed);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
     }
 
-    if (update.callback_query) {
-      const cq = update.callback_query;
+    if (parsedMessage.callbackQuery) {
+      const cq = parsedMessage.callbackQuery;
 
       // ① 先回答 callback_query，去掉客户端的加载状态
       await fetch(
@@ -138,7 +138,8 @@ export default {
     // ✅ 只允许在指定群组中响应
     const ALLOWED_CHAT_IDS = new Set([
       -1002742074355,
-      -1002848481881
+      -1002848481881,
+      -1002661676227
     ]);
 
     if (!ALLOWED_CHAT_IDS.has(chatId)) {
