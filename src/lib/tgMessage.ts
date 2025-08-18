@@ -34,6 +34,7 @@
 
 // Types
 export type EnvLike = { TOKEN: string; BOT_USERNAME?: string };
+export type CallbackJson = { type: string;[k: string]: any };
 
 export type ParsedUpdate = {
   // 原始 update
@@ -53,7 +54,7 @@ export type ParsedUpdate = {
   // 文本（如果存在）
   text?: string;
   // callback_data（如果是 callback_query）
-  callbackData?: string | undefined;
+  callbackData?: string | CallbackJson;
   // 是否是 reply（针对 message）
   isReply?: boolean;
   // 被回复的 message（如果存在）
@@ -140,6 +141,19 @@ function parseCommandFromText(text: string, botUsername?: string) {
   return { isCommand: false };
 }
 
+function parseCallbackData(raw: unknown): string | CallbackJson | undefined {
+  if (typeof raw !== "string") return undefined;
+  try {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === "object") {
+      return obj as CallbackJson;
+    }
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+
 const TgMessage = {
   // 将 webhook 收到的完整 update 解析为统一结构
   parseUpdate(update: any, botUsername?: string): ParsedUpdate {
@@ -154,6 +168,9 @@ const TgMessage = {
       parsed.callbackQuery = update.callback_query;
       parsed.callbackData = update.callback_query.data;
       parsed.from = update.callback_query.from;
+
+      parsed.callbackData = parseCallbackData(update.callback_query.data);
+
 
       // callback 可能来自内联消息（inline_message_id）或者 message
       if (update.callback_query.message) {

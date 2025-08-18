@@ -43,9 +43,25 @@ export default {
 
     if (parsedMessage.callbackQuery) {
       const cq = parsedMessage.callbackQuery;
+      const data = parsedMessage.callbackData;
 
       // 处理回调命令
+
       let payload: any;
+      
+      // ✅ 新逻辑：JSON 格式 callback
+      if (typeof data === "object" && data.type) {
+        switch (data.type) {
+          case "delete_message":
+            payload = await handleDeleteMessage(cq, env);
+            break;
+          default:
+            console.log("ℹ️ 未知 callback type，忽略", data);
+            return new Response("OK", { status: 200 });
+        }
+      }
+      // 🔙 老逻辑：保持兼容
+
       if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
         payload = handleDuel(cq, env);
         console.log("➡️ [callback] handleDuel 返回 payload:", payload);
