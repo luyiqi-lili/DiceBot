@@ -17,6 +17,8 @@ import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 
+export type Env = { TOKEN: string; BOT_USERNAME?: string };
+
 export default {
   async fetch(request, env) {
     console.log("📥 收到请求", {
@@ -48,13 +50,25 @@ export default {
       // 处理回调命令
 
       let payload: any;
-      
+
       // ✅ 新逻辑：JSON 格式 callback
       if (typeof data === "object" && data.type) {
         switch (data.type) {
           case "delete_message":
-            payload = await handleDeleteMessage(cq, env);
-            break;
+            {
+              const chatId = cq.message.chat.id;
+              const messageId = cq.message.message_id;
+
+              await TgMessage.deleteMessage(env, chatId, messageId);
+              await TgMessage.answerCallbackQuery(env, cq.id, {
+                text: "消息已删除",
+                show_alert: true
+              });
+
+              // 已处理完成，直接返回
+              return new Response("OK", { status: 200 });
+            }
+
           default:
             console.log("ℹ️ 未知 callback type，忽略", data);
             return new Response("OK", { status: 200 });
@@ -77,9 +91,6 @@ export default {
         payload = handle21(cq, env);
       } else if (cq.data?.startsWith("fish_pull:")) {
         payload = await handleFish(cq, env);
-      }
-      else if (cq.data === "delete_message") {
-        payload = await handleDeleteMessage(cq, env);
       }
 
       else {
