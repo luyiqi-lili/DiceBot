@@ -42,9 +42,8 @@ export default {
     let parsedMessage;
     try {
       update = await request.json();
-      parsedMessage = TgMessage.parseUpdate(update);
+      parsedMessage = TgMessage.parseUpdate(update,env.BOT_USERNAME); 
       console.log("✅ 解析请求 JSON 成功");
-      console.log("✅ 解析请求 JSON 成功", parsedMessage);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });

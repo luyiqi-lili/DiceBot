@@ -105,17 +105,18 @@ async function callTelegramApi(env: EnvLike, method: string, body: any) {
 // 解析命令文本（例如 "/roll 1d6+1" 或 "@Bot roll 1d6"）
 function parseCommandFromText(text: string, botUsername?: string) {
   // 先拆分为 tokens
+  log("解析命令");
   const tokens = text.trim().split(/\s+/);
+  
+  log("分割字符",tokens);
   if (tokens.length === 0) return { isCommand: false };
 
   const first = tokens[0];
   // 支持以下形式： /cmd 或 /cmd@BotUsername 或 @BotUsername cmd 或 /r (缩写)
   if (/^\/.+/.test(first)) {
     // 以斜线开头
-    // 例如 "/roll@MyBot" 或 "/roll"
-    const cmdPart = first.slice(1); // 去掉开头的 /
-    const [nameWithAt, ...restAfter] = [cmdPart, ...tokens.slice(1)];
-    const [name] = nameWithAt.split('@');
+    // "/roll"
+    const name = first.slice(1); // 去掉开头的 /
     return { isCommand: true, command: name, args: tokens.slice(1) };
   }
 
