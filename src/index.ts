@@ -72,11 +72,11 @@ export default {
           switch (callbackData.type) {
             case "delete_message":
               {
-                const chat_id = callbackQuery.message.chat_id;
+                const chat_id = callbackQuery.message.chat.id;
                 const message_id = callbackQuery.message.message_id;
 
                 await TgMessage.deleteMessage(env, chat_id, message_id);
-                await TgMessage.answerCallbackQuery(env, callbackData.id, {
+                await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
                   text: "消息已删除",
                   show_alert: true
                 });
