@@ -27,53 +27,57 @@ export type Env = {
 
 export default {
   async fetch(request, env) {
-    console.log("📥 收到请求", {
+
+    //1. 日记记录原始请求
+    console.log("index: 收到请求", {
       method: request.method,
       url: request.url,
       headers: Object.fromEntries(request.headers)
     });
 
+    //2. 直接相应非post请求
     if (request.method !== "POST") {
-      console.log("➡️ 非 POST 请求，返回存活内容");
+      console.log("index: 非 POST 请求，返回存活内容");
       return new Response("I am alive", { status: 200 });
     }
 
+    //3. 解析请求
+    //TODO:  update在全部命令迁移完成后要取消
     let update;
     let parsedMessage;
     try {
       update = await request.json();
       parsedMessage = TgMessage.parseUpdate(update,env.BOT_USERNAME); 
-      console.log("✅ 解析请求 JSON 成功");
+      console.log("index: 解析请求 JSON 成功");
     } catch (e) {
-      console.error("❌ 无法解析 JSON", e);
+      console.error("index: 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
     }
 
+    //4. 分别处理 callback_query 和 message
     console.log("index:parsedMessage.type", parsedMessage.type);
     switch (parsedMessage.type) {
+
+      //4.1 处理 callback_query
       case 'callback_query': {
 
-        const cq = parsedMessage.callbackQuery;
-        const data = parsedMessage.callbackData;
+        const callbackData = parsedMessage.callbackData;
 
         // 处理回调命令
-
-        let payload: any;
-
+        // TODO 回调都改成json格式
         // ✅ 新逻辑：JSON 格式 callback
-
-        if (typeof data === "object" && data.type) {
-          console.log("index:parsedMessage.callbackData.type", data.type);
-          switch (data.type) {
+        if (typeof callbackData === "object" && callbackData.type) {
+          console.log("index:parsedMessage.callbackData.type", callbackData.type);
+          switch (callbackData.type) {
             case "delete_message":
               {
-                const chatId = cq.message.chat.id;
-                const messageId = cq.message.message_id;
+                const chat_id = callbackData.message.chat_id;
+                const message_id = callbackData.message.message_id;
 
-                await TgMessage.deleteMessage(env, chatId, messageId);
-                await TgMessage.answerCallbackQuery(env, cq.id, {
+                await TgMessage.deleteMessage(env, chat_id, message_id);
+                await TgMessage.answerCallbackQuery(env, callbackData.id, {
                   text: "消息已删除",
-                  show_alert: false
+                  show_alert: true
                 });
 
                 // 已处理完成，直接返回
@@ -81,12 +85,14 @@ export default {
               }
 
             default:
-              console.log("ℹ️ 未知 callback type，忽略", data);
+              console.log("ℹ️ 未知 callback type，忽略", callbackData);
               return new Response("OK", { status: 200 });
           }
         }
-        // 🔙 老逻辑：保持兼容
 
+        // 🔙 老逻辑：保持兼容        
+        let payload: any;
+        const cq = parsedMessage.callbackQuery;
         if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
           payload = handleDuel(cq, env);
           console.log("➡️ [callback] handleDuel 返回 payload:", payload);
@@ -129,24 +135,30 @@ export default {
 
         return new Response("OK", { status: 200 });
       }
+
+      //4.2 处理消息
+      //TOOD 后续迁移全部的消息
       case 'message': {
+
         console.log("main:isCommand", parsedMessage.isCommand);
-
         if (parsedMessage.isCommand) {
+
           console.log("main:command", parsedMessage.command);
-
           switch (parsedMessage.command) {
-            case "news": {
-              console.log(`检查到news命令`);
-              await handleNews(parsedMessage.message, env);
-              console.log(`news处理完成`);
-              return new Response("OK", { status: 200 });
 
+            //4.3 处理news
+            case "news": {
+              console.log(`index: 检查到news命令`);
+              await handleNews(parsedMessage.message, env);
+              console.log(`index: news处理完成`);
+              return new Response("OK", { status: 200 });
             }
           }
         }
       }
     }
+
+    
     try {
       const editResponse = await handleTopicEdited(update, env);
       if (editResponse) return editResponse;
