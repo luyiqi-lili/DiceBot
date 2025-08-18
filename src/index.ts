@@ -9,7 +9,6 @@ import { handleLike } from "./commands/like";
 import { handleNews } from "./commands/news";
 import { handleBook } from "./commands/book";
 import { handleTrans } from "./commands/trans";
-import { handle21 } from "./commands/21";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
@@ -18,6 +17,8 @@ import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
+
+
 
 export type Env = {
   TOKEN: string;
@@ -70,6 +71,16 @@ export default {
         if (typeof callbackData === "object" && callbackData.type) {
           console.log("index:parsedMessage.callbackData.type", callbackData.type);
           switch (callbackData.type) {
+            case "21": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 21 点回调", callbackData);
+              // 引入新的 handler
+              const { handle21Callback } = await import("./commands/21");
+              await handle21Callback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+
             case "delete_message":
               {
                 const chat_id = callbackQuery.message.chat.id;
@@ -146,7 +157,14 @@ export default {
 
           console.log("main:command", parsedMessage.command);
           switch (parsedMessage.command) {
+            case "21": {
+              console.log("index: 检测到 /21点 命令，进入 21 逻辑");
+              await handle21Message(parsedMessage.message, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: 21处理完成`);
+              return new Response("OK", { status: 200 });
 
+            }
             //4.3 处理news
             case "news": {
               console.log(`index: 检查到news命令`);
