@@ -1,3 +1,5 @@
+/* index.ts */
+
 import { handleEcho } from "./commands/echo";
 import { handleRoll } from "./commands/roll";
 import { handleGroll } from "./commands/groll";
@@ -12,12 +14,16 @@ import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
-import { handleDeleteMessage } from "./commands/deleteMessage";
 import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
+import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 
-export type Env = { TOKEN: string; BOT_USERNAME?: string };
+export type Env = {
+  TOKEN: string;
+  BOT_USERNAME: string;
+  NEWS_STORE: KVNamespace
+};
 
 export default {
   async fetch(request, env) {
@@ -62,7 +68,7 @@ export default {
               await TgMessage.deleteMessage(env, chatId, messageId);
               await TgMessage.answerCallbackQuery(env, cq.id, {
                 text: "消息已删除",
-                show_alert: true
+                show_alert: false
               });
 
               // 已处理完成，直接返回
@@ -129,7 +135,18 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
+    if (parsedMessage.isCommand) {
+      console.log(`检查到命令`);
+      switch (parsedMessage.command) {
+        case "news": {
+          console.log(`检查到news命令`);
+          await handleNews(parsedMessage.message, env);
+          console.log(`news处理完成`);
+          return new Response("OK", { status: 200 });
 
+        }
+      }
+    }
 
     const msg = update.message ?? update.channel_post;
     if (!msg) {
@@ -149,11 +166,7 @@ export default {
       // 如果是回调，就退而求其次用 msg.message.chat.id
       ?? msg.message.chat.id;
     // ✅ 只允许在指定群组中响应
-    const ALLOWED_CHAT_IDS = new Set([
-      -1002742074355,
-      -1002848481881,
-      -1002661676227
-    ]);
+
 
     if (!ALLOWED_CHAT_IDS.has(chatId)) {
       console.log(`🚫 chatId ${chatId} 不在允许响应的群组内，跳过处理`);
