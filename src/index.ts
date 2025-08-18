@@ -50,82 +50,103 @@ export default {
       return new Response("Bad Request", { status: 400 });
     }
 
-    console.log("main:callbackQuery", parsedMessage.callbackQuery);
+    console.log("index:parsedMessage.type", parsedMessage.type);
+    switch (parsedMessage.type) {
+      case 'callback_query': {
 
-    if (parsedMessage.callbackQuery) {
-      const cq = parsedMessage.callbackQuery;
-      const data = parsedMessage.callbackData;
+        const cq = parsedMessage.callbackQuery;
+        const data = parsedMessage.callbackData;
 
-      // 处理回调命令
+        // 处理回调命令
 
-      let payload: any;
+        let payload: any;
 
-      // ✅ 新逻辑：JSON 格式 callback
-      if (typeof data === "object" && data.type) {
-        switch (data.type) {
-          case "delete_message":
-            {
-              const chatId = cq.message.chat.id;
-              const messageId = cq.message.message_id;
+        // ✅ 新逻辑：JSON 格式 callback
 
-              await TgMessage.deleteMessage(env, chatId, messageId);
-              await TgMessage.answerCallbackQuery(env, cq.id, {
-                text: "消息已删除",
-                show_alert: false
-              });
+        if (typeof data === "object" && data.type) {
+          console.log("index:parsedMessage.callbackData.type", data.type);
+          switch (data.type) {
+            case "delete_message":
+              {
+                const chatId = cq.message.chat.id;
+                const messageId = cq.message.message_id;
 
-              // 已处理完成，直接返回
+                await TgMessage.deleteMessage(env, chatId, messageId);
+                await TgMessage.answerCallbackQuery(env, cq.id, {
+                  text: "消息已删除",
+                  show_alert: false
+                });
+
+                // 已处理完成，直接返回
+                return new Response("OK", { status: 200 });
+              }
+
+            default:
+              console.log("ℹ️ 未知 callback type，忽略", data);
               return new Response("OK", { status: 200 });
-            }
-
-          default:
-            console.log("ℹ️ 未知 callback type，忽略", data);
-            return new Response("OK", { status: 200 });
+          }
         }
-      }
-      // 🔙 老逻辑：保持兼容
+        // 🔙 老逻辑：保持兼容
 
-      if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
-        payload = handleDuel(cq, env);
-        console.log("➡️ [callback] handleDuel 返回 payload:", payload);
-      } else if (
-        cq.data.startsWith("groll_accept") ||
-        cq.data.startsWith("groll_end")) {
-        payload = handleGroll(cq, env);
-        console.log("➡️ [callback] handleGroll 返回 payload:", payload);
-      } else if (
-        cq.data.startsWith("21_draw") ||
-        cq.data.startsWith("21_next")
-      ) {
-        payload = handle21(cq, env);
-      } else if (cq.data?.startsWith("fish_pull:")) {
-        payload = await handleFish(cq, env);
-      }
+        if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
+          payload = handleDuel(cq, env);
+          console.log("➡️ [callback] handleDuel 返回 payload:", payload);
+        } else if (
+          cq.data.startsWith("groll_accept") ||
+          cq.data.startsWith("groll_end")) {
+          payload = handleGroll(cq, env);
+          console.log("➡️ [callback] handleGroll 返回 payload:", payload);
+        } else if (
+          cq.data.startsWith("21_draw") ||
+          cq.data.startsWith("21_next")
+        ) {
+          payload = handle21(cq, env);
+        } else if (cq.data?.startsWith("fish_pull:")) {
+          payload = await handleFish(cq, env);
+        }
 
-      else {
-        console.log("ℹ️ 未知 callback_data，忽略");
+        else {
+          console.log("ℹ️ 未知 callback_data，忽略");
+          return new Response("OK", { status: 200 });
+        }
+
+        const method = payload.method || "sendMessage";
+        delete payload.method;
+        console.log(`➡️ [callback] 准备调用 ${method} 接口`, payload);
+        try {
+          const apiRes = await fetch(
+            `https://api.telegram.org/bot${env.TOKEN}/${method}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            }
+          );
+          const json = await apiRes.json();
+          console.log(`✅ [callback] ${method} API 成功`, json);
+        } catch (e) {
+          console.error(`❌ [callback] ${method} API 调用失败`, e);
+        }
+
         return new Response("OK", { status: 200 });
       }
+      case 'message': {
+        console.log("main:isCommand", parsedMessage.isCommand);
 
-      const method = payload.method || "sendMessage";
-      delete payload.method;
-      console.log(`➡️ [callback] 准备调用 ${method} 接口`, payload);
-      try {
-        const apiRes = await fetch(
-          `https://api.telegram.org/bot${env.TOKEN}/${method}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+        if (parsedMessage.isCommand) {
+          console.log("main:command", parsedMessage.command);
+
+          switch (parsedMessage.command) {
+            case "news": {
+              console.log(`检查到news命令`);
+              await handleNews(parsedMessage.message, env);
+              console.log(`news处理完成`);
+              return new Response("OK", { status: 200 });
+
+            }
           }
-        );
-        const json = await apiRes.json();
-        console.log(`✅ [callback] ${method} API 成功`, json);
-      } catch (e) {
-        console.error(`❌ [callback] ${method} API 调用失败`, e);
+        }
       }
-
-      return new Response("OK", { status: 200 });
     }
     try {
       const editResponse = await handleTopicEdited(update, env);
@@ -138,21 +159,7 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
-    console.log("main:isCommand", parsedMessage.isCommand);
 
-    if (parsedMessage.isCommand) {
-    console.log("main:command", parsedMessage.command);
-
-      switch (parsedMessage.command) {
-        case "news": {
-          console.log(`检查到news命令`);
-          await handleNews(parsedMessage.message, env);
-          console.log(`news处理完成`);
-          return new Response("OK", { status: 200 });
-
-        }
-      }
-    }
 
     const msg = update.message ?? update.channel_post;
     if (!msg) {
