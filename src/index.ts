@@ -136,7 +136,7 @@ export default {
     }
 
     if (parsedMessage.isCommand) {
-      console.log(`检查到命令`);
+      console.log(`检查到命令`,parsedMessage.command);
       switch (parsedMessage.command) {
         case "news": {
           console.log(`检查到news命令`);
