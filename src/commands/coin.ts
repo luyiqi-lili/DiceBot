@@ -97,7 +97,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
     const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
     const allowed =
       (chatId === -1002848481881 && [66].includes(threadId)) ||
-      (chatId === -1002742074355 && [215].includes(threadId));
+      (chatId === -1002742074355 && [62].includes(threadId));
     if (!allowed) {
       return {
         method: "sendMessage",
