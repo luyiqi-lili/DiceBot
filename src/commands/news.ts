@@ -32,9 +32,9 @@ function buildMessageLink(msg: any) {
 }
 
 /**
- * 使用 TgMessage 自己发送消息，并保持向调用方返回原先那种 { text, parse_mode, reply_markup } 结构（兼容旧逻辑）。
+ * 直接使用 TgMessage 发送消息（不再返回旧的 payload 格式）
  */
-export async function handleNews(msg: any, env: Env) {
+export async function handleNews(msg: any, env: Env): Promise<void> {
   console.log("[News] 收到消息，msg.text:", msg.text);
   const text: string = msg.text || "";
   const invoker = msg.from?.first_name || "某人";
@@ -68,7 +68,6 @@ export async function handleNews(msg: any, env: Env) {
     ?? msg.message?.message_thread_id;
 
   if (isExplicitReply) {
-    // 处理“爆料”行为（用户回复某条消息并对其 /news）
     const content = escapeHtml(reply.text!.trim());
 
     const raw = await env.NEWS_STORE.get(kvKey);
@@ -82,12 +81,11 @@ export async function handleNews(msg: any, env: Env) {
     }> = raw ? JSON.parse(raw) : [];
 
     const todayEntries = list.filter(e => e.invokerId === invokerId);
-    // 允许白名单更多爆料
-    // WHITE_LIST 在你项目其他处定义，这里仅以 env 或常量方式决定（如需可改）
-    const WHITE_LIST = new Set<string>([]); // 如果你有全局白名单，请从外部注入或 import
-    const isVip = WHITE_LIST.has(invoker) || WHITE_LIST.has(invokerId);
+
+    // 如果你有白名单逻辑，请在这里替换或导入；当前实现默认普通用户限制
+    const isVip = false;
     const maxPerDay = isVip ? 99 : 90;
-    console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，${isVip ? "白名单" : "普通"}用户上限 ${maxPerDay}`);
+    console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，上限 ${maxPerDay}`);
 
     if (todayEntries.length >= maxPerDay) {
       const idx = list.findIndex(e => e.invokerId === invokerId);
@@ -100,14 +98,13 @@ export async function handleNews(msg: any, env: Env) {
     const link = buildMessageLink(msg);
     if (list.some(e => e.invokerId === invokerId && e.link === link && link !== '')) {
       const dupText = `⚠️ ${invoker} 已经对这条消息爆料过了！`;
-      // 直接发送一个提醒
       await TgMessage.sendText(env, {
         chat_id: msg.chat.id,
         text: dupText,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
-      return { text: dupText, parse_mode: "HTML", reply_markup: deleteInlineKb };
+      return;
     }
 
     const targetUser = reply.from?.first_name || "某人";
@@ -144,8 +141,7 @@ export async function handleNews(msg: any, env: Env) {
       message_thread_id: threadId
     });
 
-    // 返回兼容旧接口的对象（但消息已发送）
-    return { text: sendText, parse_mode: "HTML", reply_markup: deleteInlineKb };
+    return;
   } else {
     // 查询模式：读取当天爆料列表并展示
     console.log("[News] 查询模式，读取 KV at", kvKey);
@@ -160,7 +156,7 @@ export async function handleNews(msg: any, env: Env) {
         parse_mode: "HTML",
         message_thread_id: threadId
       });
-      return { text: noText, parse_mode: "HTML" };
+      return;
     }
 
     const list: Array<{ invoker: string; targetUser: string; text: string; link: string }> = JSON.parse(stored);
@@ -194,6 +190,6 @@ export async function handleNews(msg: any, env: Env) {
       message_thread_id: threadId
     });
 
-    return { text: result, parse_mode: "HTML", reply_markup };
+    return;
   }
 }

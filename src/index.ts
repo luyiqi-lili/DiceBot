@@ -332,12 +332,6 @@ export default {
       const res = await handleTrans(msg, env);
       payload.text = res.text;
       if (res.parse_mode) payload.parse_mode = res.parse_mode;
-    } else if (/\/news\b/.test(text)) {
-      console.log("📰 检测到 /news 命令，进入新闻逻辑");
-      const res = await handleNews(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
     } else if (/\/book\b/.test(text)) {
       console.log("📰 检测到 /book 命令，进入书签逻辑");
       const res = await handleBook(msg, env);
