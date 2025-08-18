@@ -34,8 +34,8 @@ export default {
     let parsedMessage;
     try {
       update = await request.json();
-      parsedMessage = TgMessage.parseUpdate(update);
-      console.log("✅ 解析请求 JSON 成功", update);
+      parsedMessage = TgMessage.parseUpdate(await request.json());
+      console.log("✅ 解析请求 JSON 成功", parsedMessage);
     } catch (e) {
       console.error("❌ 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
@@ -44,21 +44,7 @@ export default {
     if (parsedMessage.callbackQuery) {
       const cq = parsedMessage.callbackQuery;
 
-      // ① 先回答 callback_query，去掉客户端的加载状态
-      await fetch(
-        `https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            callback_query_id: cq.id,
-            // 不显示任何提示：
-            show_alert: false
-          })
-        }
-      );
-
-      // ② 再处理回调命令
+      // 处理回调命令
       let payload: any;
       if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
         payload = handleDuel(cq, env);
