@@ -52,6 +52,11 @@ export default {
       return new Response("Bad Request", { status: 400 });
     }
 
+    if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
+      console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
+      return new Response("OK", { status: 200 });
+    }
+
     //4. 分别处理 callback_query 和 message
     console.log("index:parsedMessage.type", parsedMessage.type);
     switch (parsedMessage.type) {

@@ -46,7 +46,7 @@ export type ParsedUpdate = {
   // callback_query（当 type 为 callback_query 时）
   callbackQuery?: any;
   // 来源 chat id（优先 message.chat.id -> callback_query.message.chat.id）
-  chatId?: number;
+  chatId: number;
   // 线程 id（存在则填充）
   threadId?: number | undefined;
   // 来自用户的基本信息（如果有）
@@ -160,6 +160,7 @@ const TgMessage = {
   parseUpdate(update: any, botUsername?: string): ParsedUpdate {
     const parsed: ParsedUpdate = {
       update,
+      chatId:0,
       type: 'unknown'
     };
 
