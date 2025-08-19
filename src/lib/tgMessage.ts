@@ -220,6 +220,7 @@ const TgMessage = {
           parsed.replyToMessage = undefined;
         }
       }
+      log('reply 判断 parsed',parsed);
       log('reply 判断 parsed.message',parsed.message);
       log('reply 判断 reply_to_message',rt);
       log('reply 判断',parsed.isReply);
