@@ -107,8 +107,8 @@ function parseCommandFromText(text: string, botUsername?: string) {
   // 先拆分为 tokens
   log("解析命令");
   const tokens = text.trim().split(/\s+/);
-  
-  log("分割字符",tokens);
+
+  log("分割字符", tokens);
   if (tokens.length === 0) return { isCommand: false };
 
   const first = tokens[0];
@@ -330,9 +330,33 @@ const TgMessage = {
     return await TgMessage.send(env, 'sendChatAction', { chat_id, action });
   },
 
+
+
+
   // 构造一个常用的 inline keyboard 快速函数
   buildInlineKeyboard(buttons: Array<Array<{ text: string; callback_data?: string; url?: string; switch_inline_query?: string }>>) {
     return { inline_keyboard: buttons };
+  },
+  /**
+ * 获取 chat 中某个 user 的信息（first_name, username）
+ * - 直接调用 getChatMember Telegram API
+ * - 返回示例：{ first_name: '张三', username: 'zhangsan' }
+ */
+  async fetchChatMember(env: EnvLike, chatId: number, userId: number) {
+    try {
+      const res = await callTelegramApi(env, 'getChatMember', { chat_id: chatId, user_id: userId });
+      if (res && res.ok && res.result && (res.result as any).user) {
+        const u = (res.result as any).user;
+        return {
+          first_name: u.first_name || `用户${userId}`,
+          username: (u.username as string) || ''
+        };
+      }
+      return { first_name: `用户${userId}`, username: '' };
+    } catch (e) {
+      log('fetchChatMember 异常', e);
+      return { first_name: `用户${userId}`, username: '' };
+    }
   }
 };
 

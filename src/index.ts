@@ -7,7 +7,6 @@ import { handleHelp } from "./commands/help";
 import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
 import { handleNews } from "./commands/news";
-import { handleBook } from "./commands/book";
 import { handleTrans } from "./commands/trans";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
@@ -155,6 +154,17 @@ export default {
 
           console.log("main:command", parsedMessage.command);
           switch (parsedMessage.command) {
+
+            case "book": {
+              console.log("index: 检测到 /book 命令，进入 book逻辑");
+              const { handleBook } = await import("./commands/book");
+              await handleBook(parsedMessage.message, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /book 处理完成`);
+              return new Response("OK", { status: 200 });
+
+            }
+
             case "21": {
               console.log("index: 检测到 /21点 命令，进入 21 逻辑");
               const { handle21Message } = await import("./commands/21");
@@ -351,9 +361,6 @@ export default {
     } else if (/\/groll\b/.test(text)) {
       console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
       payload = { ...payload, ...handleGroll(msg, env) };
-    } else if (/\/21\b/.test(text)) {
-      console.log("🎲 检测到 /21点 命令，进入 21 逻辑");
-      payload = { ...payload, ...handle21(msg, env) };
     } else if (/\/duel\b/.test(text)) {
       console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
       payload = { ...payload, ...handleDuel(msg, env) };
@@ -375,12 +382,6 @@ export default {
       const res = await handleTrans(msg, env);
       payload.text = res.text;
       if (res.parse_mode) payload.parse_mode = res.parse_mode;
-    } else if (/\/book\b/.test(text)) {
-      console.log("📰 检测到 /book 命令，进入书签逻辑");
-      const res = await handleBook(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
     } else if (/\/coin\b/.test(text)) {
       // 新增 coin 命令
       const res = await handleCoin(msg, env);

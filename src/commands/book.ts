@@ -1,17 +1,11 @@
 // commands/book.ts
-import { Env } from "../types"; // Env 应包含 BOOK_STORE: KVNamespace, TOKEN: string
-import { TelegramBotPayload } from "../utils"; // 通用 Telegram payload 类型
+import TgMessage from "../lib/tgMessage";
+import { Env } from "../types"; // Env 应包含 BOOK_STORE: KVNamespace, TOKEN: string, BOT_USERNAME?: string
 
-/**
- * 生成 KV 存储 key，按用户聚合所有书签
- */
 function getUserKey(userId: number): string {
   return `book:user:${userId}`;
 }
 
-/**
- * 根据 chatId 和 messageId 构造 Telegram 可点击跳转的链接
- */
 function makeMessageLink(chatId: number, messageId: number): string {
   const abs = String(chatId).startsWith("-100")
     ? String(chatId).slice(4)
@@ -19,64 +13,21 @@ function makeMessageLink(chatId: number, messageId: number): string {
   return `https://t.me/c/${abs}/${messageId}`;
 }
 
-/**
- * 调用 Telegram API 获取某用户在本群的 first_name 和 username
- */
-async function fetchChatMember(env: Env, chatId: number, userId: number) {
-  const res = await fetch(
-    `https://api.telegram.org/bot${env.TOKEN}/getChatMember`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, user_id: userId })
-    }
-  );
-  const data = await res.json();
-  if (data.ok && data.result && data.result.user) {
-    const u = data.result.user;
-    return {
-      first_name: u.first_name || `用户${userId}`,
-      username: u.username || ""
-    };
-  }
-  return { first_name: `用户${userId}`, username: "" };
-}
+export async function handleBook(msg: any, env: Env) {
+  console.log("[Book] handleBook 入参 message_id:", msg?.message_id);
 
-export async function handleBook(
-  msg: any,
-  env: Env
-): Promise<TelegramBotPayload> {
-  console.log("[Book] 收到 /book 调用, msg.text:", msg.text);
+  // 重新解析为 ParsedUpdate，方便使用 parsed.isReply / parsed.args 等字段
+  const parsed = TgMessage.parseUpdate({ message: msg }, env.BOT_USERNAME);
+  const chatId: number = parsed.chatId!;
+  const threadId: number | undefined = parsed.threadId;
+  const fromId = parsed.from?.id;
+  const fromName = parsed.from?.first_name || `用户${fromId}`;
+  const reply = parsed.replyToMessage;
 
-  const text: string = msg.text || "";
-  const fromId = msg.from.id;
-  const fromName = msg.from.first_name;
-  const chatId = msg.chat.id;
-  const threadId: number | undefined = msg.message_thread_id;
-  const reply = msg.reply_to_message;
+  const param = (parsed.args && parsed.args.length > 0) ? parsed.args.join(" ").trim() : "";
+  console.log("[Book] parsed.args:", parsed.args, "param:", param, "isReply:", parsed.isReply);
 
-  // 提取 /book 后的参数
-  const match = text.match(/\/book(?:\s+(.+))?/);
-  const param = match && match[1] ? match[1].trim() : "";
-  console.log("[Book] 提取 param:", param);
-
-  // 判断是否要走“添加书签”流程
-  const hasBookCmd = /\/book\b/.test(text);
-  const isReplyOwn = !!reply && reply.from?.id === fromId;
-  const isExplicitAdd =
-    hasBookCmd &&
-    isReplyOwn &&
-    param !== "del" &&
-    param !== "all" &&
-    !param.startsWith("@");
-  console.log(
-    "[Book] hasBookCmd:", hasBookCmd,
-    "isReplyOwn:", isReplyOwn,
-    "isExplicitAdd:", isExplicitAdd,
-    "reply_to_message_id:", reply?.message_id
-  );
-
-  // Helpers: load & save
+  // KV helpers
   async function loadList(uid: number) {
     const raw = await env.BOOK_STORE.get(getUserKey(uid));
     const list = raw
@@ -90,9 +41,19 @@ export async function handleBook(
     console.log(`[Book] saveList ${uid}, new count=${list.length}`);
   }
 
+  // 判断是否为“添加书签”流程：
+  const isReplyOwn = !!reply && reply.from?.id === fromId;
+  const isExplicitAdd =
+    parsed.isReply &&
+    isReplyOwn &&
+    param !== "del" &&
+    param !== "all" &&
+    !param.startsWith("@");
+  console.log("[Book] isReplyOwn:", isReplyOwn, "isExplicitAdd:", isExplicitAdd);
+
   // 1. 添加书签
   if (isExplicitAdd) {
-    const remark = param;
+    const remark = param || "原文";
     const link = makeMessageLink(chatId, reply!.message_id);
     console.log("[Book] 添加书签 remark:", remark, "link:", link);
 
@@ -104,44 +65,45 @@ export async function handleBook(
     list.push({ remark, link, timestamp: new Date().toISOString() });
     await saveList(fromId, list);
 
-    const payload: TelegramBotPayload = {
+    const text = `✅ 已添加书签：[${remark}](${link}) （共 ${list.length} 条）`;
+    await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ 已添加书签：[${remark || "原文"}](${link}) （共 ${list.length} 条）`,
+      text,
       parse_mode: "Markdown",
-      reply_to_message_id: reply!.message_id,
-    };
-    if (threadId !== undefined) payload.message_thread_id = threadId;
-    return payload;
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // 2. 删除书签
-  if (/^del\s+#?(\d+)/.test(param)) {
-    const idx = parseInt(param.match(/^del\s+#?(\d+)/)![1], 10);
+  // 2. 删除书签： param 可能为 "del 3" 或 "del #3"
+  const delMatch = param.match(/^del\s+#?(\d+)/);
+  if (delMatch) {
+    const idx = parseInt(delMatch[1], 10);
     console.log("[Book] 删除书签 idx:", idx);
 
     const list = await loadList(fromId);
     if (idx < 1 || idx > list.length) {
-      return {
+      await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `⚠️ 无效序号：${idx}（当前 ${list.length} 条）`,
         parse_mode: "Markdown",
-        reply_to_message_id: msg.message_id,
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
     list.splice(idx - 1, 1);
     await saveList(fromId, list);
 
-    const payload: TelegramBotPayload = {
+    await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✅ 已删除第 ${idx} 条书签，剩余 ${list.length} 条`,
       parse_mode: "Markdown",
-      reply_to_message_id: msg.message_id,
-    };
-    if (threadId !== undefined) payload.message_thread_id = threadId;
-    return payload;
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // 3. 查看全部用户书签
+  // 3. 查看全部用户书签： param === "all"
   if (param === "all") {
     console.log("[Book] 查看 all");
     const listRes = await env.BOOK_STORE.list({ prefix: "book:user:" });
@@ -150,7 +112,7 @@ export async function handleBook(
       const uid = parseInt(name.split(":")[2], 10);
       const list = await loadList(uid);
       if (list.length === 0) continue;
-      const member = await fetchChatMember(env, chatId, uid);
+      const member = await TgMessage.fetchChatMember(env, chatId, uid);
       body += `<b>${member.first_name}：</b>\n`;
       list.forEach((e, i) => {
         body += `${i + 1}. <a href="${e.link}">${e.remark || "原文"}</a>\n`;
@@ -158,85 +120,92 @@ export async function handleBook(
       body += `\n`;
     }
     if (!body) {
-      return { chat_id: chatId, text: `📭 当前暂无任何书签`, reply_to_message_id: msg.message_id };
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `📭 当前暂无任何书签`,
+        message_thread_id: threadId
+      });
+      return;
     }
-    const payload: TelegramBotPayload = {
+
+    const text = `📰 全部书签 <blockquote expandable>${body}</blockquote>`;
+    await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `📰 全部书签 <blockquote expandable>${body}</blockquote>`,
+      text,
       parse_mode: "HTML",
-      reply_to_message_id: msg.message_id,
-    };
-    if (threadId !== undefined) payload.message_thread_id = threadId;
-    return payload;
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // 4. 查看指定用户书签
+  // 4. 查看指定用户书签： param 以 @ 开头
   if (param.startsWith("@")) {
     console.log("[Book] 查看他人书签 param:", param);
     const targetUsername = param.slice(1).toLowerCase();
 
-    // 在所有存储的 userId 中查找匹配 username
     const listRes = await env.BOOK_STORE.list({ prefix: "book:user:" });
     let targetId: number | null = null;
     for (const { name } of listRes.keys) {
       const uid = parseInt(name.split(":")[2], 10);
-      const member = await fetchChatMember(env, chatId, uid);
+      const member = await TgMessage.fetchChatMember(env, chatId, uid);
       if (member.username.toLowerCase() === targetUsername) {
         targetId = uid;
         break;
       }
     }
     if (targetId === null) {
-      return {
+      await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `⚠️ 未找到用户名为 "${param}" 的用户书签`,
-        reply_to_message_id: msg.message_id,
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
 
     const list = await loadList(targetId);
     if (list.length === 0) {
-      return {
+      await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `📭 用户 ${param} 暂无书签`,
-        reply_to_message_id: msg.message_id,
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-    const member = await fetchChatMember(env, chatId, targetId);
+    const member = await TgMessage.fetchChatMember(env, chatId, targetId);
     let body = "";
     list.forEach((e, i) => {
       body += `${i + 1}. <a href="${e.link}">${e.remark || "原文"}</a>\n`;
     });
-    const payload: TelegramBotPayload = {
+    const text = `📰 ${member.first_name} 的书签：<blockquote expandable>${body}</blockquote>`;
+    await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `📰 ${member.first_name} 的书签：<blockquote expandable>${body}</blockquote>`,
+      text,
       parse_mode: "HTML",
-      reply_to_message_id: msg.message_id,
-    };
-    if (threadId !== undefined) payload.message_thread_id = threadId;
-    return payload;
+      message_thread_id: threadId
+    });
+    return;
   }
 
   // 5. 查看自己的书签（默认）
   console.log("[Book] 查看", fromName, "的书签");
   const list = await loadList(fromId);
   if (list.length === 0) {
-    return {
+    await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `📭 ${fromName}，你还没有任何书签，回复一条消息并发送 /book 即可添加～`,
-      reply_to_message_id: msg.message_id,
-    };
+      message_thread_id: threadId
+    });
+    return;
   }
   let body = "";
   list.forEach((e, i) => {
     body += `${i + 1}. <a href="${e.link}">${e.remark || "原文"}</a>\n`;
   });
-  const payload: TelegramBotPayload = {
+  const text = `📰 ${fromName} 的书签：<blockquote expandable>${body}</blockquote>`;
+  await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: `📰 ${fromName} 的书签：<blockquote expandable>${body}</blockquote>`,
+    text,
     parse_mode: "HTML",
-    reply_to_message_id: msg.message_id,
-  };
-  if (threadId !== undefined) payload.message_thread_id = threadId;
-  return payload;
+    message_thread_id: threadId
+  });
 }
