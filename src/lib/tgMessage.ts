@@ -220,12 +220,8 @@ const TgMessage = {
           parsed.replyToMessage = undefined;
         }
       }
-
-      log('reply 判断', {
-        reply_to_message_id: rt?.message_id,
-        message_thread_id: parsed.threadId,
-        isReply: parsed.isReply
-      });
+      log('reply 判断 reply_to_message',rt);
+      log('reply 判断',parsed.isReply);
 
 
       // 判断是否为命令 / 是否定向给 bot（@BotUsername）
