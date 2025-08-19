@@ -12,7 +12,17 @@ function makeMessageLink(chatId: number, messageId: number): string {
     : String(Math.abs(chatId));
   return `https://t.me/c/${abs}/${messageId}`;
 }
-
+/** 返回用于删除本条消息的 inline keyboard */
+function makeDeleteMarkup() {
+  return TgMessage.buildInlineKeyboard([
+    [
+      {
+        text: "删除消息",
+        callback_data: JSON.stringify({ type: "delete_message" })
+      }
+    ]
+  ]);
+}
 /**
  * handleBook 接受已解析的 ParsedUpdate，避免重复解析
  * @param parsed 已由 TgMessage.parseUpdate(update, env.BOT_USERNAME) 得到的结构
@@ -54,6 +64,7 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     param !== "all" &&
     !param.startsWith("@");
   console.log("[Book] isReplyOwn:", isReplyOwn, "isExplicitAdd:", isExplicitAdd);
+  const deleteMarkup = makeDeleteMarkup();
 
   // 1. 添加书签
   if (isExplicitAdd) {
@@ -74,7 +85,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       chat_id: chatId,
       text,
       parse_mode: "Markdown",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
     });
     return;
   }
@@ -91,7 +103,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
         chat_id: chatId,
         text: `⚠️ 无效序号：${idx}（当前 ${list.length} 条）`,
         parse_mode: "Markdown",
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
       });
       return;
     }
@@ -102,7 +115,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       chat_id: chatId,
       text: `✅ 已删除第 ${idx} 条书签，剩余 ${list.length} 条`,
       parse_mode: "Markdown",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
     });
     return;
   }
@@ -127,7 +141,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `📭 当前暂无任何书签`,
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
       });
       return;
     }
@@ -137,7 +152,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
     });
     return;
   }
@@ -161,7 +177,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `⚠️ 未找到用户名为 "${param}" 的用户书签`,
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
       });
       return;
     }
@@ -171,7 +188,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `📭 用户 ${param} 暂无书签`,
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
       });
       return;
     }
@@ -185,7 +203,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
     });
     return;
   }
@@ -197,7 +216,8 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `📭 ${fromName}，你还没有任何书签，回复一条消息并发送 /book 即可添加～`,
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
     });
     return;
   }
@@ -210,6 +230,7 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
-    message_thread_id: threadId
+    message_thread_id: threadId,
+    reply_markup: deleteMarkup
   });
 }
