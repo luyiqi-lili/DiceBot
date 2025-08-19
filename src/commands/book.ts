@@ -1,5 +1,5 @@
 // commands/book.ts
-import TgMessage from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { Env } from "../types"; // Env 应包含 BOOK_STORE: KVNamespace, TOKEN: string, BOT_USERNAME?: string
 
 function getUserKey(userId: number): string {
@@ -13,17 +13,21 @@ function makeMessageLink(chatId: number, messageId: number): string {
   return `https://t.me/c/${abs}/${messageId}`;
 }
 
-export async function handleBook(msg: any, env: Env) {
-  console.log("[Book] handleBook 入参 message_id:", msg?.message_id);
+/**
+ * handleBook 接受已解析的 ParsedUpdate，避免重复解析
+ * @param parsed 已由 TgMessage.parseUpdate(update, env.BOT_USERNAME) 得到的结构
+ * @param env 环境变量（包含 BOOK_STORE 等）
+ */
+export async function handleBook(parsed: ParsedUpdate, env: Env) {
+  console.log("[Book] handleBook invoked, parsed.command:", parsed.command, "textPreview:", parsed.textPreview);
 
-  // 重新解析为 ParsedUpdate，方便使用 parsed.isReply / parsed.args 等字段
-  const parsed = TgMessage.parseUpdate({ message: msg }, env.BOT_USERNAME);
-  const chatId: number = parsed.chatId!;
-  const threadId: number | undefined = parsed.threadId;
+  const chatId = parsed.chatId!;
+  const threadId = parsed.threadId;
   const fromId = parsed.from?.id;
   const fromName = parsed.from?.first_name || `用户${fromId}`;
   const reply = parsed.replyToMessage;
 
+  // param 来源于 parsed.args（调用方已 parseCommandFromText）
   const param = (parsed.args && parsed.args.length > 0) ? parsed.args.join(" ").trim() : "";
   console.log("[Book] parsed.args:", parsed.args, "param:", param, "isReply:", parsed.isReply);
 
@@ -139,7 +143,7 @@ export async function handleBook(msg: any, env: Env) {
   }
 
   // 4. 查看指定用户书签： param 以 @ 开头
-  if (param.startsWith("@")) {
+  if (param && param.startsWith("@")) {
     console.log("[Book] 查看他人书签 param:", param);
     const targetUsername = param.slice(1).toLowerCase();
 
@@ -148,7 +152,7 @@ export async function handleBook(msg: any, env: Env) {
     for (const { name } of listRes.keys) {
       const uid = parseInt(name.split(":")[2], 10);
       const member = await TgMessage.fetchChatMember(env, chatId, uid);
-      if (member.username.toLowerCase() === targetUsername) {
+      if ((member.username || "").toLowerCase() === targetUsername) {
         targetId = uid;
         break;
       }

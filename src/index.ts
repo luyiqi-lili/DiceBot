@@ -158,7 +158,7 @@ export default {
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
-              await handleBook(parsedMessage.message, env);
+              await handleBook(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /book 处理完成`);
               return new Response("OK", { status: 200 });
