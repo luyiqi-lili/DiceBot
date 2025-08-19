@@ -212,6 +212,9 @@ const TgMessage = {
       if (rt && typeof rt === 'object' && typeof rt.message_id === 'number') {
         // parsed.threadId 在上面已经从 parsed.message.message_thread_id 填充过（如果存在）
         const threadId = parsed.threadId; // 可能为 undefined
+        log('reply 判断 threadId', threadId);
+        log('reply 判断 message_id', rt.message_id);
+
         if (rt.message_id !== threadId) {
           parsed.isReply = true;
           parsed.replyToMessage = rt;
@@ -220,10 +223,10 @@ const TgMessage = {
           parsed.replyToMessage = undefined;
         }
       }
-      log('reply 判断 parsed',parsed);
-      log('reply 判断 parsed.message',parsed.message);
-      log('reply 判断 reply_to_message',rt);
-      log('reply 判断',parsed.isReply);
+      log('reply 判断 parsed', parsed);
+      log('reply 判断 parsed.message', parsed.message);
+      log('reply 判断 reply_to_message', rt);
+      log('reply 判断', parsed.isReply);
 
 
       // 判断是否为命令 / 是否定向给 bot（@BotUsername）
