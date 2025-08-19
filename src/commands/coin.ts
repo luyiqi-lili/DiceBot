@@ -103,7 +103,7 @@ export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinRespon
         method: "sendMessage",
         chat_id: chatId,
         text:
-          `✨ 这里的神圣气息过于微弱，女神未及听闻你的祈愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+          `✨ 这里的神圣气息过于微弱，女神未能听闻你的心愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
         parse_mode: "HTML",
       };
     }
