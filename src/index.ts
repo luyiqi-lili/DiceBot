@@ -6,7 +6,6 @@ import { handleGroll } from "./commands/groll";
 import { handleHelp } from "./commands/help";
 import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
-import { handleNews } from "./commands/news";
 import { handleTrans } from "./commands/trans";
 import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
@@ -115,12 +114,7 @@ export default {
           cq.data.startsWith("groll_end")) {
           payload = handleGroll(cq, env);
           console.log("➡️ [callback] handleGroll 返回 payload:", payload);
-        } else if (
-          cq.data.startsWith("21_draw") ||
-          cq.data.startsWith("21_next")
-        ) {
-          payload = handle21(cq, env);
-        } else if (cq.data?.startsWith("fish_pull:")) {
+        }  else if (cq.data?.startsWith("fish_pull:")) {
           payload = await handleFish(cq, env);
         }
 
@@ -172,8 +166,8 @@ export default {
 
             case "21": {
               console.log("index: 检测到 /21点 命令，进入 21 逻辑");
-              const { handle21Message } = await import("./commands/21");
-              await handle21Message(parsedMessage.message, env);
+              const { handle21 } = await import("./commands/21");
+              await handle21(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: 21处理完成`);
               return new Response("OK", { status: 200 });
@@ -182,7 +176,8 @@ export default {
             //4.3 处理news
             case "news": {
               console.log(`index: 检查到news命令`);
-              await handleNews(parsedMessage.message, env);
+              const { handleNews } = await import("./commands/news");
+              await handleNews(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: news处理完成`);
               return new Response("OK", { status: 200 });

@@ -1,13 +1,10 @@
 // commands/21.ts
-import TgMessage from "../lib/tgMessage";
-import type { EnvLike } from "../lib/tgMessage"; // EnvLike shape (包含 TOKEN, BOT_USERNAME 等)
+import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 
 /**
  * 21 点游戏处理模块（重构版）
- * - handle21Message: 处理发起（/21 或 @Bot /21）消息，直接发送起始消息
- * - handle21Callback: 处理 JSON callback（{ type: "21", action: "draw" | "next" }）并直接通过 TgMessage 编辑消息/回答 callback
- *
- * 备注：所有发送/编辑调用都使用 TgMessage 提供的封装函数。
+ * - handle21: 处理发起（接收 ParsedUpdate），直接发送起始消息
+ * - handle21Callback: 处理 JSON callback（{ type: "21", action: "draw" | "next" }）
  */
 
 // 工具
@@ -55,44 +52,43 @@ const buildButtons = () => {
   };
 };
 
-// === 发起处理：/21 命令调用 ===
-export async function handle21Message(msg: any, env: EnvLike) {
-  // msg 为 Telegram message 对象
-  const chat_id = msg.chat?.id;
-  const thread_id = msg.message_thread_id ?? msg.message?.message_thread_id;
-  const initiator = msg.from?.first_name || "玩家";
+/**
+ * 处理 /21 发起（接收已解析的 parsed）
+ */
+export async function handle21(parsed: ParsedUpdate, env: EnvLike) {
+  const msg = parsed.message;
+  if (!msg) {
+    console.log("[21] parsed.message 缺失，忽略");
+    return;
+  }
+
+  const chat_id = parsed.chatId!;
+  const thread_id = parsed.threadId;
+  const initiator = parsed.from?.first_name || "玩家";
 
   const title = `🎴 ${initiator} 发起了21点游戏`;
   const text = `${title}\n当前是第1轮次，请大家抽取第1张扑克牌\n\n其他玩家点击按钮抽牌：`;
 
   const replyMarkup = buildButtons();
 
-  // 直接发送（使用 TgMessage 的 sendInline / sendText）
   try {
-    if (thread_id) {
-      await TgMessage.sendText(env, {
-        chat_id,
-        text,
-        parse_mode: "HTML",
-        reply_markup: replyMarkup,
-        message_thread_id: thread_id
-      } as any);
-    } else {
-      await TgMessage.sendText(env, {
-        chat_id,
-        text,
-        parse_mode: "HTML",
-        reply_markup: replyMarkup
-      } as any);
-    }
+    await TgMessage.sendText(env, {
+      chat_id,
+      text,
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+      message_thread_id: thread_id
+    } as any);
   } catch (e) {
     console.error("[21] send start message failed", e);
   }
 }
 
-// === 回调处理：JSON callback ===
-// callbackQuery: 原 callback_query 对象（包含 id, from, message 等）
-// callbackData: 解析好的 callback JSON，例如 { type: "21", action: "draw" }
+/**
+ * 处理 21 点的 callback（callback_query + 解析后的 callbackData）
+ * callbackQuery: 原 callback_query 对象（包含 id, from, message 等）
+ * callbackData: 解析好的 callback JSON，例如 { type: "21", action: "draw" }
+ */
 export async function handle21Callback(callbackQuery: any, callbackData: any, env: EnvLike) {
   const cq = callbackQuery;
   const data = callbackData || {};
@@ -150,7 +146,7 @@ export async function handle21Callback(callbackQuery: any, callbackData: any, en
     if (total === 21) {
       let endText = `${initiatorLine}\n游戏结束！\n`;
       players.forEach(p => {
-        const flags = [];
+        const flags: string[] = [];
         if (p.gaveUp) flags.push("放弃");
         if (p.busted) flags.push("爆了");
         endText += `- ${p.user}：${[...p.cards, ...flags].join(" ")}${p.user === replier ? ' 🎉 21点！' : ''}\n`;
@@ -179,7 +175,7 @@ export async function handle21Callback(callbackQuery: any, callbackData: any, en
     let text = `${initiatorLine}\n`;
     text += `当前是第${round}轮次，请大家抽取第${round}张扑克牌\n`;
     players.forEach(p => {
-      const flags = [];
+      const flags: string[] = [];
       if (p.gaveUp) flags.push("放弃");
       if (p.busted) flags.push("爆了");
       text += `- ${p.user}：${[...p.cards, ...flags].join(" ")}\n`;
@@ -234,7 +230,7 @@ export async function handle21Callback(callbackQuery: any, callbackData: any, en
 
       let finalText = `${initiatorLine}\n游戏结束！\n`;
       players.forEach(p => {
-        const flags = [];
+        const flags: string[] = [];
         if (p.gaveUp) flags.push("放弃");
         if (p.busted) flags.push("爆了");
         finalText += `- ${p.user}：${[...p.cards, ...flags].join(" ")}\n`;
@@ -259,7 +255,7 @@ export async function handle21Callback(callbackQuery: any, callbackData: any, en
     let text = `${initiatorLine}\n`;
     text += `当前是第${round}轮次，请大家抽取第${round}张扑克牌\n`;
     players.forEach(p => {
-      const flags = [];
+      const flags: string[] = [];
       if (p.gaveUp) flags.push("放弃");
       if (p.busted) flags.push("爆了");
       text += `- ${p.user}：${[...p.cards, ...flags].join(" ")}\n`;

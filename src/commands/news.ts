@@ -1,5 +1,5 @@
 // commands/news.ts
-import TgMessage from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 
 type Env = {
   TOKEN: string;
@@ -20,55 +20,84 @@ function getDateStr(date = new Date()) {
   return date.toISOString().slice(0, 10).replace(/-/g, "");
 }
 
-function buildMessageLink(msg: any) {
-  const chatId = msg.chat?.id?.toString?.();
-  if (msg.chat?.username && msg.reply_to_message) {
-    return `https://t.me/${msg.chat.username}/${msg.reply_to_message!.message_id}`;
-  } else if (chatId?.startsWith("-100") && msg.reply_to_message) {
-    const rawId = chatId.slice(4);
-    return `https://t.me/c/${rawId}/${msg.reply_to_message!.message_id}`;
+/**
+ * 根据 parsed 中的 message / replyToMessage 构造可跳转链接
+ * 兼容：有 chat.username 的公开群（/username/message_id）和私有群（/c/rawId/message_id）
+ */
+function buildMessageLinkFromParsed(parsed: ParsedUpdate) {
+  const msg = parsed.message;
+  const reply = parsed.replyToMessage;
+  if (!msg || !reply) return "";
+
+  const chat = msg.chat || {};
+  const chatId = String(chat.id ?? "");
+  // 公开群有 username
+  if (chat.username && reply.message_id) {
+    return `https://t.me/${chat.username}/${reply.message_id}`;
   }
-  return '';
+  // 私有频道/群以 -100 开头，用 /c/<raw>/<message_id>
+  if (chatId.startsWith("-100") && reply.message_id) {
+    const rawId = chatId.slice(4);
+    return `https://t.me/c/${rawId}/${reply.message_id}`;
+  }
+  return "";
 }
 
 /**
- * 直接使用 TgMessage 发送消息（不再返回旧的 payload 格式）
+ * 处理爆料逻辑，输入为已解析的 parsedMessage（TgMessage.parseUpdate 返回值）
  */
-export async function handleNews(msg: any, env: Env): Promise<void> {
-  console.log("[News] 收到消息，msg.text:", msg.text);
-  const text: string = msg.text || "";
-  const invoker = msg.from?.first_name || "某人";
-  const invokerId = String(msg.from?.id);
-  const reply = msg.reply_to_message;
+export async function handleNews(parsed: ParsedUpdate, env: Env): Promise<void> {
+  console.log("[News] handleNews invoked, parsed.command:", parsed.command, "textPreview:", parsed.textPreview);
 
+  const parsedMsg = parsed.message;
+  if (!parsedMsg) {
+    console.log("[News] parsed.message 缺失，忽略");
+    return;
+  }
+
+  const text = (parsed.text ?? "").trim();
+  const invoker = parsed.from?.first_name || "某人";
+  const invokerId = String(parsed.from?.id ?? "");
+  const reply = parsed.replyToMessage;
+
+  // 使用 parsed 的 isReply 判断是否为显式回复
   const isExplicitReply = Boolean(
-    reply &&
-      !("forum_topic_created" in reply) &&
-      typeof reply.text === "string" &&
-      reply.from?.username !== env.BOT_USERNAME
+    parsed.isReply &&
+      reply &&
+      !("forum_topic_created" in (reply as any)) &&
+      typeof (reply as any).text === "string" &&
+      // 确保回复不是机器人自己（避免自爆料）
+      (reply as any).from?.username !== env.BOT_USERNAME
   );
-  console.log("[News] isExplicitReply =", isExplicitReply);
+  console.log("[News] isExplicitReply =", isExplicitReply, "parsed.isReply =", parsed.isReply);
 
-  const dateMatch = text.match(/\/news\s+(\d{8})/);
-  const dateKey = dateMatch?.[1] || getDateStr();
+  // 支持命令参数中传入日期：/news 20250101
+  let dateKey = getDateStr();
+  if (parsed.args && parsed.args.length > 0) {
+    const maybe = parsed.args[0].trim();
+    if (/^\d{8}$/.test(maybe)) {
+      dateKey = maybe;
+    }
+  }
   const kvKey = `news:${dateKey}`;
   console.log("[News] 使用日期 key =", dateKey);
-  const segmenter = new Intl.Segmenter('zh', { granularity: 'grapheme' });
 
-  // 准备通用的 reply_markup（删除按钮）
+  // 中文分词用于截取片段
+  const segmenter = new Intl.Segmenter("zh", { granularity: "grapheme" });
+
+  // 准备删除按钮（内联）——保持原有行为
   const deleteInlineKb = {
     inline_keyboard: [
       [{ text: "清理爆料痕迹~", callback_data: JSON.stringify({ type: "delete_message" }) }]
     ]
   };
 
-  // message_thread_id（如果存在）——用于论坛/主题群组
-  const threadId =
-    msg.message_thread_id
-    ?? msg.message?.message_thread_id;
+  // threadId（论坛/主题群组）
+  const threadId = parsed.threadId;
 
+  // 如果是对某条消息的显式回复，则进入“新增爆料”流程
   if (isExplicitReply) {
-    const content = escapeHtml(reply.text!.trim());
+    const content = escapeHtml((reply as any).text!.trim());
 
     const raw = await env.NEWS_STORE.get(kvKey);
     const list: Array<{
@@ -80,14 +109,16 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
       timestamp: string;
     }> = raw ? JSON.parse(raw) : [];
 
+    // 统计当天该用户已爆料数
     const todayEntries = list.filter(e => e.invokerId === invokerId);
 
-    // 如果你有白名单逻辑，请在这里替换或导入；当前实现默认普通用户限制
+    // 白名单/会员逻辑预留（当前默认普通用户）
     const isVip = false;
     const maxPerDay = isVip ? 99 : 90;
     console.log(`[News] ${invoker}(ID:${invokerId}) 今天已爆料 ${todayEntries.length} 条，上限 ${maxPerDay}`);
 
     if (todayEntries.length >= maxPerDay) {
+      // 删除最早的同 invokerId 的一条（保持总数）
       const idx = list.findIndex(e => e.invokerId === invokerId);
       if (idx !== -1) {
         console.log("[News] 达到上限，删除最旧一条爆料，内容 =", list[idx]);
@@ -95,11 +126,11 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
       }
     }
 
-    const link = buildMessageLink(msg);
-    if (list.some(e => e.invokerId === invokerId && e.link === link && link !== '')) {
+    const link = buildMessageLinkFromParsed(parsed);
+    if (link !== "" && list.some(e => e.invokerId === invokerId && e.link === link)) {
       const dupText = `⚠️ ${invoker} 已经对这条消息爆料过了！`;
       await TgMessage.sendText(env, {
-        chat_id: msg.chat.id,
+        chat_id: parsed.chatId!,
         text: dupText,
         parse_mode: "HTML",
         message_thread_id: threadId
@@ -107,7 +138,7 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
       return;
     }
 
-    const targetUser = reply.from?.first_name || "某人";
+    const targetUser = (reply as any).from?.first_name || "某人";
     const snippet = [...segmenter.segment(content)]
       .map(seg => seg.segment)
       .slice(0, 50)
@@ -132,9 +163,8 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
     const sendText = `✅ ${invoker} 给骰娘爆料：<b>${targetUser}</b> 说了「${linkedSnippet}」` +
       `（你今日已爆料 ${Math.min(todayEntries.length + 1, maxPerDay)}/${maxPerDay} 条）`;
 
-    // 使用 TgMessage 发送（在群组主题中保留 message_thread_id）
     await TgMessage.sendText(env, {
-      chat_id: msg.chat.id,
+      chat_id: parsed.chatId!,
       text: sendText,
       parse_mode: "HTML",
       reply_markup: deleteInlineKb,
@@ -151,7 +181,7 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
     if (!stored) {
       const noText = `📭 ${dateKey} 暂无小道消息～回复一条消息并发送 <b>@${env.BOT_USERNAME} /news</b> 即可爆料喔！`;
       await TgMessage.sendText(env, {
-        chat_id: msg.chat.id,
+        chat_id: parsed.chatId!,
         text: noText,
         parse_mode: "HTML",
         message_thread_id: threadId
@@ -181,9 +211,8 @@ export async function handleNews(msg: any, env: Env): Promise<void> {
       ]
     };
 
-    // 直接发送展示消息
     await TgMessage.sendText(env, {
-      chat_id: msg.chat.id,
+      chat_id: parsed.chatId!,
       text: result,
       parse_mode: "HTML",
       reply_markup,
