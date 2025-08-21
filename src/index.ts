@@ -80,6 +80,15 @@ export default {
               await handle21Callback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
+            case "duel": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 duel 点回调", callbackData);
+              // 引入新的 handler
+              const { handleDuelCallback } = await import("./commands/duel");
+              await handleDuelCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
             case "groll": {
               // callbackQuery 为 parsedMessage.callbackQuery
               // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
@@ -114,10 +123,7 @@ export default {
         // 🔙 老逻辑：保持兼容        
         let payload: any;
         const cq = parsedMessage.callbackQuery;
-        if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
-          payload = handleDuel(cq, env);
-          console.log("➡️ [callback] handleDuel 返回 payload:", payload);
-        } else if (cq.data?.startsWith("fish_pull:")) {
+        if (cq.data?.startsWith("fish_pull:")) {
           payload = await handleFish(cq, env);
         }
 
@@ -164,7 +170,16 @@ export default {
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /book 处理完成`);
               return new Response("OK", { status: 200 });
+            }
 
+            
+            case "duel": {
+              console.log("index: 检测到 /duel 命令，进入 duel 逻辑");
+              const { handleDuel } = await import("./commands/duel");
+              await handleDuel(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /duel 处理完成`);
+              return new Response("OK", { status: 200 });
             }
 
             case "groll": {
@@ -174,7 +189,6 @@ export default {
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /groll 处理完成`);
               return new Response("OK", { status: 200 });
-
             }
 
             case "21": {
@@ -184,9 +198,8 @@ export default {
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: 21处理完成`);
               return new Response("OK", { status: 200 });
-
             }
-            //4.3 处理news
+
             case "news": {
               console.log(`index: 检查到news命令`);
               const { handleNews } = await import("./commands/news");
@@ -371,9 +384,6 @@ export default {
       console.log("🎯 检测到 /roll 命令");
       const userName = msg.from?.first_name || "某人";
       payload.text = handleRoll(text, userName);
-    } else if (/\/duel\b/.test(text)) {
-      console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
-      payload = { ...payload, ...handleDuel(msg, env) };
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
     } else if (/\/like\b/.test(text)) {
