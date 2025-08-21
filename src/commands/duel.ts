@@ -127,6 +127,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
       chat_id,
       text: `目标不能是自己或机器人。正确用法：@${botName} /duel @对手 赌注文本`,
       parse_mode: "HTML",
+      reply_markup: reply_delete,
       message_thread_id: thread_id
     });
     return;
@@ -151,8 +152,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "接受决斗", callback_data: JSON.stringify(cb) }],
-          [{ text: "删除消息", callback_data: JSON.stringify({ type: "delete_message" }) }]
+          [{ text: "接受决斗", callback_data: JSON.stringify(cb) }]
         ]
       },
       message_thread_id: thread_id
