@@ -3,7 +3,6 @@
 import { handleEcho } from "./commands/echo";
 import { handleRoll } from "./commands/roll";
 import { handleHelp } from "./commands/help";
-import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
 import { handleTrans } from "./commands/trans";
 import { recordAffection } from "./commands/handleAffinity";

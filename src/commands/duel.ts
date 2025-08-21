@@ -37,6 +37,12 @@ function pickDisplayNameFromParsed(parsed: ParsedUpdate) {
   return parsed.from?.first_name || "决斗者";
 }
 
+const reply_markup = {
+  inline_keyboard: [
+    [{ text: "删除消息", callback_data: JSON.stringify({ type: "delete_message" }) }]
+  ]
+};
+
 /**
  * 处理 /duel 发起（接收 ParsedUpdate）
  */
@@ -59,6 +65,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
       chat_id,
       text: `命令格式不正确。\n正确用法：@${botName} /duel @对手 赌注文本\n例如：@${botName} /duel @lihua 一瓶可乐`,
       parse_mode: "HTML",
+      reply_markup,
       message_thread_id: thread_id
     });
     return;
