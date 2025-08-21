@@ -2,7 +2,6 @@
 
 import { handleEcho } from "./commands/echo";
 import { handleRoll } from "./commands/roll";
-import { handleGroll } from "./commands/groll";
 import { handleHelp } from "./commands/help";
 import { handleDuel } from "./commands/duel";
 import { handleLike } from "./commands/like";
@@ -81,6 +80,15 @@ export default {
               await handle21Callback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
+            case "groll": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 groll回调", callbackData);
+              // 引入新的 handler
+              const { handleGrollCallback } = await import("./commands/groll");
+              await handleGrollCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
 
             case "delete_message":
               {
@@ -109,12 +117,7 @@ export default {
         if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
           payload = handleDuel(cq, env);
           console.log("➡️ [callback] handleDuel 返回 payload:", payload);
-        } else if (
-          cq.data.startsWith("groll_accept") ||
-          cq.data.startsWith("groll_end")) {
-          payload = handleGroll(cq, env);
-          console.log("➡️ [callback] handleGroll 返回 payload:", payload);
-        }  else if (cq.data?.startsWith("fish_pull:")) {
+        } else if (cq.data?.startsWith("fish_pull:")) {
           payload = await handleFish(cq, env);
         }
 
@@ -160,6 +163,16 @@ export default {
               await handleBook(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /book 处理完成`);
+              return new Response("OK", { status: 200 });
+
+            }
+
+            case "groll": {
+              console.log("index: 检测到 /groll 命令，进入 groll 逻辑");
+              const { handleGroll } = await import("./commands/groll");
+              await handleGroll(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /groll 处理完成`);
               return new Response("OK", { status: 200 });
 
             }
@@ -358,9 +371,6 @@ export default {
       console.log("🎯 检测到 /roll 命令");
       const userName = msg.from?.first_name || "某人";
       payload.text = handleRoll(text, userName);
-    } else if (/\/groll\b/.test(text)) {
-      console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
-      payload = { ...payload, ...handleGroll(msg, env) };
     } else if (/\/duel\b/.test(text)) {
       console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
       payload = { ...payload, ...handleDuel(msg, env) };
