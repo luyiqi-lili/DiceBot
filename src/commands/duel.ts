@@ -199,7 +199,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
   }
 
   if (!isTarget) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: "只有被挑战的  ${expectedTargetIdent}  ${parsedTargetName}  才能接受此决斗。", show_alert: true });
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `只有被挑战的  ${expectedTargetIdent} 和 ${parsedTargetName}  才能接受此决斗。`, show_alert: true });
     return;
   }
 
