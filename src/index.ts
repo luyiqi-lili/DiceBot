@@ -164,7 +164,7 @@ export default {
       const firstName = msg.from.first_name || "";
       const key = `count:${userId}`;
       // 读取原始记录（可能是旧版的纯数字）
-/*      const prev = await env.TGBOTCOUNT.get(key);
+       const prev = await env.TGBOTCOUNT.get(key);
       let record;
       if (prev) {
         try {
@@ -186,7 +186,7 @@ export default {
       record.firstName = firstName;
       // 写回 KV，使用 JSON 格式
        await env.TGBOTCOUNT.put(key, JSON.stringify(record));
-*/
+ 
 
     }
 
