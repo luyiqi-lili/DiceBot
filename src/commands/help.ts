@@ -11,7 +11,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
     threadId: parsedMessage.threadId
   });
 
-  const botUsername = (env && (env as any).BOT_USERNAME) || process.env.BOT_USERNAME || "Bot";
+  const botUsername = (env && (env as any).BOT_USERNAME);
 
   const text = `🤖 <b>可用命令：</b>
 <blockquote expandable>/echo &lt;内容&gt; - 让骰娘判断你说的对不对  
