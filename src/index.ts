@@ -1,8 +1,6 @@
 /* index.ts */
 
-import { handleEcho } from "./commands/echo";
 import { handleRoll } from "./commands/roll";
-import { handleLike } from "./commands/like";
 import { handleTrans } from "./commands/trans";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
@@ -178,6 +176,15 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
+            case "echo": {
+              console.log("index: 检测到 /echo 命令，进入 echo逻辑");
+              const { handleEcho } = await import("./commands/echo");
+              await handleEcho(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /echo 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
 
             case "like": {
               console.log("index: 检测到 /like 命令，进入 like 逻辑");
@@ -326,11 +333,7 @@ export default {
       console.log("📌 附加 message_thread_id 到响应消息");
     }
 
-    if (/\/echo\b/.test(text)) {
-      console.log("📢 检测到 /echo 命令");
-      const userName = msg.from?.first_name || "某人";
-      payload.text = handleEcho(text, userName);
-    } else if (/^\/rh\b/.test(text)) {
+    if (/^\/rh\b/.test(text)) {
       console.log("🎲 检测到 /rh 命令，进行隐藏掷骰");
       const userName = msg.from?.first_name || "某人";
       const rollResult = handleRoll(text.replace(/^\/rh/, "/roll"), userName);  // 替换为 /roll 处理逻辑
@@ -402,7 +405,7 @@ export default {
       payload.text = handleRoll(text, userName);
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
-    }  else if (/\/trans\b/.test(text)) {
+    } else if (/\/trans\b/.test(text)) {
       console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
       const res = await handleTrans(msg, env);
       payload.text = res.text;
