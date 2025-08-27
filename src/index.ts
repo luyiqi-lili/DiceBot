@@ -171,7 +171,16 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-            
+            case "help": {
+              console.log("index: 检测到 /help 命令，进入 book逻辑");
+              const { handleHelp } = await import("./commands/help");
+              await handleHelp(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+
             case "duel": {
               console.log("index: 检测到 /duel 命令，进入 duel 逻辑");
               const { handleDuel } = await import("./commands/duel");
@@ -271,7 +280,7 @@ export default {
       const firstName = msg.from.first_name || "";
       const key = `count:${userId}`;
       // 读取原始记录（可能是旧版的纯数字）
-       const prev = await env.TGBOTCOUNT.get(key);
+      const prev = await env.TGBOTCOUNT.get(key);
       let record;
       if (prev) {
         try {
@@ -292,8 +301,8 @@ export default {
       record.count += 1;
       record.firstName = firstName;
       // 写回 KV，使用 JSON 格式
-       await env.TGBOTCOUNT.put(key, JSON.stringify(record));
- 
+      await env.TGBOTCOUNT.put(key, JSON.stringify(record));
+
 
     }
 
@@ -390,12 +399,6 @@ export default {
       const res = await handleLike(msg, env);
       payload.text = res.text;
       if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    } else if (/\/help\b/.test(text)) {
-      console.log("ℹ️ 检测到 /help 命令，返回完整帮助信息");
-      const helpResponse = handleHelp(env.BOT_USERNAME);
-      payload.text = helpResponse.text;
-      payload.parse_mode = helpResponse.parse_mode;
-      payload.reply_markup = helpResponse.reply_markup;
     } else if (/\/trans\b/.test(text)) {
       console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
       const res = await handleTrans(msg, env);

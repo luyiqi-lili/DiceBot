@@ -1,5 +1,17 @@
-export function handleHelp(botUsername: string) {
-  console.log("📖 返回帮助信息");
+import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+
+/**
+ * 重构的 help handler
+ * - 直接接收 parsedMessage
+ * - 直接使用 TgMessage 发送消息（sendText）
+ */
+export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
+  console.log("[help] 处理 help 命令，parsedMessage:", {
+    chatId: parsedMessage.chatId,
+    threadId: parsedMessage.threadId
+  });
+
+  const botUsername = (env && (env as any).BOT_USERNAME) || process.env.BOT_USERNAME || "Bot";
 
   const text = `🤖 <b>可用命令：</b>
 <blockquote expandable>/echo &lt;内容&gt; - 让骰娘判断你说的对不对  
@@ -9,12 +21,12 @@ export function handleHelp(botUsername: string) {
 /roll Nd{A B C} - 从多个选项中抽取 N 次，例如 /roll 3d{红 白 绿}  
 /duel @目标 赌注内容 - 向某人发起一场赌注决斗！
 /groll - 发起一个群骰，支持最多 20 人加入
-/book - 查看自己的书签 
+/book - 查看自己的书签  
 /book &lt;关键字&gt; - 回复自己消息并带上备注，添加书签到个人列表  
 /book del #序号 - 删除指定序号的书签  
 /book all - 查看本群所有用户的书签  
 /book @用户名 - 查看指定用户的书签   
-/21 - <a href="https://t.me/c/2742074355/345/196400">发起一局多人 21 点游戏 </a>
+/21 - <a href=\"https://t.me/c/2742074355/345/196400\">发起一局多人 21 点游戏 </a>
 
 <b>使用方法：</b>  
 <i>请先 @${botUsername} 再输入命令！</i>
@@ -51,13 +63,27 @@ export function handleHelp(botUsername: string) {
         { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` },
         { text: "/21", switch_inline_query_current_chat: `/21` }
       ]
-
     ]
   };
 
-  return {
-    text,
-    parse_mode: "HTML",
-    reply_markup
-  };
+  const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
+  if (!chatId) {
+    console.error("[help] 无法找到 chatId，无法发送帮助信息");
+    return;
+  }
+
+  try {
+    return await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      reply_markup,
+      message_thread_id: parsedMessage.threadId
+    });
+  } catch (err) {
+    console.error("[help] 发送帮助信息失败", err);
+    throw err;
+  }
 }
+
+export default handleHelp;
