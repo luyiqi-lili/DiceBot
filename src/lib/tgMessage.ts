@@ -67,6 +67,9 @@ export type ParsedUpdate = {
   args?: string[];
   // 原始 update 中的文本首段（方便短文本判断）
   textPreview?: string | undefined;
+
+  forumTopicEdited?: any;
+
 };
 interface TelegramApiResponse<T = any> {
   ok: boolean;
@@ -214,8 +217,14 @@ const TgMessage = {
 
     // 普通消息（message / edited_message / channel_post）
     if (update.message) {
-      parsed.type = 'message';
       parsed.message = update.message;
+      // 如果 message 含有 forum_topic_edited 字段，优先把类型标为 topic_edited
+      if (update.message.forum_topic_edited) {
+        parsed.type = 'topic_edited';
+        parsed.forumTopicEdited = update.message.forum_topic_edited;
+      } else {
+        parsed.type = 'message';
+      }
     } else if (update.edited_message) {
       parsed.type = 'edited_message';
       parsed.message = update.edited_message;
