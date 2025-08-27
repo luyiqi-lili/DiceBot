@@ -183,18 +183,18 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
         // 介于 100 和 1000：两步判定
         // 1) 定义 10 种鱼（从常见到稀有），并设置稀有鱼更难上钩的 hookRate
         const fishList = [
-            { name: "🍾破损漂流瓶", hookRate: 0.60, value: 0 },
-            { name: "🪵浮木", hookRate: 0.60, value: 0 },
-            { name: "👢没用的靴子", hookRate: 0.60, value: 0 },
-            { name: "🌿绿海草", hookRate: 0.60, value: 0 },
-            { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 0 },
+            { name: "🍾破损漂流瓶", hookRate: 0.60, value: 1 },
+            { name: "🪵浮木", hookRate: 0.60, value: 1 },
+            { name: "👢没用的靴子", hookRate: 0.60, value: 1 },
+            { name: "🌿绿海草", hookRate: 0.60, value: 1 },
+            { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 1 },
 
-            { name: "🐚回音海螺", hookRate: 0.40, value: 1 },
-            { name: "🦀三钳蟹", hookRate: 0.40, value: 1 },
-            { name: "🦐樱花虾", hookRate: 0.40, value: 1 },
-            { name: "🌿蓝海草", hookRate: 0.40, value: 1 },
-            { name: "🐟沙丁鱼", hookRate: 0.40, value: 1 },
-            { name: "<tg-spoiler>🔵跳蛋</tg-spoiler>", hookRate: 0.40, value: 1 },
+            { name: "🐚回音海螺", hookRate: 0.40, value: 2 },
+            { name: "🦀三钳蟹", hookRate: 0.40, value: 2 },
+            { name: "🦐樱花虾", hookRate: 0.40, value: 2 },
+            { name: "🌿蓝海草", hookRate: 0.40, value: 2 },
+            { name: "🐟沙丁鱼", hookRate: 0.40, value: 2 },
+            { name: "<tg-spoiler>🔵跳蛋</tg-spoiler>", hookRate: 0.40, value: 2 },
 
             { name: "🐡红刺豚", hookRate: 0.35, value: 2 },
             { name: "🐟蓝鳍鱼", hookRate: 0.35, value: 2 },
@@ -249,7 +249,8 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
             { name: "🦏海犀牛", hookRate: 0.10, value: 13 },
             { name: "🦑大王乌贼", hookRate: 0.10, value: 13 },
-
+            { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
+/*
             { name: "🧜‍♀️七彩美人鱼", hookRate: 0.05, value: 19 },
             { name: "👑皇后利刃鲨", hookRate: 0.05, value: 19 },
 
@@ -265,7 +266,7 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
             { name: "<tg-spoiler>👙fufu的胸罩</tg-spoiler>", hookRate: -0.25, value: 31 },
             { name: "<tg-spoiler>✈️勇菈的人格飞机杯</tg-spoiler>", hookRate: -0.25, value: 31 },
             { name: "<tg-spoiler>🥕闪闪的黄金萝卜</tg-spoiler>", hookRate: -0.25, value: 31 }
-
+*/
         ];
 
         // 将 score 归一到 0..1，100 -> 0, 1000 -> 1
