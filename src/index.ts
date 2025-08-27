@@ -1,6 +1,5 @@
 /* index.ts */
 
-import { handleTrans } from "./commands/trans";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
@@ -184,6 +183,15 @@ export default {
               await handleHelp(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+            case "trans": {
+              console.log("index: 检测到 /trans 命令，进入 trans逻辑");
+              const { handleTrans } = await import("./commands/trans");
+              await handleTrans(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /trans 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
@@ -383,11 +391,6 @@ export default {
       payload = { ...payload, ...(await handleRose(msg, env)) };
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
-    } else if (/\/trans\b/.test(text)) {
-      console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
-      const res = await handleTrans(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
     } else if (/\/coin\b/.test(text)) {
       // 新增 coin 命令
       const res = await handleCoin(msg, env);
