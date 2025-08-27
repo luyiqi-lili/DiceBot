@@ -35,11 +35,6 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
       command: parsedMessage.command
     });
 
-    // 仅处理 message 类型且存在 forum_topic_edited
-    if (parsedMessage.type !== "message" || !parsedMessage.message) {
-      console.log("[topicEdit] 不是普通消息，跳过");
-      return;
-    }
 
     const msg = parsedMessage.message;
 
