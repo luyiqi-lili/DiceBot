@@ -2,10 +2,8 @@
 
 import { handleEcho } from "./commands/echo";
 import { handleRoll } from "./commands/roll";
-import { handleHelp } from "./commands/help";
 import { handleLike } from "./commands/like";
 import { handleTrans } from "./commands/trans";
-import { recordAffection } from "./commands/handleAffinity";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
@@ -172,11 +170,21 @@ export default {
             }
 
             case "help": {
-              console.log("index: 检测到 /help 命令，进入 book逻辑");
+              console.log("index: 检测到 /help 命令，进入 help逻辑");
               const { handleHelp } = await import("./commands/help");
               await handleHelp(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+
+            case "like": {
+              console.log("index: 检测到 /like 命令，进入 like 逻辑");
+              const { handleLike } = await import("./commands/like");
+              await handleLike(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /like 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
@@ -394,12 +402,7 @@ export default {
       payload.text = handleRoll(text, userName);
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
-    } else if (/\/like\b/.test(text)) {
-      // 调用我们在下一步定义的 handleLike
-      const res = await handleLike(msg, env);
-      payload.text = res.text;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    } else if (/\/trans\b/.test(text)) {
+    }  else if (/\/trans\b/.test(text)) {
       console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
       const res = await handleTrans(msg, env);
       payload.text = res.text;
