@@ -11,6 +11,7 @@ export type Env = {
   TOKEN: string;
   BOT_USERNAME: string;
   NEWS_STORE: KVNamespace
+  TOPIC_KV: KVNamespace
 };
 
 export default {
