@@ -1,7 +1,6 @@
 /* index.ts */
 
 import { handleRose } from "./commands/rose";
-//import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
 import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";

@@ -65,7 +65,9 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
         211, 361, 244, 234072, 165, 258, 182, 194,
         141941, 251, 389, 409, 48
       ],
-      // 如需添加其他 chatId 可在此添加
+      [-1002848481881]: [
+        69
+      ],
     };
 
     const allowedThreads = whitelist[chatId];
@@ -156,9 +158,11 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
     }
 
     // --- 目标提示位置（固定） ---
-    const targetChatId = -1002742074355;
-    const targetThreadId = 302677;
-
+//    const targetChatId = -1002742074355;
+//    const targetThreadId = 302677;
+ 
+    const targetChatId = -1002848481881;
+    const targetThreadId = 66;
     // 删除上一次提示（如果存在）
     if (record.message_id) {
       try {
