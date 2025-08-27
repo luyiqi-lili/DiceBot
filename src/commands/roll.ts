@@ -28,6 +28,7 @@ function extractInput(parsedMessage: ParsedUpdate): string {
  * 基于原有实现，计算并返回要发送的文本（未做 HTML 转义）
  */
 function computeRollText(inputRaw: string, userName: string): string {
+  // 先规范化输入（保留原有逻辑）
   let input = inputRaw.replace(/.*\/r(?:oll)?\s*/i, "").trim();
 
   // /rd -> 1d100, 以及 d<number> -> 1d<number>
@@ -36,9 +37,14 @@ function computeRollText(inputRaw: string, userName: string): string {
   }
   input = input.replace(/\b[dD](\d+)/g, "1d$1");
 
+  // 标题：显示给用户的命令形式（如果 input 为空，就显示 /roll）
+  const cmdDisplay = input ? `/roll ${input}` : `/roll`;
+  const header = `${userName} 执行 ${cmdDisplay} 结果是：\n`;
+
+  // 空参数（默认 1-100）
   if (!input) {
     const point = Math.floor(Math.random() * 100) + 1;
-    return `${userName} 掷出了 ${point} 点`;
+    return `${header}${point} 点`;
   }
 
   const normalizedInput = input.replace(/[｛]/g, "{").replace(/[｝]/g, "}");
@@ -54,7 +60,8 @@ function computeRollText(inputRaw: string, userName: string): string {
       const idx = Math.floor(Math.random() * options.length);
       picks.push(options[idx]);
     }
-    return `${userName} 抽取了 ${count} 次：\n` + picks.map((p, i) => `#${i + 1}: ${p}`).join("\n");
+    const body = `${userName} 抽取了 ${count} 次：\n` + picks.map((p, i) => `#${i + 1}: ${p}`).join("\n");
+    return `${header}${body}`;
   }
 
   // 单次抽取 {A B C}
@@ -64,7 +71,8 @@ function computeRollText(inputRaw: string, userName: string): string {
     if (options.length === 0) return `${userName} 的抽取列表不能为空。示例：/roll {红 白 绿}`;
     const idx = Math.floor(Math.random() * options.length);
     const pick = options[idx];
-    return `${userName} 抽取结果：${pick}`;
+    const body = `${userName} 抽取结果：${pick}`;
+    return `${header}${body}`;
   }
 
   // 验证字符合法性（只允许数字 d + - 空格）
@@ -114,7 +122,8 @@ function computeRollText(inputRaw: string, userName: string): string {
     }
   }
 
-  return `${userName} 掷出了：\n${rollDetails.join("\n")}\n📊 总和：${total}`;
+  const body = `${userName} 掷出了：\n${rollDetails.join("\n")}\n📊 总和：${total}`;
+  return `${header}${body}`;
 }
 
 /**
