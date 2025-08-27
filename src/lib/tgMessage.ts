@@ -103,41 +103,69 @@ async function callTelegramApi(env: EnvLike, method: string, body: any) {
 }
 
 // 解析命令文本（例如 "/roll 1d6+1" 或 "@Bot roll 1d6"）
+// 这个函数做了几个增强：
+// 1. 保持原有对 "/cmd"、"/cmd@Bot"、"@Bot cmd" 的支持
+// 2. 额外识别像 "/rd10"、"/r2d10" 这类快捷写法 —— 将视作命令名 "r" 并把后缀作为第一个参数
+// 例如: "/rd10" -> command: "r", args: ["d10"]; "/r2d10" -> command: "r", args: ["2d10"]
+// 3. 对大小写不敏感地处理 bot username 比对
 function parseCommandFromText(text: string, botUsername?: string) {
-  // 先拆分为 tokens
-  log("解析命令");
+  log('解析命令');
   const tokens = text.trim().split(/\s+/);
-
-  log("分割字符", tokens);
+  log('分割字符', tokens);
   if (tokens.length === 0) return { isCommand: false };
 
+
   const first = tokens[0];
-  // 支持以下形式： /cmd 或 /cmd@BotUsername 或 @BotUsername cmd 或 /r (缩写)
-  if (/^\/.+/.test(first)) {
-    // 以斜线开头
-    // "/roll"
-    const name = first.slice(1); // 去掉开头的 /
-    return { isCommand: true, command: name, args: tokens.slice(1) };
+
+
+  // 1. 以斜线开头的常规命令，例如 "/roll"、"/roll@Bot"、"/rd10"、"/r2d10"
+  if (first.startsWith('/')) {
+    // 去掉起始的 '/'
+    // 并且移除尾随的 @username 部分（如果存在）
+    const withoutSlash = first.slice(1);
+    const [namePart] = withoutSlash.split('@'); // e.g. 'rd10' 或 'r2d10' 或 'roll'
+
+
+    if (!namePart) return { isCommand: false };
+
+
+    // 如果是以 "r" 开头且第二个字符是数字或字母 'd'（比如 rd10 / r2d10），视为快捷的 /r 命令
+    // 这样不会把 /roll 当做 /r（因为第二个字符是 'o'，不匹配）
+    if (/^r(?:\d|d)/i.test(namePart)) {
+      // namePart = 'rd10' | 'r2d10' | 'r123' ...
+      const suffix = namePart.slice(1); // 'd10' | '2d10' | '123'
+      const args = [] as string[];
+      if (suffix) args.push(suffix);
+      // 其余 tokens 也应该被当成参数
+      args.push(...tokens.slice(1));
+      return { isCommand: true, command: 'r', args };
+    }
+
+
+    // 普通的 '/cmd' 或 '/cmd@Bot' 处理（拆 @）
+    const [nameOnly] = namePart.split('@');
+    return { isCommand: true, command: nameOnly, args: tokens.slice(1) };
   }
 
-  // 形如 "@BotUsername cmd ..." 或者开头以 @BotUsername 的情况
+
+  // 2. 形如 "@BotUsername cmd ..." 的情况
   if (botUsername && first.toLowerCase() === `@${botUsername.toLowerCase()}`) {
     const second = tokens[1] || '';
     if (!second) return { isCommand: false };
-    // 如果第二个也是 /cmd 直接解析
     if (second.startsWith('/')) {
       const [name] = second.slice(1).split('@');
       return { isCommand: true, command: name, args: tokens.slice(2) };
     }
-    // 否则把第二个当作普通命令词
     return { isCommand: true, command: second, args: tokens.slice(2) };
   }
 
-  // 兼容以 "/r" 或 "/rh" 等缩写直接出现（不带 bot username）
+
+  // 3. 兼容以 "/r" 或其他常规命令直接出现（不带 bot username）
   if (first.startsWith('/')) {
     const [name] = first.slice(1).split('@');
     return { isCommand: true, command: name, args: tokens.slice(1) };
   }
+
 
   return { isCommand: false };
 }
@@ -160,7 +188,7 @@ const TgMessage = {
   parseUpdate(update: any, botUsername?: string): ParsedUpdate {
     const parsed: ParsedUpdate = {
       update,
-      chatId:0,
+      chatId: 0,
       type: 'unknown'
     };
 
