@@ -1,7 +1,7 @@
 /* index.ts */
 
 import { handleRose } from "./commands/rose";
-import { handleTopicEdited } from "./commands/topicEditHandler";
+//import { handleTopicEdited } from "./commands/topicEditHandler";
 import { handleCoin } from "./commands/coin";
 import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";
@@ -51,6 +51,19 @@ export default {
     //4. 分别处理 callback_query 和 message
     console.log("index:parsedMessage.type", parsedMessage.type);
     switch (parsedMessage.type) {
+      case 'edited_message': {
+        console.log("index: 检测到 edited_message，尝试处理话题标题编辑");
+        try {const { handleTopicEdited } = await import("./commands/topicEditHandler");
+          const editResponse = await handleTopicEdited(parsedMessage, env);
+          if (editResponse) {
+            return editResponse; // 如果 handler 返回 Response（按需），则直接返回
+          }
+        } catch (e) {
+          console.error("❌ handleTopicEdited(edited_message) 失败", e);
+        }
+        // 如果没有被 handleTopicEdited 消化，继续不做其它处理（返回 OK）
+        return new Response("OK", { status: 200 });
+      }
 
       //4.1 处理 callback_query
       case 'callback_query': {
@@ -255,17 +268,6 @@ export default {
       }
     }
 
-
-    try {
-      const editResponse = await handleTopicEdited(update, env);
-      if (editResponse) return editResponse;
-
-    }
-    catch (e) {
-      console.error(`❌ [callback] ${method} 标题更新失败`, e);
-
-      return new Response("OK", { status: 200 });
-    }
 
 
 
