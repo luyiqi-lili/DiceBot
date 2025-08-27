@@ -166,7 +166,7 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-            
+
             case "roll": {
               console.log("index: 检测到 /roll 命令，进入 roll逻辑");
               const { handleRoll } = await import("./commands/roll");
@@ -342,7 +342,7 @@ export default {
       console.log("📌 附加 message_thread_id 到响应消息");
     }
 
-     if (/\/fate\b/.test(text)) {
+    if (/\/fate\b/.test(text)) {
       console.log("🔮 检测到 /fate 命令，开始发送媒体组");
       console.log("🔮 检测到 /fate 命令，开始处理 handleFate 返回的 payload");
       try {
@@ -379,10 +379,6 @@ export default {
     } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
-    } else if (/\/r/.test(text)) {
-      console.log("🎯 检测到 /roll 命令");
-      const userName = msg.from?.first_name || "某人";
-      payload.text = handleRoll(text, userName);
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
     } else if (/\/trans\b/.test(text)) {
