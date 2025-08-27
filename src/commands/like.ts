@@ -103,7 +103,7 @@ export async function handleLike(parsedMessage: ParsedUpdate, env: EnvLike) {
   }
 
   const count = record.count;
-  const likeTextMap =  likeTextMapFriend;
+  const likeTextMap = likeTextMapFriend;
 
   let attitudePool: string[] = [];
   for (const entry of likeTextMap) {
@@ -123,8 +123,10 @@ export async function handleLike(parsedMessage: ParsedUpdate, env: EnvLike) {
 
   const remark = escapeHtml(attitudePool[Math.floor(Math.random() * attitudePool.length)]);
   const safeCount = escapeHtml(count.toString());
+  const displayName = record.firstName || (from.first_name as string) || `ID ${userId}`;
+  const safeName = escapeHtml(displayName);
 
-  const text = `你已经召唤骰娘<b>${safeCount}</b>次了！${remark}`;
+  const text = `${safeName}，你已经召唤骰娘<b>${safeCount}</b>次了！${remark}`;
 
   return await TgMessage.sendText(env, {
     chat_id: chatId,
