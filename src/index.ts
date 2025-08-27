@@ -12,6 +12,7 @@ export type Env = {
   BOT_USERNAME: string;
   NEWS_STORE: KVNamespace
   TOPIC_KV: KVNamespace
+  COIN_KV: KVNamespace
 };
 
 export default {
@@ -48,7 +49,7 @@ export default {
       return new Response("OK", { status: 200 });
     }
 
-    //4. 分别处理 callback_query 和 message
+    //4. 分别处理 callback_query 和 message 和 topic_edited
     console.log("index:parsedMessage.type", parsedMessage.type);
     switch (parsedMessage.type) {
       case 'topic_edited': {
@@ -196,6 +197,16 @@ export default {
               await handleHelp(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+
+            case "coin": {
+              console.log("index: 检测到 /coin 命令，进入 coin逻辑");
+              const { handleCoin } = await import("./commands/coin");
+              await handleCoin(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /coin 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
@@ -393,11 +404,6 @@ export default {
       payload = { ...payload, ...(await handleRose(msg, env)) };
     } else if (/\/fish\b/.test(text)) {
       payload = { ...payload, ...(await handleFish(msg, env)) };
-    } else if (/\/coin\b/.test(text)) {
-      // 新增 coin 命令
-      const res = await handleCoin(msg, env);
-      payload = { ...payload, ...res };
-
     } else if (/\/whoami\b/.test(text)) {
       console.log("🆔 检测到 /whoami 命令");
 
