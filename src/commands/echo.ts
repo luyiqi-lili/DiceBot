@@ -65,32 +65,6 @@ export async function handleEcho(parsedMessage: ParsedUpdate, env: EnvLike) {
 
   content = content.trim() || "(没有内容)";
 
-  function wildcardToRegExp(pattern: string): RegExp | null {
-    // 1) 先把 pattern 中的正则特殊字符（除了 *）都转义
-    //    这里列出常见需要转义的字符： . + ^ = ! : $ { } ( ) | [ ] \ /
-    const escaped = pattern.replace(/([.+^=!:${}()|[\]\\\/])/g, "\\$1");
-    // 2) 把 * 替换成 .*（注意：此处没有引入额外的正则元字符）
-    const regexStr = escaped.replace(/\*/g, ".*");
-    try {
-      return new RegExp(regexStr, "i");
-    } catch (e) {
-      console.error("[echo] 无效的通配符模式，跳过：", pattern, e);
-      return null;
-    }
-  }
-
-  for (const pattern of specialPatterns) {
-    const regex = wildcardToRegExp(pattern);
-    if (!regex) continue; // 无效 pattern，安全跳过
-    if (regex.test(content)) {
-      return await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: specialResponse,
-        message_thread_id: parsedMessage.threadId
-      });
-    }
-  }
-
   // 模拟掷骰子，结果为 1~6
   const diceRoll = Math.floor(Math.random() * 6) + 1;
 
