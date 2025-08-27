@@ -166,8 +166,10 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-
-            case "roll": {
+            case "roll":
+            case "r":
+            case "rd":
+            case "rh": {
               console.log("index: 检测到 /roll 命令，进入 roll逻辑");
               const { handleRoll } = await import("./commands/roll");
               await handleRoll(parsedMessage, env);
