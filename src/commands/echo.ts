@@ -65,11 +65,23 @@ export async function handleEcho(parsedMessage: ParsedUpdate, env: EnvLike) {
 
   content = content.trim() || "(没有内容)";
 
-  // 通配符模式检查
+  function wildcardToRegExp(pattern: string): RegExp | null {
+    // 1) 先把 pattern 中的正则特殊字符（除了 *）都转义
+    //    这里列出常见需要转义的字符： . + ^ = ! : $ { } ( ) | [ ] \ /
+    const escaped = pattern.replace(/([.+^=!:${}()|[\]\\\/])/g, "\\$1");
+    // 2) 把 * 替换成 .*（注意：此处没有引入额外的正则元字符）
+    const regexStr = escaped.replace(/\*/g, ".*");
+    try {
+      return new RegExp(regexStr, "i");
+    } catch (e) {
+      console.error("[echo] 无效的通配符模式，跳过：", pattern, e);
+      return null;
+    }
+  }
+
   for (const pattern of specialPatterns) {
-    // 将通配符 '*' 转换为 '.*'，并对其它正则特殊字符进行转义
-    const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, "\\$&").replace(/\\\*/g, ".*");
-    const regex = new RegExp(escaped, "i");
+    const regex = wildcardToRegExp(pattern);
+    if (!regex) continue; // 无效 pattern，安全跳过
     if (regex.test(content)) {
       return await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -92,7 +104,7 @@ export async function handleEcho(parsedMessage: ParsedUpdate, env: EnvLike) {
     "非常同意"    // 6
   ];
   const chosenAttitude = attitudeMap[diceRoll - 1]; // 类型是 keyof typeof attitudeResponses
-  const responses = attitudeResponses[chosenAttitude];  
+  const responses = attitudeResponses[chosenAttitude];
   const chosenResponse = responses[Math.floor(Math.random() * responses.length)];
 
   console.log("🗣 用户名 =", rawUserName);
