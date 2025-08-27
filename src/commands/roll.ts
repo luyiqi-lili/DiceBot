@@ -1,80 +1,79 @@
+import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+
+function escapeHtml(text: string) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 /**
- * 处理 /roll 命令
- * @param text 完整的消息文本
- * @param userName 用户的显示名称
- * @returns 格式化后的回复字符串
+ * 将原始文本解析为 roll 输入参数（例如 "2d6+1" 或 "{红 白 绿}"）
  */
-export function handleRoll(text: string, userName: string): string {
-  //  const input = text.replace(/.*\/roll\s*/i, "").trim();
-  let input = text.replace(/.*\/r(?:oll)?\s*/i, "").trim();
+function extractInput(parsedMessage: ParsedUpdate): string {
+  // 优先使用解析好的 args
+  if (Array.isArray(parsedMessage.args) && parsedMessage.args.length > 0) {
+    return parsedMessage.args.join(" ").trim();
+  }
 
+  // 否则从原始文本中去掉可能的 @Bot 前缀与命令词
+  let text = parsedMessage.text || "";
+  // 移除开头的 @Bot 或 /command 或带 @ 的命令
+  text = text.replace(/^@?\w+\s*/i, "");
+  text = text.replace(/^\/(?:r|roll|rh|rd)\b/i, "");
+  return text.trim();
+}
 
-  // /rd → 1d100，或 /rd   → 1d100
+/**
+ * 基于原有实现，计算并返回要发送的文本（未做 HTML 转义）
+ */
+function computeRollText(inputRaw: string, userName: string): string {
+  let input = inputRaw.replace(/.*\/r(?:oll)?\s*/i, "").trim();
+
+  // /rd -> 1d100, 以及 d<number> -> 1d<number>
   if (/^[dD]\s*$/.test(input)) {
     input = "1d100";
   }
-
-  // /rd20 → 1d20
   input = input.replace(/\b[dD](\d+)/g, "1d$1");
 
-
-
-
-  input = input.replace(/\b[dD](\d+)/g, "1d$1");
-  console.log("🎲 用户输入骰点参数 =", input || "默认");
-
-  // 空参数，默认 1d100
   if (!input) {
     const point = Math.floor(Math.random() * 100) + 1;
-    console.log(`🎯 ${userName} 掷出了 ${point} 点`);
     return `${userName} 掷出了 ${point} 点`;
   }
 
-  // 统一中英文大括号为英文格式
-  const normalizedInput = input
-    .replace(/[｛]/g, "{")
-    .replace(/[｝]/g, "}");
+  const normalizedInput = input.replace(/[｛]/g, "{").replace(/[｝]/g, "}");
 
-  // 处理元素抽取：n d{A,B,C} 或 {A,B,C}，支持中英文逗号和空格
+  // 多次抽取 3d{A B C}
   const multiDrawMatch = normalizedInput.match(/^(\d+)[dD]\{([^}]+)\}$/);
   if (multiDrawMatch) {
     const count = parseInt(multiDrawMatch[1], 10);
     const options = multiDrawMatch[2].split(/[，,\s]+/).filter(Boolean);
-    if (options.length === 0) {
-      return `${userName} 的抽取列表不能为空。示例：/roll 3d{红 白 绿}`;
-    }
+    if (options.length === 0) return `${userName} 的抽取列表不能为空。示例：/roll 3d{红 白 绿}`;
     const picks: string[] = [];
     for (let i = 0; i < count; i++) {
       const idx = Math.floor(Math.random() * options.length);
       picks.push(options[idx]);
     }
-    console.log(`📦 ${userName} 抽取结果 =`, picks);
     return `${userName} 抽取了 ${count} 次：\n` + picks.map((p, i) => `#${i + 1}: ${p}`).join("\n");
   }
 
+  // 单次抽取 {A B C}
   const singleDrawMatch = normalizedInput.match(/^\{([^}]+)\}$/);
   if (singleDrawMatch) {
     const options = singleDrawMatch[1].split(/[，,\s]+/).filter(Boolean);
-    if (options.length === 0) {
-      return `${userName} 的抽取列表不能为空。示例：/roll {红 白 绿}`;
-    }
+    if (options.length === 0) return `${userName} 的抽取列表不能为空。示例：/roll {红 白 绿}`;
     const idx = Math.floor(Math.random() * options.length);
     const pick = options[idx];
-    console.log(`🎯 ${userName} 单次抽取 = ${pick}`);
     return `${userName} 抽取结果：${pick}`;
   }
 
-  // 验证仅允许数字、d、加减号组成的表达式（排除非法字符与包含大括号的表达式）
+  // 验证字符合法性（只允许数字 d + - 空格）
   if (/[^\d+dD+\-\s]/.test(normalizedInput) || /[{}]/.test(normalizedInput)) {
     return `${userName} 的骰点表达式无效，请使用如 /roll 2d6+1d4+5 的格式`;
   }
 
-  // 正则匹配：例如 2d6、1d4、+3、-5
   const parts = normalizedInput.match(/(\d+d\d+|\d+|[+\-])/gi);
-  if (!parts) {
-    console.log("⚠️ 无法解析表达式");
-    return `${userName} 的骰点格式无效，请使用如 /roll 2d6+1d4+5 的格式`;
-  }
+  if (!parts) return `${userName} 的骰点格式无效，请使用如 /roll 2d6+1d4+5 的格式`;
 
   let total = 0;
   let currentSign = 1;
@@ -111,11 +110,66 @@ export function handleRoll(text: string, userName: string): string {
       total += value;
       rollDetails.push(`${currentSign < 0 ? "-" : "+"}${Math.abs(value)}`);
     } else {
-      console.log("❌ 未识别片段 =", part);
       return `${userName} 的骰点表达式有误，无法识别：${part}`;
     }
   }
 
-  console.log(`📊 ${userName} 的骰子总和 = ${total}`);
   return `${userName} 掷出了：\n${rollDetails.join("\n")}\n📊 总和：${total}`;
 }
+
+/**
+ * 接受 parsedMessage，直接通过 TgMessage 发送 reply
+ * 支持 /rh（隐藏掷骰：将结果发到私聊并在群组提示）
+ * 支持 /rd 或 d 的简写
+ */
+export async function handleRoll(parsedMessage: ParsedUpdate, env: EnvLike) {
+  const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
+  const threadId = parsedMessage.threadId;
+  const from = parsedMessage.from || parsedMessage.message?.from;
+  if (!from) {
+    console.error("[roll] 找不到用户信息 from");
+    return;
+  }
+  if (!chatId) {
+    console.error("[roll] 找不到 chatId");
+    return;
+  }
+
+  const displayName = (from.first_name as string) || (from.username as string) || `ID ${from.id}`;
+  const userNameEsc = escapeHtml(displayName);
+
+  const input = extractInput(parsedMessage);
+  const resultText = computeRollText(input, displayName);
+
+  // 判断是否为隐藏掷骰 /rh 或命令名为 rh
+  const isHidden = parsedMessage.command === "rh" || (/^\/rh\b/i.test(parsedMessage.text || ""));
+
+  if (isHidden) {
+    // 群提示
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `🎲 已将掷骰结果发送至 <b>${userNameEsc}</b> 的私聊。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+
+    // 私聊发送详细结果（不做 HTML 转义以保留格式，但对用户生成的变量做转义）
+    await TgMessage.sendText(env, {
+      chat_id: from.id,
+      text: `🎲 <b>你的隐藏掷骰结果</b>：\n${escapeHtml(resultText)}`,
+      parse_mode: "HTML"
+    });
+
+    return;
+  }
+
+  // 普通回复直接发到群组
+  await TgMessage.sendText(env, {
+    chat_id: chatId,
+    text: escapeHtml(resultText),
+    parse_mode: "HTML",
+    message_thread_id: threadId
+  });
+}
+
+export default handleRoll;

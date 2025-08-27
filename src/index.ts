@@ -1,6 +1,5 @@
 /* index.ts */
 
-import { handleRoll } from "./commands/roll";
 import { handleTrans } from "./commands/trans";
 import { handleRose } from "./commands/rose";
 import { handleTopicEdited } from "./commands/topicEditHandler";
@@ -164,6 +163,16 @@ export default {
               await handleBook(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /book 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+            
+            case "roll": {
+              console.log("index: 检测到 /roll 命令，进入 roll逻辑");
+              const { handleRoll } = await import("./commands/roll");
+              await handleRoll(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /roll 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
