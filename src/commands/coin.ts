@@ -506,6 +506,40 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
+  // /coin create <amount>
+  if (sub === "create") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin create。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const amount = parseInt(args[1] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    await createTreasury(kv, amount);
+    const newTre = await getTreasury(kv);
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，填补到了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空中凭空铸币，或许会引发通胀的暗涌。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
 
   // 未知子命令
   await TgMessage.sendText(env, {
