@@ -534,7 +534,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const newTre = await getTreasury(kv);
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，填补到了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空中凭空铸币，或许会引发通胀的暗涌。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
+      text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
