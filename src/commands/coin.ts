@@ -333,7 +333,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // 新增管理命令：check / take / create
-  // /coin check [treasury|<uid>|<chatId||threadId>]  — 仅限 ADMIN_UIDS
+  // /coin check — 不带参数显示国库 + 所有用户账户总和；回复某人则查询该人余额（仅管理员可用）
   if (sub === "check") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS.includes(callerNum)) {
@@ -346,42 +346,67 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const target = args[1];
-    if (!target) {
-      const tBal = await getBalance(TREASURY_KEY);
+    // 如果是回复某人的消息，则查询该人的余额
+    const replied = parsedMessage.message?.reply_to_message?.from;
+    if (replied) {
+      const targetId = String(replied.id);
+      const bal = await getBalance(targetId);
+      const targetName = escapeHtml(String(replied.first_name ?? replied.username ?? targetId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `🏦 国库 当前有 ${tBal} 💰。`,
+        text: `👤 ${targetName} 的余额：${bal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
     }
 
-    if (target === "treasury" || target === "国库") {
-      const tBal = await getBalance(TREASURY_KEY);
-      await TgMessage.sendText(env, { chat_id: chatId, text: `🏦 国库 当前有 ${tBal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
+    // 否则（无参数且非回复）—— 计算国库与所有用户账户余额之和
+    try {
+      let treasuryBal = await getBalance(TREASURY_KEY);
+
+      // 遍历 KV 列表，累加所有看起来像用户 UID 的键（纯数字），排除国库键和房间键（含 '||'）
+      let totalUserBal = 0;
+      let cursor: string | undefined = undefined;
+      do {
+        const listOpts: any = cursor ? { cursor } : {};
+        // limit 可选，视 KV 大小调整；这里不指定则使用默认分页
+        const res = await (kv as any).list(listOpts);
+        cursor = res.cursor;
+
+        for (const k of (res.keys || [])) {
+          const name: string = k.name;
+          if (name === TREASURY_KEY) continue;
+          if (name.includes("||")) continue; // 跳过房间键
+          if (/^\d+$/.test(name)) { // 仅数字键视为用户账户
+            const v = await getBalance(name);
+            totalUserBal += v;
+          }
+        }
+      } while (cursor);
+
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text:
+          `🏦 国库：${treasuryBal} 💰。\n` +
+          `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
+          `📊 国库 + 用户总计：${treasuryBal + totalUserBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    } catch (e) {
+      console.error("[coin] /coin check 列表或计算失败", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 查询失败：无法遍历账户数据，请稍后重试或联系管理员。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
-
-    // 支持房间 key: "<chatId>||<threadId>"
-    if (target.includes("||")) {
-      const roomBal = await getBalance(target);
-      await TgMessage.sendText(env, { chat_id: chatId, text: `📥 房间 ${escapeHtml(target)} 当前有 ${roomBal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
-      return;
-    }
-
-    // 支持数字 UID
-    const uidNum = Number(target);
-    if (!isNaN(uidNum)) {
-      const bal = await getBalance(String(uidNum));
-      await TgMessage.sendText(env, { chat_id: chatId, text: `👤 用户 ${escapeHtml(String(uidNum))} 的余额：${bal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
-      return;
-    }
-
-    await TgMessage.sendText(env, { chat_id: chatId, text: `❓ 无法识别的目标，请使用：<code>/coin check treasury</code> 、<code>/coin check 123456</code>、或房间键 <code>chatId||threadId</code>。`, parse_mode: "HTML", message_thread_id: threadId });
-    return;
   }
+
 
   // /coin take <amount> [<targetUid>]  — 从国库取款，限 ADMIN_UIDS
   if (sub === "take") {
