@@ -408,7 +408,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 如果回复某人：查询该人余额
     const repliedFrom = parsedMessage.message?.reply_to_message?.from;
-    if (repliedFrom) {
+    if (repliedFrom && parsedMessage.isReply ) {
       const targetId = String(repliedFrom.id);
       const bal = await getBalance(kv, targetId);
       const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? targetId));
