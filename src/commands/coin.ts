@@ -10,7 +10,7 @@ export type CoinEnv = EnvLike & {
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
-// 国库键
+// 艾丽莎宝库键
 export const TREASURY_KEY = "__treasury__";
 
 // 管理员白名单（可分权限）
@@ -111,7 +111,7 @@ export function calcTransferFeeRate(targetBal: number): number {
 /**
  * 转账：fromId -> toId
  * - 若余额不足返回 { ok:false, reason }
- * - 成功返回 { ok:true, fee, fromNew, toNew }（手续费自动写入国库 TREASURY_KEY）
+ * - 成功返回 { ok:true, fee, fromNew, toNew }（手续费自动写入艾丽莎宝库 TREASURY_KEY）
  */
 export async function transfer(
   kv: KVNamespace,
@@ -131,7 +131,7 @@ export async function transfer(
   await setBalance(kv, fromId, senderBal - amount);
   // 收款
   await setBalance(kv, toId, targetBal + amount - fee);
-  // 手续费入国库
+  // 手续费入艾丽莎宝库
   const oldTre = await getBalance(kv, TREASURY_KEY);
   await setBalance(kv, TREASURY_KEY, oldTre + fee);
 
@@ -143,7 +143,7 @@ export async function transfer(
   };
 }
 
-/* 国库相关操作 */
+/* 艾丽莎宝库相关操作 */
 export async function getTreasury(kv: KVNamespace): Promise<number> {
   return await getBalance(kv, TREASURY_KEY);
 }
@@ -153,12 +153,12 @@ export async function addToTreasury(kv: KVNamespace, amount: number): Promise<nu
 export async function takeFromTreasury(kv: KVNamespace, amount: number): Promise<boolean> {
   return await deductFromBalance(kv, TREASURY_KEY, amount);
 }
-/** 凭空注入国库（create） */
+/** 凭空注入艾丽莎宝库（create） */
 export async function createTreasury(kv: KVNamespace, amount: number): Promise<number> {
   return await addToTreasury(kv, amount);
 }
 
-/** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和国库键） */
+/** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */
 export async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
   let total = 0;
   let cursor: string | undefined = undefined;
@@ -344,7 +344,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // send (转账) — 使用 transfer()，手续费自动入国库
+  // send (转账) — 使用 transfer()，手续费自动入艾丽莎宝库
   if (sub === "send") {
 
     const amount = parseInt(args[1] || "", 10);
@@ -382,7 +382,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       chat_id: chatId,
       text:
         `💸 ${escapeHtml(userName)} 向 ${targetName} 转账 ${amount} 💰。\n` +
-        `📊 ${targetName} 原有余额 ${result.toNew! - (amount - result.fee!)} 💰，适用费率 ${feePercent}%，手续费 ${result.fee} 💰（已入国库）。\n` +
+        `📊 ${targetName} 原有余额 ${result.toNew! - (amount - result.fee!)} 💰，适用费率 ${feePercent}%，手续费 ${result.fee} 💰（已入艾丽莎宝库）。\n` +
         `✅ 转账后 ${targetName} 新余额：${result.toNew} 💰；\n` +
         `🪙 你的新余额：${result.fromNew} 💰。`,
       parse_mode: "HTML",
@@ -421,16 +421,16 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 否则返回国库与所有用户合计
+    // 否则返回艾丽莎宝库与所有用户合计
     try {
       const treasuryBal = await getTreasury(kv);
       const totalUserBal = await sumAllUserBalances(kv);
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text:
-          `🏦 国库：${treasuryBal} 💰。\n` +
+          `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
           `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-          `📊 国库 + 用户总计：${treasuryBal + totalUserBal} 💰。`,
+          `📊 艾丽莎宝库 + 用户总计：${treasuryBal + totalUserBal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -447,7 +447,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
   }
 
-  // /coin take <amount> — 从国库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
+  // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
   if (sub === "take") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
@@ -473,7 +473,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 目标：如果是回复某人则转给被回复的人，
     let targetUid = userId;
-    let targetLabel = escapeHtml(userId);
+    let targetLabel = escapeHtml(userName);
     if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
       targetUid = String(r.id);
@@ -484,14 +484,14 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (treasuryBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ 国库余额不足，当前只有 ${treasuryBal} 💰。`,
+        text: `❌ 艾丽莎宝库余额不足，当前只有 ${treasuryBal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
     }
 
-    // 扣除国库并增加目标账户
+    // 扣除艾丽莎宝库并增加目标账户
     await setBalance(kv, TREASURY_KEY, treasuryBal - amount);
     const oldTargetBal = await getBalance(kv, targetUid);
     const newTargetBal = oldTargetBal + amount;
@@ -499,7 +499,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ 已从国库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。国库剩余 ${treasuryBal - amount} 💰。`,
+      text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${treasuryBal - amount} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -515,9 +515,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       `<code>/coin</code> 查询余额\n` +
       `<code>/coin pray</code> 今日祈祷\n` +
       `<code>/coin send 50</code> 回复消息支付 50 💰\n` +
-      `<code>/coin check</code> （管理员查询国库/用户合计/回复某人查看其余额）\n` +
-      `<code>/coin take 100</code> （管理员从国库取款）\n` +
-      `<code>/coin create 1000</code> （管理员向国库注入）`,
+      `<code>/coin check</code> （管理员查询艾丽莎宝库/用户合计/回复某人查看其余额）\n` +
+      `<code>/coin take 100</code> （管理员从艾丽莎宝库取款）\n` +
+      `<code>/coin create 1000</code> （管理员向艾丽莎宝库注入）`,
     parse_mode: "HTML",
     message_thread_id: threadId
   });
