@@ -9,7 +9,17 @@ export type CoinEnv = EnvLike & {
   BOT_USERNAME?: string;
 };
 
-interface PayConfig {
+/* ------------------------- 全局配置（统一在顶部） ------------------------- */
+// 国库键
+export const TREASURY_KEY = "__treasury__";
+
+// 管理员白名单（可分权限）
+export const ADMIN_UIDS_CHECK: number[] = [8080375150];
+export const ADMIN_UIDS_TAKE: number[] = [8080375150];
+export const ADMIN_UIDS_CREATE: number[] = [8080375150];
+
+/* ------------------------- payConfigs（保留你的原始内容） ------------------------- */
+export interface PayConfig {
   chatId: number;
   threadIds?: number[];
   placeName?: string;
@@ -17,8 +27,7 @@ interface PayConfig {
   successMessage?: string;
 }
 
-/* 配置区域（保留你原始内容） */
-const payConfigs: PayConfig[] = [
+export const payConfigs: PayConfig[] = [
   {
     chatId: -1002742074355,
     threadIds: [182],
@@ -45,14 +54,7 @@ const payConfigs: PayConfig[] = [
   }
 ];
 
-/* 管理员与国库配置（请替换 ADMIN_UIDS 为实际的数字 UID） */
-const ADMIN_UIDS: number[] = [/* 123456789, 987654321 */]; // TODO: 填入允许操作国库 / check / take / create 的 UID
-const TREASURY_KEY = "__treasury__";
-
-/* 工具函数 */
-function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+/* ------------------------- 公共工具函数（导出供其它模块复用） ------------------------- */
 function escapeHtml(text: string) {
   return (text ?? "")
     .replace(/&/g, "&amp;")
@@ -60,12 +62,135 @@ function escapeHtml(text: string) {
     .replace(/>/g, "&gt;");
 }
 
+/** 读取余额（KV） */
+export async function getBalance(kv: KVNamespace, id: string): Promise<number> {
+  try {
+    const raw = await kv.get(id);
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch (e) {
+    console.warn("[coin] getBalance KV 读取失败", e);
+    return 0;
+  }
+}
+
+/** 写入余额（KV） */
+export async function setBalance(kv: KVNamespace, id: string, bal: number): Promise<void> {
+  try {
+    await kv.put(id, String(bal));
+  } catch (e) {
+    console.error("[coin] setBalance KV 写入失败", e);
+  }
+}
+
+/** 增加账户余额，返回新余额 */
+export async function addToBalance(kv: KVNamespace, id: string, delta: number): Promise<number> {
+  const cur = await getBalance(kv, id);
+  const next = cur + delta;
+  await setBalance(kv, id, next);
+  return next;
+}
+
+/** 从账户扣款，若余额不足返回 false，否则扣款并返回 true */
+export async function deductFromBalance(kv: KVNamespace, id: string, amount: number): Promise<boolean> {
+  const cur = await getBalance(kv, id);
+  if (cur < amount) return false;
+  await setBalance(kv, id, cur - amount);
+  return true;
+}
+
+/** 费率计算（和你原来的阶梯规则一致） */
+export function calcTransferFeeRate(targetBal: number): number {
+  if (targetBal < 100) return 0;
+  if (targetBal < 300) return 0.1;
+  if (targetBal < 500) return 0.3;
+  if (targetBal < 700) return 0.5;
+  if (targetBal < 900) return 0.7;
+  return 0.9;
+}
+
 /**
- * 重构后的 handleCoin：直接接收 parsedMessage 并发送消息
+ * 转账：fromId -> toId
+ * - 若余额不足返回 { ok:false, reason }
+ * - 成功返回 { ok:true, fee, fromNew, toNew }（手续费自动写入国库 TREASURY_KEY）
  */
+export async function transfer(
+  kv: KVNamespace,
+  fromId: string,
+  toId: string,
+  amount: number
+): Promise<{ ok: boolean; reason?: string; fee?: number; fromNew?: number; toNew?: number }> {
+  if (amount <= 0) return { ok: false, reason: "invalid amount" };
+  const senderBal = await getBalance(kv, fromId);
+  if (senderBal < amount) return { ok: false, reason: "insufficient" };
+
+  const targetBal = await getBalance(kv, toId);
+  const rate = calcTransferFeeRate(targetBal);
+  const fee = Math.floor(amount * rate);
+
+  // 扣款
+  await setBalance(kv, fromId, senderBal - amount);
+  // 收款
+  await setBalance(kv, toId, targetBal + amount - fee);
+  // 手续费入国库
+  const oldTre = await getBalance(kv, TREASURY_KEY);
+  await setBalance(kv, TREASURY_KEY, oldTre + fee);
+
+  return {
+    ok: true,
+    fee,
+    fromNew: senderBal - amount,
+    toNew: targetBal + amount - fee
+  };
+}
+
+/* 国库相关操作 */
+export async function getTreasury(kv: KVNamespace): Promise<number> {
+  return await getBalance(kv, TREASURY_KEY);
+}
+export async function addToTreasury(kv: KVNamespace, amount: number): Promise<number> {
+  return await addToBalance(kv, TREASURY_KEY, amount);
+}
+export async function takeFromTreasury(kv: KVNamespace, amount: number): Promise<boolean> {
+  return await deductFromBalance(kv, TREASURY_KEY, amount);
+}
+/** 凭空注入国库（create） */
+export async function createTreasury(kv: KVNamespace, amount: number): Promise<number> {
+  return await addToTreasury(kv, amount);
+}
+
+/** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和国库键） */
+export async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
+  let total = 0;
+  let cursor: string | undefined = undefined;
+  do {
+    const opts: any = cursor ? { cursor } : {};
+    const res = await (kv as any).list(opts);
+    cursor = res.cursor;
+    for (const k of (res.keys || [])) {
+      const name: string = k.name;
+      if (name === TREASURY_KEY) continue;
+      if (name.includes("||")) continue;
+      if (/^\d+$/.test(name)) {
+        const v = await getBalance(kv, name);
+        total += v;
+      }
+    }
+  } while (cursor);
+  return total;
+}
+
+/* ------------------------- 原有命令处理（使用上面导出函数） ------------------------- */
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
   const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
-  const threadId = parsedMessage.threadId ?? parsedMessage.message?.message_thread_id ?? parsedMessage.message?.reply_to_message?.message_thread_id ?? undefined;
+  const threadId =
+    parsedMessage.threadId ??
+    parsedMessage.message?.message_thread_id ??
+    parsedMessage.message?.reply_to_message?.message_thread_id ??
+    undefined;
   const from = parsedMessage.from ?? parsedMessage.message?.from;
 
   if (!chatId || !from) {
@@ -73,38 +198,16 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // 文本与参数：优先使用 parsedMessage.args（parseCommandFromText 已经拆分）
   const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.slice() : [];
-
-
   const userId = String(from.id);
   const userName = String(from.first_name ?? from.username ?? "你");
   const safeUserName = escapeHtml(userName);
-
   const kv = env.COIN_KV;
-
-  async function getBalance(id: string): Promise<number> {
-    try {
-      const raw = await kv.get(id);
-      return raw ? parseInt(raw, 10) || 0 : 0;
-    } catch (e) {
-      console.warn("[coin] getBalance KV 读取失败", e);
-      return 0;
-    }
-  }
-  async function setBalance(id: string, bal: number) {
-    try {
-      await kv.put(id, String(bal));
-    } catch (e) {
-      console.error("[coin] setBalance KV 写入失败", e);
-    }
-  }
-
   const sub = (args[0] || "").toLowerCase();
 
   // — 查询余额（默认无子命令）
   if (!sub) {
-    const bal = await getBalance(userId);
+    const bal = await getBalance(kv, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `${safeUserName}，你目前有 ${bal} 💰。`,
@@ -114,9 +217,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // 日常祈祷
+  // pray
   if (sub === "pray") {
-    // 限制到特定群组/主题（原逻辑）
     const allowed =
       (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
       (chatId === -1002742074355 && [62].includes(threadId ?? 0));
@@ -143,15 +245,18 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 活动期间奖励逻辑（原始硬编码时间）
     const todayD = new Date();
-    const duringEvent = (todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17"));
+    const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
     const gain = duringEvent ? randomInt(11, 20) : randomInt(1, 10);
 
-    const bal = await getBalance(userId);
+    const bal = await getBalance(kv, userId);
     const newBal = bal + gain;
-    await setBalance(userId, newBal);
-    try { await kv.put(prayKey, today); } catch (e) { /* ignore */ }
+    await setBalance(kv, userId, newBal);
+    try {
+      await kv.put(prayKey, today);
+    } catch (e) {
+      /* ignore */
+    }
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -162,9 +267,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // pay 操作（向房间/祈愿箱投币）
+  // pay
   if (sub === "pay") {
-    // 找到配置
     const cfg = payConfigs.find((c) => {
       if (c.chatId !== chatId) return false;
       if (!c.threadIds || c.threadIds.length === 0) return true;
@@ -182,10 +286,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const amount = parseInt(args[1] || "", 10);
-    // 无数字则查询该房间余额
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
-      const roomBal = await getBalance(roomKey);
+      const roomBal = await getBalance(kv, roomKey);
       const place = cfg.placeName || `房间 ${threadId}`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -206,8 +309,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 检查并扣除用户余额
-    const senderBal = await getBalance(userId);
+    const senderBal = await getBalance(kv, userId);
     if (senderBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -217,21 +319,17 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
-    const newSenderBal = senderBal - amount;
-    await setBalance(userId, newSenderBal);
+    await setBalance(kv, userId, senderBal - amount);
 
-    // 更新房间余额（key 为 chatId||threadId）
     const roomKey = `${chatId}||${threadId ?? 0}`;
-    const oldRoomBal = await getBalance(roomKey);
+    const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
-    await setBalance(roomKey, newRoomBal);
+    await setBalance(kv, roomKey, newRoomBal);
 
     const place = cfg.placeName || `房间 ${threadId}`;
-
-    // 模板替换（小心 HTML 转义）
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
     const textOut = template
-      .replace(/\$\{userName\}/g, safeUserName)
+      .replace(/\$\{userName\}/g, escapeHtml(userName))
       .replace(/\$\{place\}/g, escapeHtml(place))
       .replace(/\$\{amount\}/g, String(amount))
       .replace(/\$\{total\}/g, String(newRoomBal))
@@ -246,7 +344,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // send (转账) — 新逻辑：手续费进入国库
+  // send (转账) — 使用 transfer()，手续费自动入国库
   if (sub === "send") {
 
     const amount = parseInt(args[1] || "", 10);
@@ -260,8 +358,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const target = parsedMessage.message?.reply_to_message?.from;
-    if (!target || !parsedMessage.isReply) {
+    // 获取被回复用户
+    const repliedFrom = parsedMessage.message?.reply_to_message?.from;
+    if (!repliedFrom || !parsedMessage.isReply) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${safeUserName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
@@ -271,61 +370,33 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 检查并扣除发送者余额
-    const senderBal = await getBalance(userId);
-    if (senderBal < amount) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `❌ ${safeUserName}，你的余额不足，当前只有 ${senderBal} 💰。`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
+    const result = await transfer(kv, userId, String(repliedFrom.id), amount);
+    if (!result.ok) {
+      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
       return;
     }
-    const newSenderBal = senderBal - amount;
-    await setBalance(userId, newSenderBal);
 
-    // 接收者旧余额
-    const targetId = String(target.id);
-    const oldBal = await getBalance(targetId);
-
-    // 阶梯费率
-    let rate: number;
-    if (oldBal < 100) rate = 0;
-    else if (oldBal < 300) rate = 0.1;
-    else if (oldBal < 500) rate = 0.3;
-    else if (oldBal < 700) rate = 0.5;
-    else if (oldBal < 900) rate = 0.7;
-    else rate = 0.9;
-
-    const fee = Math.floor(amount * rate);
-    const newTargetBal = oldBal + amount - fee;
-    await setBalance(targetId, newTargetBal);
-
-    // 将手续费存入国库
-    const oldTreasury = await getBalance(TREASURY_KEY);
-    await setBalance(TREASURY_KEY, oldTreasury + fee);
-
-    const targetName = escapeHtml(String(target.first_name ?? target.username ?? "TA"));
-
+    const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? "TA"));
+    const feePercent = result.fee && amount ? Math.round((result.fee / amount) * 100) : 0;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text:
-        `💸 ${safeUserName} 向 ${targetName} 转账 ${amount} 💰。\n` +
-        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate * 100).toFixed(0)}%，手续费 ${fee} 💰（已入国库）。\n` +
-        `✅ 转账后 ${targetName} 新余额：${newTargetBal} 💰；\n` +
-        `🪙 你的新余额：${newSenderBal} 💰。`,
+        `💸 ${escapeHtml(userName)} 向 ${targetName} 转账 ${amount} 💰。\n` +
+        `📊 ${targetName} 原有余额 ${result.toNew! - (amount - result.fee!)} 💰，适用费率 ${feePercent}%，手续费 ${result.fee} 💰（已入国库）。\n` +
+        `✅ 转账后 ${targetName} 新余额：${result.toNew} 💰；\n` +
+        `🪙 你的新余额：${result.fromNew} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
     return;
   }
 
-  // 新增管理命令：check / take / create
-  // /coin check [treasury|<uid>|<chatId||threadId>]  — 仅限 ADMIN_UIDS
+  /* ------------------------- 管理命令：check / take / create ------------------------- */
+
+  // /coin check
   if (sub === "check") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS.includes(callerNum)) {
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${safeUserName}，你没有权限使用 /coin check。`,
@@ -335,91 +406,125 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const target = args[1];
-    if (!target) {
-      const tBal = await getBalance(TREASURY_KEY);
+    // 如果回复某人：查询该人余额
+    const repliedFrom = parsedMessage.message?.reply_to_message?.from;
+    if (repliedFrom) {
+      const targetId = String(repliedFrom.id);
+      const bal = await getBalance(kv, targetId);
+      const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? targetId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `🏦 国库 当前有 ${tBal} 💰。`,
+        text: `👤 ${targetName} 的余额：${bal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
     }
 
-    if (target === "treasury" || target === "国库") {
-      const tBal = await getBalance(TREASURY_KEY);
-      await TgMessage.sendText(env, { chat_id: chatId, text: `🏦 国库 当前有 ${tBal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
+    // 否则返回国库与所有用户合计
+    try {
+      const treasuryBal = await getTreasury(kv);
+      const totalUserBal = await sumAllUserBalances(kv);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text:
+          `🏦 国库：${treasuryBal} 💰。\n` +
+          `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
+          `📊 国库 + 用户总计：${treasuryBal + totalUserBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    } catch (e) {
+      console.error("[coin] /coin check 列表或计算失败", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 查询失败：无法遍历账户数据，请稍后重试或联系管理员。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
-
-    // 支持房间 key: "<chatId>||<threadId>"
-    if (target.includes("||")) {
-      const roomBal = await getBalance(target);
-      await TgMessage.sendText(env, { chat_id: chatId, text: `📥 房间 ${escapeHtml(target)} 当前有 ${roomBal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
-      return;
-    }
-
-    // 支持数字 UID
-    const uidNum = Number(target);
-    if (!isNaN(uidNum)) {
-      const bal = await getBalance(String(uidNum));
-      await TgMessage.sendText(env, { chat_id: chatId, text: `👤 用户 ${escapeHtml(String(uidNum))} 的余额：${bal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
-      return;
-    }
-
-    await TgMessage.sendText(env, { chat_id: chatId, text: `❓ 无法识别的目标，请使用：<code>/coin check treasury</code> 、<code>/coin check 123456</code>、或房间键 <code>chatId||threadId</code>。`, parse_mode: "HTML", message_thread_id: threadId });
-    return;
   }
 
-  // /coin take <amount> [<targetUid>]  — 从国库取款，限 ADMIN_UIDS
+  // /coin take <amount> [<targetUid>]
   if (sub === "take") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS.includes(callerNum)) {
-      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ ${safeUserName}，你没有权限使用 /coin take。`, parse_mode: "HTML", message_thread_id: threadId });
+    if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin take。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
 
     const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount) || amount <= 0) {
-      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`, parse_mode: "HTML", message_thread_id: threadId });
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
+        parse_mode: "HTML", message_thread_id: threadId
+      });
       return;
     }
 
     const targetUid = args[2] ? String(args[2]) : userId; // 默认为自己
-    const treasuryBal = await getBalance(TREASURY_KEY);
+    const treasuryBal = await getTreasury(kv);
     if (treasuryBal < amount) {
-      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 国库余额不足，当前只有 ${treasuryBal} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 国库余额不足，当前只有 ${treasuryBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
 
-    // 扣除国库并增加目标账户
-    await setBalance(TREASURY_KEY, treasuryBal - amount);
-    const oldTargetBal = await getBalance(targetUid);
-    await setBalance(targetUid, oldTargetBal + amount);
+    await takeFromTreasury(kv, amount);
+    await addToBalance(kv, targetUid, amount);
 
-    await TgMessage.sendText(env, { chat_id: chatId, text: `✅ 已从国库取出 ${amount} 💰，并转入账户 ${escapeHtml(targetUid)}。国库剩余 ${treasuryBal - amount} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `✅ 已从国库取出 ${amount} 💰，并转入账户 ${escapeHtml(targetUid)}。国库剩余 ${treasuryBal - amount} 💰。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
     return;
   }
 
-  // /coin create <amount> — 向国库注入（凭空） ，限 ADMIN_UIDS
+  // /coin create <amount>
   if (sub === "create") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS.includes(callerNum)) {
-      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ ${safeUserName}，你没有权限使用 /coin create。`, parse_mode: "HTML", message_thread_id: threadId });
+    if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin create。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
 
     const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount) || amount <= 0) {
-      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ ${safeUserName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`, parse_mode: "HTML", message_thread_id: threadId });
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
       return;
     }
 
-    const oldTreasury = await getBalance(TREASURY_KEY);
-    await setBalance(TREASURY_KEY, oldTreasury + amount);
-
-    await TgMessage.sendText(env, { chat_id: chatId, text: `✅ 已向国库注入 ${amount} 💰。国库当前 ${oldTreasury + amount} 💰。`, parse_mode: "HTML", message_thread_id: threadId });
+    await createTreasury(kv, amount);
+    const newTre = await getTreasury(kv);
+    await TgMessage.sendText(env, { 
+      chat_id: chatId, 
+      text: `✅ 已向国库注入 ${amount} 💰。国库当前 ${newTre} 💰。`, 
+      parse_mode: "HTML", 
+      message_thread_id: threadId });
     return;
   }
 
@@ -431,7 +536,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       `<code>/coin</code> 查询余额\n` +
       `<code>/coin pray</code> 今日祈祷\n` +
       `<code>/coin send 50</code> 回复消息支付 50 💰\n` +
-      `<code>/coin check</code> （管理员查询国库）\n` +
+      `<code>/coin check</code> （管理员查询国库/用户合计/回复某人查看其余额）\n` +
       `<code>/coin take 100</code> （管理员从国库取款）\n` +
       `<code>/coin create 1000</code> （管理员向国库注入）`,
     parse_mode: "HTML",
