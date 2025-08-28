@@ -352,7 +352,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const replied = parsedMessage.replyToMessage;
       const targetId = parsedMessage.replyToMessage.from?.id;
       const bal = await getBalance(targetId);
-      const targetName = escapeHtml(String(replied.first_name ?? replied.username ?? targetId));
+      const targetName = escapeHtml(String(replied.from?.first_name ?? replied.from?.username ?? targetId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `👤 ${targetName} 的余额：${bal} 💰。`,
