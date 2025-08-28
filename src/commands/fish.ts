@@ -247,10 +247,11 @@ export async function handleFish(msg: any, env: any): Record<string, any> {
 
             { name: "🦈龙牙鲨", hookRate: 0.10, value: 13 },
             { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
-            { name: "🦏海犀牛", hookRate: 0.10, value: 13 },
-            { name: "🦑大王乌贼", hookRate: 0.10, value: 13 },
             { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
-/*
+
+/*            { name: "🦏海犀牛", hookRate: 0.10, value: 13 },
+            { name: "🦑大王乌贼", hookRate: 0.10, value: 13 },
+
             { name: "🧜‍♀️七彩美人鱼", hookRate: 0.05, value: 19 },
             { name: "👑皇后利刃鲨", hookRate: 0.05, value: 19 },
 
