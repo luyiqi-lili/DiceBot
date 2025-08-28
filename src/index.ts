@@ -1,7 +1,6 @@
 /* index.ts */
 
 import { handleRose } from "./commands/rose";
-import { handleCoin } from "./commands/coin";
 import { handleFate } from "./commands/fate";
 import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
