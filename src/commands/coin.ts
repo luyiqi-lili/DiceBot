@@ -350,7 +350,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     
     if (parsedMessage.isReply) {
       const replied = parsedMessage.replyToMessage;
-      const targetId = String(replied.id);
+      const targetId = parsedMessage.replyToMessage.from?.id;
       const bal = await getBalance(targetId);
       const targetName = escapeHtml(String(replied.first_name ?? replied.username ?? targetId));
       await TgMessage.sendText(env, {
