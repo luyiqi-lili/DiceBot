@@ -71,7 +71,7 @@ export default {
 
         const callbackQuery = parsedMessage.callbackQuery;
         const callbackData = parsedMessage.callbackData;
-
+        console.log("index:parsedMessage.callbackData", callbackData);
         // 处理回调命令
         // TODO 回调都改成json格式
         // ✅ 新逻辑：JSON 格式 callback
