@@ -2,7 +2,6 @@
 
 import { handleRose } from "./commands/rose";
 import { handleFate } from "./commands/fate";
-import { handleFish } from "./commands/fish";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 
@@ -136,38 +135,6 @@ export default {
               return new Response("OK", { status: 200 });
           }
         }
-
-        // 🔙 老逻辑：保持兼容        
-        let payload: any;
-        const cq = parsedMessage.callbackQuery;
-        if (cq.data?.startsWith("fish_pull:")) {
-          payload = await handleFish(cq, env);
-        }
-
-        else {
-          console.log("ℹ️ 未知 callback_data，忽略");
-          return new Response("OK", { status: 200 });
-        }
-
-        const method = payload.method || "sendMessage";
-        delete payload.method;
-        console.log(`➡️ [callback] 准备调用 ${method} 接口`, payload);
-        try {
-          const apiRes = await fetch(
-            `https://api.telegram.org/bot${env.TOKEN}/${method}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
-            }
-          );
-          const json = await apiRes.json();
-          console.log(`✅ [callback] ${method} API 成功`, json);
-        } catch (e) {
-          console.error(`❌ [callback] ${method} API 调用失败`, e);
-        }
-
-        return new Response("OK", { status: 200 });
       }
 
       //4.2 处理消息
@@ -421,9 +388,7 @@ export default {
     } else if (/\/rose\b/.test(text)) {
       console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
       payload = { ...payload, ...(await handleRose(msg, env)) };
-    } else if (/\/fish\b/.test(text)) {
-      payload = { ...payload, ...(await handleFish(msg, env)) };
-    } else if (/\/whoami\b/.test(text)) {
+    }else if (/\/whoami\b/.test(text)) {
       console.log("🆔 检测到 /whoami 命令");
 
       // 用户基本信息
