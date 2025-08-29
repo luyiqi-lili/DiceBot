@@ -222,7 +222,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         const fishingRecordText = showFishingRecord(fishingRecord);
         const text =
             `${clickerName} 拉杆！\n` +
-            `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵，国库已记入。 当前余额 ${currentBal}💰 ` +
+            `😕 没有咬钩……这次空手而归。\n\n 本次花费 ${baitCost}💰鱼饵。当前余额 ${currentBal}💰 ` +
             fishingRecordText;
 
         await TgMessage.editMessageText(env, {
@@ -243,7 +243,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         const fishingRecordText = showFishingRecord(fishingRecord);
         const text =
             `${clickerName} 鱼跑了！\n` +
-            `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵，国库已记入。 当前余额 ${currentBal}💰 ` +
+            `💥 力道太大/时间太久。下次小心点～\n\n 本次花费 ${baitCost}💰鱼饵。 当前余额 ${currentBal}💰 ` +
             fishingRecordText;
 
         await TgMessage.editMessageText(env, {
