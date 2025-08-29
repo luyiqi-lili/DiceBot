@@ -1,6 +1,5 @@
 // commands/book.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { Env } from "../types"; // Env 应包含 BOOK_STORE: KVNamespace, TOKEN: string, BOT_USERNAME?: string
 
 function getUserKey(userId: number): string {
   return `book:user:${userId}`;
