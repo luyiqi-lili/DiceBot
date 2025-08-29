@@ -70,6 +70,7 @@ export default {
       case 'callback_query': {
 
         const callbackQuery = parsedMessage.callbackQuery;
+        console.log("index:parsedMessage.callbackQuery", callbackQuery);
         const callbackData = parsedMessage.callbackData;
         console.log("index:parsedMessage.callbackData", callbackData);
         // 处理回调命令
