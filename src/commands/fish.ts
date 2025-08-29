@@ -294,7 +294,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         const newTre = await payoutFromTreasuryAllowNegative(env.COIN_KV, payout);
 
         resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${chosen.value} 💰渔获，最新余额 ${newOwnerBal}💰。\n`;
-        resultText += `（国库支付 ${payout}💰；国库余额 ${newTre} 💰）\n`;
+       // resultText += `（国库支付 ${payout}💰；国库余额 ${newTre} 💰）\n`;
     } else {
         resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 \n`;
     }
