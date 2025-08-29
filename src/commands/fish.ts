@@ -158,7 +158,7 @@ const fishList = [
 /**
  * 处理 callback_query（parsedMessage.callbackQuery 的内容）
  * callbackData 可以是已解析的 object，也可以是字符串（JSON）；
- * 预期结构： { action: "fish_pull", ownerId: number, strength: number, baitCost: number, startTs?: number }
+ * 预期结构： { type: "fish", ownerId: number, strength: number, baitCost: number, startTs?: number }
  */
 export async function handleFishCallback(callbackQuery: any, callbackData: any, env: FishEnv) {
 
@@ -425,7 +425,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
         `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
     // callback_data 使用 JSON 字符串化
-    const callbackDataObj = { action: "fish", o: ownerId, s: strength, b: baitCost };
+    const callbackDataObj = { type: "fish", o: ownerId, s: strength, b: baitCost };
     const callbackData = JSON.stringify(callbackDataObj);
 
     // 发送含按钮的消息（由 TgMessage 发送）
