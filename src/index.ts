@@ -96,10 +96,10 @@ export default {
               await handleDuelCallback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
-            case "fish_pull": {
+            case "fish": {
               // callbackQuery 为 parsedMessage.callbackQuery
               // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
-              console.log("➡️ 处理 fish_pull 点回调", callbackData);
+              console.log("➡️ 处理 fish 点回调", callbackData);
               // 引入新的 handler
               const { handleFishCallback } = await import("./commands/fish");
               await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
