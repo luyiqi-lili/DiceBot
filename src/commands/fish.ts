@@ -1,6 +1,6 @@
 // src/commands/fish.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { CoinEnv, TREASURY_KEY, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury } from "./coin";
+import { CoinEnv, TREASURY_KEY, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury,payoutFromTreasuryAllowNegative } from "./coin";
 import { fishList } from "../lib/liveConfig";
 
 /**
@@ -26,13 +26,7 @@ function nowDateYMD(): string {
  * 从国库支付（允许出现负值）
  * - 返回新的国库余额（可能小于0）
  */
-async function payoutFromTreasuryAllowNegative(kv: KVNamespace, amount: number): Promise<number> {
-    const curRaw = await kv.get(TREASURY_KEY);
-    const cur = curRaw ? parseInt(curRaw, 10) || 0 : 0;
-    const next = cur - amount;
-    await kv.put(TREASURY_KEY, String(next));
-    return next;
-}
+
 
 /* ------------------------- 钓鱼记录 KV 操作 ------------------------- */
 type FishingRecord = {

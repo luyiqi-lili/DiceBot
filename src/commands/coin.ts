@@ -153,10 +153,23 @@ export async function addToTreasury(kv: KVNamespace, amount: number): Promise<nu
 export async function takeFromTreasury(kv: KVNamespace, amount: number): Promise<boolean> {
   return await deductFromBalance(kv, TREASURY_KEY, amount);
 }
+/**
+ * 从国库支付（允许出现负值）
+ * - 返回新的国库余额（可能小于0）
+ */
+export async function payoutFromTreasuryAllowNegative(kv: KVNamespace, amount: number): Promise<number> {
+    const curRaw = await kv.get(TREASURY_KEY);
+    const cur = curRaw ? parseInt(curRaw, 10) || 0 : 0;
+    const next = cur - amount;
+    await kv.put(TREASURY_KEY, String(next));
+    return next;
+}
+
 /** 凭空注入艾丽莎宝库（create） */
 export async function createTreasury(kv: KVNamespace, amount: number): Promise<number> {
   return await addToTreasury(kv, amount);
 }
+
 
 /** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */
 export async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
@@ -251,6 +264,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const bal = await getBalance(kv, userId);
     const newBal = bal + gain;
+    await payoutFromTreasuryAllowNegative(kv,gain);
     await setBalance(kv, userId, newBal);
     try {
       await kv.put(prayKey, today);
