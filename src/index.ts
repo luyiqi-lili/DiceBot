@@ -12,6 +12,7 @@ export type Env = {
   NEWS_STORE: KVNamespace
   TOPIC_KV: KVNamespace
   COIN_KV: KVNamespace
+  BOOK_STORE: KVNamespace
 };
 
 export default {

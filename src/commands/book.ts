@@ -1,5 +1,8 @@
 // commands/book.ts
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+export type Env = EnvLike & {
+  BOOK_STORE: KVNamespace;
+};
 
 function getUserKey(userId: number): string {
   return `book:user:${userId}`;
