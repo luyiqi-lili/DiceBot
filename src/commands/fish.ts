@@ -70,9 +70,9 @@ function showFishingRecord(record: FishingRecord): string {
         // 最新的显示在最上面
         const rev = [...record.results].reverse();
         rev.forEach((r, idx) => {
-            resultText += `<b>第${idx + 1}次:</b> 花费 ${r.baitCost}💰, `;
+            resultText += `<b>第${todayCount- idx+1}次:</b> 花费 ${r.baitCost}💰, `;
             if (r.hooked) {
-                resultText += `钓到 ${escapeHtml(String(r.fishValue))}`;
+                resultText += `钓到 ${r.fishValue}`;
             } else {
                 resultText += `未钓到鱼`;
             }
