@@ -1,6 +1,5 @@
 /* index.ts */
 
-import { handleRose } from "./commands/rose";
 import { handleFate } from "./commands/fate";
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
@@ -54,7 +53,8 @@ export default {
     switch (parsedMessage.type) {
       case 'topic_edited': {
         console.log("index: 检测到 topic_edited，尝试处理话题标题编辑");
-        try {const { handleTopicEdited } = await import("./commands/topicEditHandler");
+        try {
+          const { handleTopicEdited } = await import("./commands/topicEditHandler");
           const editResponse = await handleTopicEdited(parsedMessage, env);
           if (editResponse) {
             return editResponse; // 如果 handler 返回 Response（按需），则直接返回
@@ -157,6 +157,15 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
+            case "rose": {
+              console.log("index: 检测到 /rose 命令，进入 rose逻辑");
+              const { handleRose } = await import("./commands/rose");
+              await handleRose(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /rose 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
             case "roll":
             case "r":
             case "rd":
@@ -187,7 +196,6 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-
             case "coin": {
               console.log("index: 检测到 /coin 命令，进入 coin逻辑");
               const { handleCoin } = await import("./commands/coin");
@@ -215,7 +223,6 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-
             case "like": {
               console.log("index: 检测到 /like 命令，进入 like 逻辑");
               const { handleLike } = await import("./commands/like");
@@ -224,7 +231,6 @@ export default {
               console.log(`index: /like 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
 
             case "duel": {
               console.log("index: 检测到 /duel 命令，进入 duel 逻辑");
@@ -386,10 +392,7 @@ export default {
       return new Response("OK", { status: 200 });
 
 
-    } else if (/\/rose\b/.test(text)) {
-      console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
-      payload = { ...payload, ...(await handleRose(msg, env)) };
-    }else if (/\/whoami\b/.test(text)) {
+    } else if (/\/whoami\b/.test(text)) {
       console.log("🆔 检测到 /whoami 命令");
 
       // 用户基本信息
