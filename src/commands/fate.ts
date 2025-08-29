@@ -56,7 +56,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             message_thread_id: threadId
         });
 
-        const messageId =
+        const message_id =
             placeholderRes?.result?.message_id ??
             placeholderRes?.result?.message?.message_id;
 
@@ -104,7 +104,8 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
         const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
         const model = "gemini-2.5-flash"; // 可替换为你实际使用的 model 名称
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`;
-
+        const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘名叫莉莉，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。';
+        const userPrompt = '下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。';
         const streamBody = {
             contents: [{ parts: [{ text: userPrompt }] }],
             systemInstruction: { parts: [{ text: systemInstruction }] },
@@ -158,7 +159,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
         // helper: 安全编辑（节流 + 截断）
         async function tryEdit(force = false) {
             const now = Date.now();
-            if (!messageId) return;
+            if (!message_id) return;
             const delta = accumulated.length - lastSentLength;
             if (!force && delta < MIN_DELTA_CHARS && now - lastEditTs < EDIT_INTERVAL_MS) return;
             // 截断过长内容
