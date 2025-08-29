@@ -48,217 +48,152 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
 
     // === 流式解析分支：替换你原来的 isInterpret 分支 ===
     if (isInterpret) {
-        // 发一条占位消息（用户会马上看到），保留 message_id 用于后续 edit
-        const placeholderRes = await TgMessage.sendText(env, {
-            chat_id: chatId,
-            text: `🔮 莉莉正在解读牌义，开始准备解析……`,
-            parse_mode: "HTML",
-            message_thread_id: threadId
-        });
-
-        const message_id =
-            placeholderRes?.result?.message_id ??
-            placeholderRes?.result?.message?.message_id;
-
-        // 立即从用户扣费（用户要求：开始解析就扣款）
-        // 如果扣款失败（余额不足或其他原因），编辑占位消息并返回
-        const deducted = await deductFromBalance(env.COIN_KV, String(fromId), 5);
-        if (!deducted) {
-            try {
-                await TgMessage.editMessageText(env, {
-                    chat_id: chatId,
-                    message_id,
-                    parse_mode: "HTML",
-                    text: `❌ ${escapeHtml(fromName)} 的余额不足，解析一次需 5 💰。请充值后再试。`
-                });
-            } catch (e) {
-                console.error("[fate][stream] edit insufficent-balance failed", e);
-            }
-            return;
-        }
-
-        // 把这笔钱记入国库（国库操作不影响用户体验；若失败仅记录日志）
-        try {
-            await addToTreasury(env.COIN_KV, 5);
-        } catch (e) {
-            console.error("[fate][stream] addToTreasury failed (non-fatal)", e);
-            // 不回滚用户（按你要求：一旦开始即扣款），仅记录错误
-        }
-
-        // 获取新余额用于最终提示
-        const newBal = await getBalance(env.COIN_KV, String(fromId));
-
-        // 发送占位消息的同时开始流式请求到 Google Generative API
-        const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
-        if (!apiKeys.length) {
-            // 无 API key：告诉用户并结束（钱已扣）
-            await TgMessage.editMessageText(env, {
+        // 权限/线程判断（保留你原有的限制）
+        const allowed =
+            (chatId === -1002848481881 && [66].includes(threadId as number)) ||
+            (chatId === -1002742074355 && [345].includes(threadId as number));
+        if (!allowed) {
+            await TgMessage.sendText(env, {
                 chat_id: chatId,
-                message_id,
+                text: `✨这里的魔力有些稀薄……要不要回到莉莉熟悉的地方，让占卜的力量更完整地展现呢？...`,
                 parse_mode: "HTML",
-                text: `❌ 抱歉，当前无法进行牌义解析（缺少 API Key）。已扣除的 5 💰 将进入国库。`
+                message_thread_id: threadId
             });
             return;
         }
 
-        const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-        const model = "gemini-2.5-flash"; // 可替换为你实际使用的 model 名称
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`;
-        const systemInstruction = '你是一个精通塔罗牌牌义解析的雌小鬼骰娘名叫莉莉，使用幽默诙谐,带有情色比喻的日式HRPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。';
-        const userPrompt = '下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。';
-        const streamBody = {
+        // 先发一条“处理中”消息，后续用 editMessageText 更新为解析结果或错误提示
+        let processingMsgId: number | undefined = undefined;
+        try {
+            const processingRes: any = await TgMessage.sendText(env, {
+                chat_id: chatId,
+                text: `🔮 ${escapeHtml(fromName)}，骰娘正在解析你的命运中，请稍等...`,
+                parse_mode: "HTML",
+                message_thread_id: threadId
+            });
+            // 从 TgMessage 返回值中取 message_id（兼容不同实现）
+            processingMsgId = processingRes?.result?.message_id ?? processingRes?.result?.message?.message_id ?? undefined;
+        } catch (e) {
+            console.warn("🔮 [handleFate] 发送处理提示失败，继续执行解析流程", e);
+            processingMsgId = undefined;
+        }
+
+        // 组装 prompt 并调用 Google API
+        const systemInstruction =
+            "你是一个精通塔罗牌牌义解析的骰娘名叫莉莉，使用幽默诙谐,使用带有感情比喻的日式RPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。";
+        const userPrompt = `下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
+
+        const payload = {
             contents: [{ parts: [{ text: userPrompt }] }],
             systemInstruction: { parts: [{ text: systemInstruction }] },
             generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
         };
 
-        let streamRes: Response;
+        const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
+        if (!apiKeys.length) {
+            const failText = `❌ 抱歉，当前无法进行牌义解析（缺少 API Key）。`;
+            if (processingMsgId) {
+                await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
+            } else {
+                await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
+            }
+            return;
+        }
+
+        let textOut: string | undefined;
+        let apiResp: any;
         try {
-            streamRes = await fetch(url, {
+            const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+            const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "x-goog-api-key": randomKey
                 },
-                body: JSON.stringify(streamBody)
+                body: JSON.stringify(payload)
             });
+            apiResp = await res.json();
+            textOut = apiResp?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            console.log("🔮 [handleFate] Google API response:", apiResp);
         } catch (err) {
-            console.error("[fate][stream] fetch error", err);
-            await TgMessage.editMessageText(env, {
-                chat_id: chatId,
-                message_id,
-                parse_mode: "HTML",
-                text: `❌ 连接解析服务失败（网络异常）。已扣除的 5 💰 将进入国库。`
-            });
-            return;
-        }
-
-        if (!streamRes.ok || !streamRes.body) {
-            const bodyText = await streamRes.text().catch(() => "");
-            console.error("[fate][stream] stream endpoint returned non-ok:", streamRes.status, bodyText);
-            await TgMessage.editMessageText(env, {
-                chat_id: chatId,
-                message_id,
-                parse_mode: "HTML",
-                text: `❌ 解析服务不可用（${streamRes.status}）。已扣除的 5 💰 将进入国库。`
-            });
-            return;
-        }
-
-        // 准备读取流并按块编辑 Telegram 消息
-        const reader = streamRes.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let carry = "";
-        let accumulated = ""; // 最终累积文本（未经 HTML 转义）
-        let lastEditTs = 0;
-        const EDIT_INTERVAL_MS = 800; // 最短编辑间隔
-        const MIN_DELTA_CHARS = 50; // 累计多少新字符触发一次编辑
-        let lastSentLength = 0;
-        const TG_MAX = 3800; // 给 Telegram 留余地，4096 限制以内
-
-        // helper: 安全编辑（节流 + 截断）
-        async function tryEdit(force = false) {
-            const now = Date.now();
-            if (!message_id) return;
-            const delta = accumulated.length - lastSentLength;
-            if (!force && delta < MIN_DELTA_CHARS && now - lastEditTs < EDIT_INTERVAL_MS) return;
-            // 截断过长内容
-            let safe = accumulated;
-            if (safe.length > TG_MAX) {
-                safe = safe.slice(0, TG_MAX) + "\n\n（已截断，完整结果将保存在私聊或稍后补发）";
+            console.error("🔮 [handleFate] 调用 Google API 失败", err);
+            const failText = `❌ 解析服务调用失败，请稍后重试。`;
+            if (processingMsgId) {
+                await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
+            } else {
+                await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
             }
-            // HTML 转义
-            safe = escapeHtml(safe);
-            // 拼合提示（显示已扣款与余额）
-            const header = `🔮 莉莉的解析（进行中） — 已扣 5 💰，剩余 ${newBal} 💰\n\n`;
-            try {
+            return;
+        }
+
+        if (!textOut) {
+            const failText = `❌ 解析未返回有效内容，请稍后重试。`;
+            if (processingMsgId) {
+                await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
+            } else {
+                await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
+            }
+            return;
+        }
+
+        // 解析成功后尝试从用户扣费并把钱转入国库
+        try {
+            const deducted = await deductFromBalance(env.COIN_KV, String(fromId), 5);
+            if (!deducted) {
+                const failText = `❌ 扣费失败（余额不足或系统错误），解析已生成但未能扣款。请先充值后重试。`;
+                if (processingMsgId) {
+                    await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
+                } else {
+                    await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
+                }
+                return;
+            }
+
+            // 将这笔钱加入国库（艾丽莎宝库）
+            await addToTreasury(env.COIN_KV, 5);
+
+            // 获取新余额用于提示
+            const newBal = await getBalance(env.COIN_KV, String(fromId));
+
+            const cardList = cap
+                .split("\n")
+                .map((line: string) => line.split("：")[1])
+                .filter(Boolean)
+                .join("、");
+
+            const resultText = textOut || "解析失败，请稍后重试。";
+            const final = `${escapeHtml(fromName)} 消耗了 5 💰（新余额 ${newBal}），请骰娘为三张牌 ${escapeHtml(cardList)} 进行解析，解析如下： <blockquote expandable>` +
+                resultText +
+                `</blockquote>`;
+
+            if (processingMsgId) {
                 await TgMessage.editMessageText(env, {
                     chat_id: chatId,
-                    message_id,
+                    message_id: processingMsgId,
                     parse_mode: "HTML",
-                    text: `${header}${safe}`
+                    text: final
                 });
-                lastSentLength = accumulated.length;
-                lastEditTs = now;
-            } catch (e) {
-                console.error("[fate][stream] edit error", e);
+            } else {
+                await TgMessage.sendText(env, {
+                    chat_id: chatId,
+                    text: final,
+                    parse_mode: "HTML",
+                    message_thread_id: threadId
+                });
             }
-        }
-
-        // 读取流：兼容 SSE（data: ...）或纯 JSON 片段或纯文本
-        try {
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                if (!value) continue;
-                carry += decoder.decode(value, { stream: true });
-
-                // 常见：SSE 风格以双换行分隔 events
-                const parts = carry.split("\n\n");
-                // 最后一个可能是不完整的片段，保留到 carry
-                carry = parts.pop() || "";
-
-                for (const part of parts) {
-                    const lines = part.split("\n").map((l) => l.trim());
-                    // 抽取 data: 开头的行（SSE）
-                    const dataLines = lines.filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim());
-                    const chunkStr = dataLines.length ? dataLines.join("\n") : part;
-
-                    // 尝试解析为 JSON
-                    let parsedChunk: string | null = null;
-                    try {
-                        const j = JSON.parse(chunkStr);
-                        // 兼容几种可能结构
-                        if (j.delta?.content && typeof j.delta.content === "string") parsedChunk = j.delta.content;
-                        else if (j.candidates && j.candidates[0]?.content?.parts?.[0]?.text) parsedChunk = j.candidates[0].content.parts[0].text;
-                        else if (typeof j.text === "string") parsedChunk = j.text;
-                        else if (typeof j === "string") parsedChunk = j;
-                    } catch (e) {
-                        // 不是 JSON，则把 chunkStr 当纯文本片段
-                        if (chunkStr && chunkStr.trim()) parsedChunk = chunkStr;
-                    }
-
-                    if (parsedChunk) {
-                        // 合并到累计文本
-                        accumulated += parsedChunk;
-                        // 按阈值节流编辑
-                        await tryEdit(false);
-                    }
-                }
-            }
-
-            // 流读取结束，做最终编辑（force）
-            await tryEdit(true);
-
-            // 最终结果（已转义）
-            const finalSafe = escapeHtml(accumulated.slice(0, TG_MAX));
-            const finalText =
-                `${escapeHtml(fromName)} 消耗了 5 💰（新余额 ${newBal}），莉莉的解析如下：\n\n${finalSafe}`;
-
-            // 最终编辑（清除“进行中”提示并展示完整结果）
-            await TgMessage.editMessageText(env, {
-                chat_id: chatId,
-                message_id,
-                parse_mode: "HTML",
-                text: finalText
-            });
-
-            // 完成后可选择记录到 KV 或其它（此处不做）
             return;
         } catch (err) {
-            console.error("[fate][stream] stream read/processing error", err);
-            // 流中断或处理异常：告诉用户并保留已生成片段（已扣款，不回滚）
-            const partial = escapeHtml(accumulated.slice(0, TG_MAX));
-            await TgMessage.editMessageText(env, {
-                chat_id: chatId,
-                message_id,
-                parse_mode: "HTML",
-                text: `⚠️ 解析过程中发生错误，已保存部分结果（已扣 5 💰，新余额 ${newBal}）：\n\n${partial}\n\n（解析中断，请稍后重试或联系管理员。）`
-            });
+            console.error("🔮 [handleFate] 扣费或入国库过程中出错", err);
+            // 尝试提示并（如果可能）返还（这里简单提示）
+            const failText = `❌ 解析完成但扣费/入库时发生错误，已记录。请联系管理员。`;
+            if (processingMsgId) {
+                await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
+            } else {
+                await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
+            }
             return;
         }
     }
-
 
     // --- 抽牌流程 ---
     console.log("🎴 [handleFate] 执行抽牌流程");
