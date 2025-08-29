@@ -1,6 +1,6 @@
 /* index.ts */
 
-import { handleFate } from "./commands/fate";
+
 import TgMessage, { ParsedUpdate } from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 
@@ -154,6 +154,14 @@ export default {
               await handleBook(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /book 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            case "fate": {
+              console.log("index: 检测到 /fate 命令，进入 fate逻辑");
+              const { handleFate } = await import("./commands/fate");
+              await handleFate(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /fate 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
@@ -358,41 +366,7 @@ export default {
       console.log("📌 附加 message_thread_id 到响应消息");
     }
 
-    if (/\/fate\b/.test(text)) {
-      console.log("🔮 检测到 /fate 命令，开始发送媒体组");
-      console.log("🔮 检测到 /fate 命令，开始处理 handleFate 返回的 payload");
-      try {
-        // 1. 调用 handleFate，拿到完整 payload，包括 method 字段
-        const payload = await handleFate(msg, env);
-        const method = payload.method || 'sendMessage';
-        // 2. 删除 method 字段，剩下的就是请求 body
-        delete payload.method;
-        console.log(`➡️ 调用 Telegram API 方法：${method}`, payload);
-
-        if (threadId) {
-          payload.message_thread_id = threadId;
-          console.log("📌 [fate] 附加 message_thread_id:", threadId);
-        }
-
-
-        // 3. 根据 method 动态请求
-        const apiRes = await fetch(
-          `https://api.telegram.org/bot${env.TOKEN}/${method}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          }
-        );
-        const data = await apiRes.json();
-        console.log(`✅ ${method} API 返回`, data);
-      } catch (err) {
-        console.error("❌ /fate 处理失败", err);
-      }
-      return new Response("OK", { status: 200 });
-
-
-    } else if (/\/whoami\b/.test(text)) {
+     if (/\/whoami\b/.test(text)) {
       console.log("🆔 检测到 /whoami 命令");
 
       // 用户基本信息
