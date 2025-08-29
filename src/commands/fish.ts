@@ -1,6 +1,7 @@
 // src/commands/fish.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { CoinEnv, TREASURY_KEY, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury } from "./coin";
+import { fishList } from "../lib/liveConfig";
 
 /**
  * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
@@ -85,75 +86,7 @@ function showFishingRecord(record: FishingRecord): string {
     return resultText;
 }
 
-/* ------------------------- 鱼表（保留你原先数据 & 索引化） ------------------------- */
-const fishList = [
-    { name: "🍾破损漂流瓶", hookRate: 0.60, value: 1 },
-    { name: "🪵浮木", hookRate: 0.60, value: 1 },
-    { name: "👢没用的靴子", hookRate: 0.60, value: 1 },
-    { name: "🌿绿海草", hookRate: 0.60, value: 1 },
-    { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 1 },
-
-    { name: "🐚回音海螺", hookRate: 0.40, value: 2 },
-    { name: "🦀三钳蟹", hookRate: 0.40, value: 2 },
-    { name: "🦐樱花虾", hookRate: 0.40, value: 2 },
-    { name: "🌿蓝海草", hookRate: 0.40, value: 2 },
-    { name: "🐟沙丁鱼", hookRate: 0.40, value: 2 },
-    { name: "<tg-spoiler>🔵跳蛋</tg-spoiler>", hookRate: 0.40, value: 2 },
-
-    { name: "🐡红刺豚", hookRate: 0.35, value: 2 },
-    { name: "🐟蓝鳍鱼", hookRate: 0.35, value: 2 },
-    { name: "🐠带刺石斑", hookRate: 0.35, value: 2 },
-    { name: "🐟石楠花鱼", hookRate: 0.35, value: 2 },
-    { name: "🐟穴鱼", hookRate: 0.35, value: 2 },
-    { name: "🐡球绒鱼", hookRate: 0.35, value: 2 },
-    { name: "🐟芒果鱼", hookRate: 0.35, value: 2 },
-    { name: "<tg-spoiler>📿项圈</tg-spoiler>", hookRate: 0.35, value: 2 },
-
-    { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
-    { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
-    { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
-    { name: "<tg-spoiler>⚡震动棒</tg-spoiler>", hookRate: 0.30, value: 3 },
-    { name: "<tg-spoiler>🍆假阳具</tg-spoiler>", hookRate: 0.30, value: 3 },
-
-    { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
-    { name: "<tg-spoiler>🛏️充气娃娃</tg-spoiler>", hookRate: 0.25, value: 5 },
-    { name: "🦑毒刺乌贼", hookRate: 0.25, value: 5 },
-    { name: "🐝海蜻蜓", hookRate: 0.25, value: 5 },
-    { name: "🦭尖牙海豹", hookRate: 0.25, value: 5 },
-    { name: "🐟双塔金枪鱼", hookRate: 0.25, value: 5 },
-    { name: "🦐猎人巨虾", hookRate: 0.25, value: 5 },
-    { name: "🌭深海肉茎", hookRate: 0.25, value: 5 },
-    { name: "🪼黏液海触手", hookRate: 0.25, value: 5 },
-    { name: "🦑骆驼乌贼", hookRate: 0.25, value: 5 },
-    { name: "🪙金币鱼", hookRate: 0.25, value: 5 },
-    { name: "🐟巨嘴金鱼", hookRate: 0.25, value: 5 },
-
-    { name: "🐬彩虹海豚", hookRate: 0.20, value: 7 },
-    { name: "🌊风暴海鲈", hookRate: 0.20, value: 7 },
-    { name: "🌹玫瑰海胆", hookRate: 0.20, value: 7 },
-    { name: "🐟冰原鲳", hookRate: 0.20, value: 7 },
-    { name: "🪸珊瑚海马", hookRate: 0.20, value: 7 },
-    { name: "🛡️骑士鱼", hookRate: 0.20, value: 7 },
-    { name: "💖爱心鱼", hookRate: 0.20, value: 7 },
-    { name: "🐠阴蒂鱼", hookRate: 0.20, value: 7 },
-
-    { name: "🐉红蛟", hookRate: 0.15, value: 11 },
-    { name: "🧬远古海马", hookRate: 0.15, value: 11 },
-    { name: "☯️阴阳鱼", hookRate: 0.15, value: 11 },
-    { name: "🌺牡丹海参", hookRate: 0.15, value: 11 },
-    { name: "🐢银龟", hookRate: 0.15, value: 11 },
-    { name: "☀️太阳鲨鱼", hookRate: 0.15, value: 11 },
-    { name: "🌋岩浆鳗鱼", hookRate: 0.15, value: 11 },
-    { name: "⚡雷电鮟鱇鱼", hookRate: 0.15, value: 11 },
-    { name: "🌊潮汐鱼人", hookRate: 0.15, value: 11 },
-    { name: "🦑黄金乌贼", hookRate: 0.15, value: 11 },
-    { name: "🐋触须鲸", hookRate: 0.15, value: 11 },
-
-    { name: "🦈龙牙鲨", hookRate: 0.10, value: 13 },
-    { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
-    { name: "🐱猫鱼", hookRate: 0.10, value: 13 }
-];
-
+ 
 /* ------------------------- callback 处理函数 ------------------------- */
 /**
  * 处理 callback_query（parsedMessage.callbackQuery 的内容）
