@@ -13,6 +13,7 @@ export type Env = {
   TOPIC_KV: KVNamespace
   COIN_KV: KVNamespace
   BOOK_STORE: KVNamespace
+  FISHING_RECORD_KV: KVNamespace
 };
 
 export default {
@@ -94,6 +95,15 @@ export default {
               // 引入新的 handler
               const { handleDuelCallback } = await import("./commands/duel");
               await handleDuelCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+            case "fish_pull": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 fish_pull 点回调", callbackData);
+              // 引入新的 handler
+              const { handleFishCallback } = await import("./commands/fish");
+              await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
             case "groll": {
@@ -197,6 +207,15 @@ export default {
               await handleHelp(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
+            case "fish": {
+              console.log("index: 检测到 /fish 命令，进入 fish 逻辑");
+              const { handleFish } = await import("./commands/fish");
+              await handleFish(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /fish 处理完成`);
               return new Response("OK", { status: 200 });
             }
 
