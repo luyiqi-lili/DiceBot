@@ -55,15 +55,6 @@ const MAJOR_ARCANA = [
     { name: "逆世界", file: "https://luyiqi-lili.github.io/pic/21d.jpg" }
 ];
 
-function escapeHtml(s: string) {
-    if (!s) return "";
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-
-function getDateStr(date = new Date()) {
-    return date.toISOString().slice(0, 10).replace(/-/g, "");
-}
-
 export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> {
     console.log("🔮 [handleFate] invoked, parsed.command:", parsed.command, "textPreview:", parsed.textPreview);
 
@@ -157,6 +148,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             });
 
             const j = await res.json();
+            console.log(`💰 [handleFate]服务器反馈 ${j} `);
             const candidates = j?.candidates;
             const textOut = candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
