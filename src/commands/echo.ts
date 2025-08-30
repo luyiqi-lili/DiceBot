@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import { fishList } from "../lib/liveConfig";
+import { attitudeResponses } from "../lib/liveConfig";
 
 // 黑名单用户名列表（请按需修改）
 const blacklist = [

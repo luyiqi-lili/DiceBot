@@ -156,6 +156,15 @@ export default {
               console.log(`index: /book 处理完成`);
               return new Response("OK", { status: 200 });
             }
+
+            case "whoami": {
+              console.log("index: 检测到 / whoami 命令，进入 whoami 逻辑");
+              const { handleWhoami } = await import("./commands/whoami");
+              await handleWhoami(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: / whoami 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
             case "fate": {
               console.log("index: 检测到 /fate 命令，进入 fate逻辑");
               const { handleFate } = await import("./commands/fate");
@@ -366,38 +375,7 @@ export default {
       console.log("📌 附加 message_thread_id 到响应消息");
     }
 
-     if (/\/whoami\b/.test(text)) {
-      console.log("🆔 检测到 /whoami 命令");
-
-      // 用户基本信息
-      const userId = msg.from.id;
-      const userName = msg.from.first_name || "";
-
-      // 群组信息
-      const chatId = msg.chat.id;
-      const chatTitle = msg.chat.title || "(无群名)";
-
-      // 主题 / 线程 信息（Telegram 论坛群组专用）
-      // message_thread_id 在普通群里通常是 undefined
-      const threadId =
-        msg.message_thread_id
-        ?? msg.message?.message_thread_id;
-
-      // 构造输出文本
-      let replyText = `你的用户 ID：<code>${userId}</code>\n` +
-        `你的用户名：<code>${userName}</code>\n` +
-        `群组 ID：<code>${chatId}</code>\n` +
-        `群组名称：<code>${chatTitle}</code>\n`;
-
-      if (threadId) {
-        replyText += `主题 ID：<code>${threadId}</code>\n`;
-      }
-
-      payload.text = replyText;
-      payload.parse_mode = "HTML";
-
-    }
-    else {
+    {
       // 未识别命令 —— 提示用户输入 /help 查询
       const responses = [
         "呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨",
