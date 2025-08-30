@@ -287,104 +287,25 @@ export default {
               console.log(`index: news处理完成`);
               return new Response("OK", { status: 200 });
             }
+
+            default: {
+              console.log("index: 未知命令，发送默认帮助提示");
+              const { handleDefaultHelp } = await import("./commands/help");
+              await handleDefaultHelp(parsedMessage, env);
+
+              // 删除触发命令的原始消息（保持与其它 case 一致的行为）
+              try {
+                await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              } catch (e) {
+                console.warn("index: 删除触发命令消息失败（可忽略）", e);
+              }
+
+              return new Response("OK", { status: 200 });
+            }
+
           }
         }
       }
-    }
-
-
-
-
-    const msg = update.message ?? update.channel_post;
-    if (!msg) {
-      console.log("➖ 无 message 或 channel_post，忽略本次更新");
-      return new Response("OK", { status: 200 });
-    }
-
-    const text = msg.text;
-    if (!text) {
-      console.log("➖ 消息中无 text 字段，忽略");
-      return new Response("OK", { status: 200 });
-    }
-
-    const chatId =
-      // 如果是普通消息，就用 msg.chat.id
-      msg.chat?.id
-      // 如果是回调，就退而求其次用 msg.message.chat.id
-      ?? msg.message.chat.id;
-    // ✅ 只允许在指定群组中响应
-
-
-    if (!ALLOWED_CHAT_IDS.has(chatId)) {
-      console.log(`🚫 chatId ${chatId} 不在允许响应的群组内，跳过处理`);
-      return new Response("OK", { status: 200 });
-    }
-    const threadId =
-      msg.message_thread_id
-      ?? msg.message?.message_thread_id;
-
-    console.log(`🔍 检查是否包含 @${env.BOT_USERNAME}`);
-
-
-    if (
-      !text.trim().startsWith(`@${env.BOT_USERNAME}`) &&
-      !text.trim().startsWith("/r")
-    ) {
-      console.log("➖ 文本不不是以 @Bot 用户名，或者/r 开头，忽略");
-      return new Response("OK", { status: 200 });
-    }
-
-    console.log("➡️ 将处理文本 =", text);
-
-    let payload: any = {
-      chat_id: chatId,
-      parse_mode: "HTML"
-    };
-
-    if (threadId) {
-      payload.message_thread_id = threadId;
-      console.log("📌 附加 message_thread_id 到响应消息");
-    }
-
-    {
-      // 未识别命令 —— 提示用户输入 /help 查询
-      const responses = [
-        "呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨",
-        "诶诶？咒语不在词典里欸，骰娘好困惑！<i>快用</i> /help <i>来检查一下正确咒语吧～</i>🌟",
-        "骰娘耳朵竖起来听咒语了，可是……没听懂耶🥺 是不是写错啦？<b>用 /help 咒语召唤帮助之书！📖</b>",
-        "呀！你的咒语好像失败啦！骰娘感受到一股混沌的魔力呢～不如用 <b>/help</b> 检查一下正确咒语吧🎀",
-        "唔……骰娘尝试解析咒语中……失败了！可能咒语太古老啦～来试试 <b>/help</b>，看看现代用法！🔮"
-      ];
-
-      const randomIndex = Math.floor(Math.random() * responses.length);
-      payload.text = responses[randomIndex];
-      payload.parse_mode = "HTML";
-      payload.reply_markup = {
-        inline_keyboard: [
-          [
-            {
-              text: "✨ 查看帮助咒语 ✨",
-              switch_inline_query_current_chat: "/help"
-            }
-          ]
-        ]
-      };
-    }
-
-
-    try {
-      const apiRes = await fetch(
-        `https://api.telegram.org/bot${env.TOKEN}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }
-      );
-      const json = await apiRes.json();
-      console.log("✅ sendMessage API 成功", json);
-    } catch (e) {
-      console.error("❌ sendMessage API 调用失败", e);
     }
 
     return new Response("OK", { status: 200 });

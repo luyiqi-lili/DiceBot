@@ -86,4 +86,60 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
   }
 }
 
+
+export async function handleDefaultHelp(parsed: ParsedUpdate, env: EnvLike & { BOT_USERNAME?: string }): Promise<void> {
+  try {
+    if (!parsed || parsed.type !== "message" || !parsed.message) {
+      console.log("[defaultHelp] 非 message 或缺少 message，忽略");
+      return;
+    }
+
+    const chatId = parsed.chatId ?? parsed.message.chat?.id;
+    const threadId = parsed.threadId ?? parsed.message.message_thread_id ?? parsed.message?.reply_to_message?.message_thread_id;
+    const botName = env.BOT_USERNAME || "Bot";
+
+    const responses = [
+      `呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨`,
+      `诶诶？咒语不在词典里欸，骰娘好困惑！<i>快用</i> /help <i>来检查一下正确咒语吧～</i>🌟`,
+      `骰娘耳朵竖起来听咒语了，可是……没听懂耶🥺 是不是写错啦？<b>用 /help 咒语召唤帮助之书！📖</b>`,
+      `呀！你的咒语好像失败啦！骰娘感受到一股混沌的魔力呢～不如用 <b>/help</b> 检查一下正确咒语吧🎀`,
+      `唔……骰娘尝试解析咒语中……失败了！可能咒语太古老啦～来试试 <b>/help</b>，看看现代用法！🔮`
+    ];
+
+    const idx = Math.floor(Math.random() * responses.length);
+    const text = responses[idx];
+
+    const reply_markup = {
+      inline_keyboard: [
+        [
+          {
+            text: "✨ 查看帮助咒语 ✨",
+            // 方便用户把 /help 带到当前对话
+            switch_inline_query_current_chat: "/help"
+          }
+        ],
+        [
+          // 可选：快速发起 /whoami 的按钮
+          {
+            text: "查看我的信息",
+            callback_data: JSON.stringify({ type: "whoami_quick" }) // 如果不想 callback，可改成 switch_inline_query_current_chat
+          }
+        ]
+      ]
+    };
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId!,
+      text,
+      parse_mode: "HTML",
+      reply_markup,
+      message_thread_id: threadId
+    });
+  } catch (err) {
+    console.error("[defaultHelp] 发送默认帮助失败", err);
+    // 不进一步抛错
+  }
+}
+
+
 export default handleHelp;
