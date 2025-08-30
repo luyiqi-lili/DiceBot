@@ -380,7 +380,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
         (roomLines.length > 0 ? roomLines.join("\n") : "（无房间余额）")+
-        `📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。` 
+        `\n 📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。` 
         ;
 
       await TgMessage.sendText(env, {
