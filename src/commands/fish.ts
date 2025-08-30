@@ -16,6 +16,11 @@ function nowDateYMD(): string {
     return new Date().toISOString().split("T")[0];
 }
 
+function hasProcessedMessage(record: FishingRecord, messageId?: number | undefined): boolean {
+    if (messageId === undefined) return false;
+    return record.results.some(r => r.messageId === messageId);
+}
+
 /**
  * 从国库支付（允许出现负值）
  * - 返回新的国库余额（可能小于0）
@@ -160,6 +165,11 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
     // 先判定失败 / 过强导致鱼跑了
     if (score < 100) {
+        if (hasProcessedMessage(fishingRecord, messageId)) {
+            await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `该次钓鱼已处理，忽略重复点击。`, show_alert: true });
+            return;
+        }
+
         fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId }); fishingRecord.count += 1;
         await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 
@@ -180,6 +190,12 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     }
 
     if (score > 1000) {
+
+        if (hasProcessedMessage(fishingRecord, messageId)) {
+            await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `该次钓鱼已处理，忽略重复点击。`, show_alert: true });
+            return;
+        }
+
         fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId });
         fishingRecord.count += 1;
         await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
@@ -243,7 +259,13 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 \n`;
     }
 
-    fishingRecord.results.push({ baitCost, hooked, fishValue: hooked ? chosen.name : 0,messageId });
+
+    if (hasProcessedMessage(fishingRecord, messageId)) {
+        await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `该次钓鱼已处理，忽略重复点击。`, show_alert: true });
+        return;
+    }
+
+    fishingRecord.results.push({ baitCost, hooked, fishValue: hooked ? chosen.name : 0, messageId });
     fishingRecord.count += 1;
     await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 
