@@ -239,6 +239,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const roomKey = `${chatId}||${threadId ?? 0}`;
     const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
+    
+    await addToTreasury(kv, amount);
     await setBalance(kv, roomKey, newRoomBal);
 
     const place = cfg.placeName || `房间 ${threadId}`;
