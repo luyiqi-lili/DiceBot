@@ -107,6 +107,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `只有发起者本人可以拉杆`, show_alert: true });
         return;
     }
+    TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `奋力拉杆中...`, show_alert: true });
 
     // 时间计算：使用机器人原始消息 date（秒）
     const startTs = callbackQuery.message?.date ?? Math.floor(Date.now() / 1000);
