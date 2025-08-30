@@ -161,7 +161,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const todayD = new Date();
     const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
-    const gain = duringEvent ? randomInt(11, 20) : randomInt(1, 10);
+    const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     const bal = await getBalance(kv, userId);
     const newBal = bal + gain;
