@@ -44,7 +44,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/coin send 50</code> 回复消息给某人转账 50 💰  \n
  <code>/coin check</code> （管理员查询艾丽莎宝库/用户合计/回复某人查看其余额）\n
  <code>/coin take 100</code> （管理员从艾丽莎宝库取款） \n
- <code>/fate /code>  直接使用，骰娘给你抽取3张塔罗牌 ；在骰娘抽取的塔罗牌消息上回复，花费5💰进行解析 \n
+ <code>/fate </code>  直接使用，骰娘给你抽取3张塔罗牌 ；在骰娘抽取的塔罗牌消息上回复，花费5💰进行解析 \n
 
 </blockquote>`;
 
