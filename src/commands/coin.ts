@@ -371,7 +371,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
               (c.threadIds == null || c.threadIds.length === 0 || c.threadIds.includes(threadNum))
           );
           const place = cfg?.placeName || `房间 ${threadNum}`;
-          return `🗳  ${escapeHtml(place)}（${escapeHtml(key)}）：${bal} 💰`;
+          return `🗳  ${escapeHtml(place)}：${bal} 💰`;
         });
 
       const overallTotal = treasuryBal + totalUserBal + totalRoomBal;
