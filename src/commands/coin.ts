@@ -343,46 +343,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const treasuryBal = await getTreasury(kv);
       const totalUserBal = await sumAllUserBalances(kv);
 
-      // 遍历所有 key，收集房间键（包含 "||"）的余额
-      const roomBalances: { key: string; bal: number }[] = [];
-      let cursor: string | undefined = undefined;
-      do {
-        const opts: any = cursor ? { cursor } : {};
-        const res = await (kv as any).list(opts);
-        cursor = res.cursor;
-        for (const k of (res.keys || [])) {
-          const name: string = k.name;
-          if (name === TREASURY_KEY) continue;
-          if (!name.includes("||")) continue; // 只收集房间键
-          const b = await getBalance(kv, name);
-          roomBalances.push({ key: name, bal: b });
-        }
-      } while (cursor);
-
-      // 计算房间余额总和，并按余额从高到低排序输出
-      const totalRoomBal = roomBalances.reduce((s, r) => s + r.bal, 0);
-      const roomLines = roomBalances
-        .sort((a, b) => b.bal - a.bal)
-        .map(({ key, bal }) => {
-          const [cIdStr, threadStr] = key.split("||");
-          const cId = Number(cIdStr);
-          const threadNum = Number(threadStr || 0);
-          const cfg = payConfigs.find(
-            (c) =>
-              c.chatId === cId &&
-              (c.threadIds == null || c.threadIds.length === 0 || c.threadIds.includes(threadNum))
-          );
-          const place = cfg?.placeName || `房间 ${threadNum}`;
-          return `🗳  ${escapeHtml(place)}：${bal} 💰。\n`;
-        });
-
-      const overallTotal = treasuryBal + totalUserBal + totalRoomBal;
 
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-        (roomLines.length > 0 ? roomLines.join(" ") : "（无房间余额）")+
-        ` 📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。` 
+        ` 📊 总计（宝库  + 房间）：${treasuryBal+totalUserBal} 💰。` 
         ;
 
       await TgMessage.sendText(env, {
