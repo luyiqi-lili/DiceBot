@@ -297,8 +297,6 @@ export default {
               console.log("index: 未知命令，发送默认帮助提示");
               const { handleDefaultHelp } = await import("./commands/help");
               await handleDefaultHelp(parsedMessage, env);
-
-              // 删除触发命令的原始消息（保持与其它 case 一致的行为）
               try {
  //               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               } catch (e) {

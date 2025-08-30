@@ -1,5 +1,6 @@
 // commands/book.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import  { deleteMarkup } from "../lib/util";
 export type Env = EnvLike & {
   BOOK_STORE: KVNamespace;
 };
@@ -14,17 +15,7 @@ function makeMessageLink(chatId: number, messageId: number): string {
     : String(Math.abs(chatId));
   return `https://t.me/c/${abs}/${messageId}`;
 }
-/** 返回用于删除本条消息的 inline keyboard */
-function makeDeleteMarkup() {
-  return TgMessage.buildInlineKeyboard([
-    [
-      {
-        text: "删除消息",
-        callback_data: JSON.stringify({ type: "delete_message" })
-      }
-    ]
-  ]);
-}
+
 /**
  * handleBook 接受已解析的 ParsedUpdate，避免重复解析
  * @param parsed 已由 TgMessage.parseUpdate(update, env.BOT_USERNAME) 得到的结构
@@ -66,7 +57,6 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     param !== "all" &&
     !param.startsWith("@");
   console.log("[Book] isReplyOwn:", isReplyOwn, "isExplicitAdd:", isExplicitAdd);
-  const deleteMarkup = makeDeleteMarkup();
 
   // 1. 添加书签
   if (isExplicitAdd) {
