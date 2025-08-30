@@ -357,7 +357,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         }
       } while (cursor);
 
-      // 根据余额排序（从高到低），并尝试从 payConfigs 找到友好名称
+      // 计算房间余额总和，并按余额从高到低排序输出
+      const totalRoomBal = roomBalances.reduce((s, r) => s + r.bal, 0);
       const roomLines = roomBalances
         .sort((a, b) => b.bal - a.bal)
         .map(({ key, bal }) => {
@@ -373,11 +374,14 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           return `${escapeHtml(place)}（${escapeHtml(key)}）：${bal} 💰`;
         });
 
+      const overallTotal = treasuryBal + totalUserBal + totalRoomBal;
+
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-        `📊 艾丽莎宝库 + 用户总计：${treasuryBal + totalUserBal} 💰。\n\n` +
-        `🧭 房间余额：\n` +
+        `🗳  房间余额合计：${totalRoomBal} 💰。\n` +
+        `📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。\n\n` +
+        `🗳 房间明细：\n` +
         (roomLines.length > 0 ? roomLines.join("\n") : "（无房间余额）");
 
       await TgMessage.sendText(env, {
@@ -397,7 +401,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
-
   }
 
   // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
