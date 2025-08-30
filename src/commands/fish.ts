@@ -116,20 +116,6 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     }
     await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `奋力拉杆中...`, show_alert: true });
 
-    // 2) 立刻清空按钮（快速响应界面，减少用户重复点击）
-    try {
-        const origText = callbackQuery.message?.text ?? callbackQuery.message?.caption ?? "";
-        await TgMessage.editMessageText(env, {
-            chat_id: chatId,
-            message_id: messageId,
-            text: origText,
-            parse_mode: "HTML",
-            reply_markup: { inline_keyboard: [] }
-        });
-    } catch (e) {
-        // 忽略编辑失败（按钮可能已被移除）
-    }
-
     // 时间计算：使用机器人原始消息 date（秒）
     const startTs = callbackQuery.message?.date ?? Math.floor(Date.now() / 1000);
     const nowTs = Math.floor(Date.now() / 1000);
