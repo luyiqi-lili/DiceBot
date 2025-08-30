@@ -1,4 +1,3 @@
-// src/commands/fish.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury, payoutFromTreasuryAllowNegative } from "../lib/coinService";
 import { fishList } from "../lib/liveConfig";
@@ -22,10 +21,61 @@ function hasProcessedMessage(record: FishingRecord, messageId?: number | undefin
 }
 
 /**
- * 从国库支付（允许出现负值）
- * - 返回新的国库余额（可能小于0）
+ * 池塘汇总记录，用同一个 KV（FISHING_RECORD_KV），key 前缀为 pond:YYYY-MM-DD
  */
+type PondRecord = {
+    date: string;
+    totalBait: number;    // 当天消耗的鱼饵总量
+    totalPayout: number;  // 国库当天支付给玩家的总额（钓中时）
+    totalHooked: number;  // 当天钓中次数
+    totalAttempts: number; // 当天发起的抛竿次数（包括失手/跑鱼）
+};
 
+async function getPondRecord(kv: KVNamespace, date: string): Promise<PondRecord> {
+    const key = `pond:${date}`;
+    const raw = await kv.get(key);
+    if (!raw) {
+        return { date, totalBait: 0, totalPayout: 0, totalHooked: 0, totalAttempts: 0 };
+    }
+    try {
+        const parsed = JSON.parse(raw) as PondRecord;
+        if (parsed.date !== date) {
+            return { date, totalBait: 0, totalPayout: 0, totalHooked: 0, totalAttempts: 0 };
+        }
+        return parsed;
+    } catch (e) {
+        console.warn("[fish] 解析 pond record 失败，重置", e);
+        return { date, totalBait: 0, totalPayout: 0, totalHooked: 0, totalAttempts: 0 };
+    }
+}
+
+async function setPondRecord(kv: KVNamespace, date: string, rec: PondRecord) {
+    const key = `pond:${date}`;
+    await kv.put(key, JSON.stringify(rec));
+}
+
+async function addToPondBait(kv: KVNamespace, date: string, bait: number) {
+    const rec = await getPondRecord(kv, date);
+    rec.totalBait += bait;
+    rec.totalAttempts += 1;
+    await setPondRecord(kv, date, rec);
+}
+
+async function addToPondPayout(kv: KVNamespace, date: string, payout: number, hooked: boolean) {
+    const rec = await getPondRecord(kv, date);
+    rec.totalPayout += payout;
+    if (hooked) rec.totalHooked += 1;
+    await setPondRecord(kv, date, rec);
+}
+
+function showPondRecordHTML(rec: PondRecord): string {
+    return `<blockquote expandable><b>鱼塘汇总 — ${escapeHtml(rec.date)}</b>：\n` +
+        `• 今日鱼饵消耗：<b>${rec.totalBait}</b> 💰\n` +
+        `• 今日国库支付（渔获发放）：<b>${rec.totalPayout}</b> 💰\n` +
+        `• 今日钓中次数：<b>${rec.totalHooked}</b> 次\n` +
+        `• 今日抛竿次数：<b>${rec.totalAttempts}</b> 次\n` +
+        `</blockquote>`;
+}
 
 /* ------------------------- 钓鱼记录 KV 操作 ------------------------- */
 type FishingRecord = {
@@ -238,9 +288,14 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         // 国库扣款（可能为负）
         const newTre = await payoutFromTreasuryAllowNegative(env.COIN_KV, payout);
 
+        // 更新鱼塘当日 payout
+        const today = nowDateYMD();
+        await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
+
         resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${chosen.value} 💰渔获，最新余额 ${newOwnerBal}💰。\n`;
         // resultText += `（国库支付 ${payout}💰；国库余额 ${newTre} 💰）\n`;
     } else {
+        // 即使未钓中，也把当天尝试计入 pond（totalAttempts 已在发起时计入）
         resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 \n`;
     }
 
@@ -289,6 +344,39 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
     // 解析参数：鱼饵花费在 args[0]
     const args = parsedMessage.args ?? [];
+
+    // 新增：/fish check [YYYYMMDD|YYYY-MM-DD]
+    if (args[0] === "check") {
+        const dateArg = args[1];
+        let date = nowDateYMD();
+        if (dateArg) {
+            // 接受 20250830 或 2025-08-30 两种格式
+            const raw = dateArg.replace(/[^0-9]/g, "");
+            if (raw.length === 8) {
+                date = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+            } else {
+                // 非法格式，回复提示
+                await TgMessage.sendText(env, {
+                    chat_id: parsedMessage.chatId!,
+                    text: `❌ 日期格式错误。请使用 /fish check 或 /fish check YYYYMMDD（例如 /fish check 20250830）`,
+                    parse_mode: "HTML",
+                    message_thread_id: parsedMessage.threadId
+                });
+                return;
+            }
+        }
+
+        const pondRec = await getPondRecord(env.FISHING_RECORD_KV, date);
+        const html = showPondRecordHTML(pondRec);
+        await TgMessage.sendText(env, {
+            chat_id: parsedMessage.chatId!,
+            text: html,
+            parse_mode: "HTML",
+            message_thread_id: parsedMessage.threadId
+        });
+        return;
+    }
+
     const baitCost = Math.max(1, parseInt(args[0] || "", 10) || 1);
 
     const chatId = parsedMessage.chatId!;
@@ -342,6 +430,10 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
     // 把鱼饵费用计入艾丽莎宝库（若要计费可使用 addToTreasury）
     await addToTreasury(env.COIN_KV, baitCost);
+
+    // 同时把鱼饵消耗计入鱼塘当天汇总
+    const today = nowDateYMD();
+    await addToPondBait(env.FISHING_RECORD_KV, today, baitCost);
 
     // 随机 strength（或允许传入固定值），你原来用 random strength
     const strength = Math.floor(Math.random() * 100) + 1;
