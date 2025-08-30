@@ -14,36 +14,38 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
   const botUsername = (env && (env as any).BOT_USERNAME);
 
   const text = `🤖 <b>可用命令：</b>
-<blockquote expandable>/echo &lt;内容&gt; - 让骰娘判断你说的对不对  
-/roll - 掷一个 1~100 的随机数  
-/roll XdY - 掷 X 个 Y 面骰子，例如 /roll 2d6  
-/roll {A B C} - 从多个选项中抽取一个，例如 /roll {红 白 绿}  
-/roll Nd{A B C} - 从多个选项中抽取 N 次，例如 /roll 3d{红 白 绿}  
-/duel @目标 赌注内容 - 向某人发起一场赌注决斗！
-/groll - 发起一个群骰，支持最多 20 人加入
-/book - 查看自己的书签  
-/book &lt;关键字&gt; - 回复自己消息并带上备注，添加书签到个人列表  
-/book del #序号 - 删除指定序号的书签  
-/book all - 查看本群所有用户的书签  
-/book @用户名 - 查看指定用户的书签   
-/21 - <a href=\"https://t.me/c/2742074355/345/196400\">发起一局多人 21 点游戏 </a>
+<blockquote expandable>
+ <code>/echo 某个内容 </code> - 让骰娘判断你说的对不对  \n
+ <code>/roll </code>- 掷一个 1~100 的随机数  \n
+ <code>/roll XdY </code>- 掷 X 个 Y 面骰子，例如 /roll 2d6  \n
+ <code>/roll {A B C} </code>- 从多个选项中抽取一个，例如 /roll {红 白 绿}  \n
+ <code>/roll Nd{A B C} </code>- 从多个选项中抽取 N 次，例如 /roll 3d{红 白 绿}  \n
+ <code>/roll 表达式 </code>- 支持加减法，例如 /roll 2d6+1d4+5  \n
+ <code>/r </code>- 简写，等价于 /roll 1d100 \n
+ <code>/rdY </code>- 简写，等价于 /roll 1dY    \n
+ <code>/rXdY </code>- 简写，等价于 /roll XdY  \n
+ <code>/rh </code>- 隐藏掷骰，结果仅发送到私聊  \n
+ <code>/duel @目标 赌注内容 </code>- 向某人发起一场赌注决斗！\n
+ <code>/groll </code>- 发起一个群骰，支持多人加入 \n
+ <code>/book </code>- 查看自己的书签  \n
+ <code>/book &lt;关键字&gt; </code>- 回复自己消息并带上备注，添加书签到个人列表  \n
+ <code>/book del #序号 </code>- 删除指定序号的书签  \n
+ <code>/book @用户名 </code>- 查看指定用户的书签   \n
+ <code>/21 </code>- <a href="https://t.me/c/2742074355/345/196400">发起一局多人 21 点游戏 </a> \n
+ <code>/news </code>- 直接使用，查看当日爆料列表 ；回复消息时使用）将该条消息爆料进小道消息系统  \n
+ <code>/news YYYYMMDD </code>- 查看指定日期的爆料  \n
+ <code>/like </code>- 查看你召唤骰娘的次数  \n
+ <code>/trans &lt;语言&gt; </code>- 回复消息并翻译到指定语言（默认中文），例如 /trans 日语 \n
+ <code>/rose </code>- 回复某人的消息以查看你对他的好感度   \n
+ <code>/rose send </code>- 回复某人的消息向他赠送一朵 🌷（每天首次免费，之后需支付 💰） \n
+ <code>/fish X </code> - 花费价值X的鱼饵钓鱼 \n
+ <code>/coin</code> 查询余额  \n
+ <code>/coin pray</code> 今日祈祷 \n
+ <code>/coin send 50</code> 回复消息给某人转账 50 💰  \n
+ <code>/coin check</code> （管理员查询艾丽莎宝库/用户合计/回复某人查看其余额）\n
+ <code>/coin take 100</code> （管理员从艾丽莎宝库取款） \n
+ <code>/fate /code>  直接使用，骰娘给你抽取3张塔罗牌 ；在骰娘抽取的塔罗牌消息上回复，花费5💰进行解析 \n
 
-<b>使用方法：</b>  
-<i>请先 @${botUsername} 再输入命令！</i>
-
-示例：  
-<code>@${botUsername} /echo 我觉得今天要发财</code>  
-<code>@${botUsername} /roll 3d10</code>  
-<code>@${botUsername} /roll {红 白 绿}</code>  
-<code>@${botUsername} /roll 3d{红 白 绿}</code>  
-<code>@${botUsername} /duel @对手 一杯奶茶</code>
-<code>@${botUsername} /groll</code>
-<code>@${botUsername} /book</code>  
-<code>@${botUsername} /book 阅读笔记</code>  
-<code>@${botUsername} /book del #2</code>  
-<code>@${botUsername} /book all</code>  
-<code>@${botUsername} /book @alice</code>
-<code>@${botUsername} /book @12</code>
 </blockquote>`;
 
   const reply_markup = {
@@ -62,6 +64,21 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
         { text: "/book", switch_inline_query_current_chat: `/book` },
         { text: "/book del #2", switch_inline_query_current_chat: `/book del #2` },
         { text: "/21", switch_inline_query_current_chat: `/21` }
+      ],
+      [
+        { text: "/news", switch_inline_query_current_chat: `/news` },
+        { text: "/like", switch_inline_query_current_chat: `/like` },
+        { text: "/trans", switch_inline_query_current_chat: `/trans English` }
+      ],
+      [
+        { text: "/rose", switch_inline_query_current_chat: `/rose` },
+        { text: "/rose send", switch_inline_query_current_chat: `/rose send` },
+        { text: "/fish", switch_inline_query_current_chat: `/fish 3` },
+      ],
+      [
+        { text: "/coin ", switch_inline_query_current_chat: `/coin ` },
+        { text: "/coin pray", switch_inline_query_current_chat: `/coin pray` },
+        { text: "/fate", switch_inline_query_current_chat: `/fate` },
       ]
     ]
   };
