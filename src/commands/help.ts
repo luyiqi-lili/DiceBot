@@ -96,8 +96,14 @@ export async function handleDefaultHelp(parsed: ParsedUpdate, env: EnvLike & { B
 
     const chatId = parsed.chatId ?? parsed.message.chat?.id;
     const threadId = parsed.threadId ?? parsed.message.message_thread_id ?? parsed.message?.reply_to_message?.message_thread_id;
-    const botName = env.BOT_USERNAME || "Bot";
 
+    const useText = (parsed.text ?? parsed.message?.text ?? "").toString();
+    const botName = (env.BOT_USERNAME || "").toLowerCase();
+    const startsWithAtBot = useText.trim().toLowerCase().startsWith(`@${botName}`);
+    if (!startsWithAtBot) {
+      console.log("➖ 消息未以 @Bot 开头，忽略本次更新");
+      return;
+    }
     const responses = [
       `呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨`,
       `诶诶？咒语不在词典里欸，骰娘好困惑！<i>快用</i> /help <i>来检查一下正确咒语吧～</i>🌟`,
@@ -117,13 +123,6 @@ export async function handleDefaultHelp(parsed: ParsedUpdate, env: EnvLike & { B
             // 方便用户把 /help 带到当前对话
             switch_inline_query_current_chat: "/help"
           }
-        ],
-        [
-          // 可选：快速发起 /whoami 的按钮
-          {
-            text: "查看我的信息",
-            callback_data: JSON.stringify({ type: "whoami_quick" }) // 如果不想 callback，可改成 switch_inline_query_current_chat
-          }
         ]
       ]
     };
@@ -140,6 +139,7 @@ export async function handleDefaultHelp(parsed: ParsedUpdate, env: EnvLike & { B
     // 不进一步抛错
   }
 }
+
 
 
 export default handleHelp;

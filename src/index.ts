@@ -14,6 +14,7 @@ export type Env = {
   BOOK_STORE: KVNamespace
   FISHING_RECORD_KV: KVNamespace
   TGBOTCOUNT: KVNamespace
+  AFFECTION_KV: KVNamespace
 };
 
 export default {
@@ -34,25 +35,26 @@ export default {
 
     //3. 解析请求
     //TODO:  update在全部命令迁移完成后要取消
-    let update;
     let parsedMessage;
     try {
-      update = await request.json();
-      parsedMessage = TgMessage.parseUpdate(update, env.BOT_USERNAME);
+      parsedMessage = TgMessage.parseUpdate(await request.json(), env.BOT_USERNAME);
       console.log("index: 解析请求 JSON 成功");
     } catch (e) {
       console.error("index: 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
     }
 
+    // 4.白名单群组检查
     if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
       console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
       return new Response("OK", { status: 200 });
     }
 
-    //4. 分别处理 callback_query 和 message 和 topic_edited
+    //5. 分别处理 callback_query 和 message 和 topic_edited
     console.log("index:parsedMessage.type", parsedMessage.type);
+    
     switch (parsedMessage.type) {
+      //5.1 处理房间修改
       case 'topic_edited': {
         console.log("index: 检测到 topic_edited，尝试处理话题标题编辑");
         try {
@@ -68,7 +70,7 @@ export default {
         return new Response("OK", { status: 200 });
       }
 
-      //4.1 处理 callback_query
+      //5.2 处理 callback_query
       case 'callback_query': {
 
         const callbackQuery = parsedMessage.callbackQuery;
@@ -140,17 +142,18 @@ export default {
         }
       }
 
-      //4.2 处理消息
+      //5.3 处理消息
       case 'message': {
 
         console.log("main:isCommand", parsedMessage.isCommand);
         if (parsedMessage.isCommand) {
 
+          //5.3.0 首先添加用户调用计数
           console.log("main:command", parsedMessage.command);
           await incrementUsageCount(parsedMessage, env);
 
           switch (parsedMessage.command) {
-
+            //书签
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
@@ -159,7 +162,7 @@ export default {
               console.log(`index: /book 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //UID查询 
             case "whoami": {
               console.log("index: 检测到 / whoami 命令，进入 whoami 逻辑");
               const { handleWhoami } = await import("./commands/whoami");
@@ -168,6 +171,7 @@ export default {
               console.log(`index: / whoami 处理完成`);
               return new Response("OK", { status: 200 });
             }
+            //抽卡
             case "fate": {
               console.log("index: 检测到 /fate 命令，进入 fate逻辑");
               const { handleFate } = await import("./commands/fate");
@@ -176,7 +180,7 @@ export default {
               console.log(`index: /fate 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //送花
             case "rose": {
               console.log("index: 检测到 /rose 命令，进入 rose逻辑");
               const { handleRose } = await import("./commands/rose");
@@ -185,7 +189,7 @@ export default {
               console.log(`index: /rose 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //骰点
             case "roll":
             case "r":
             case "rd":
@@ -197,7 +201,7 @@ export default {
               console.log(`index: /roll 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //帮助
             case "help": {
               console.log("index: 检测到 /help 命令，进入 help逻辑");
               const { handleHelp } = await import("./commands/help");
@@ -206,7 +210,7 @@ export default {
               console.log(`index: /help 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //钓鱼
             case "fish": {
               console.log("index: 检测到 /fish 命令，进入 fish 逻辑");
               const { handleFish } = await import("./commands/fish");
@@ -215,7 +219,7 @@ export default {
               console.log(`index: /fish 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //货币
             case "coin": {
               console.log("index: 检测到 /coin 命令，进入 coin逻辑");
               const { handleCoin } = await import("./commands/coin");
@@ -224,7 +228,7 @@ export default {
               console.log(`index: /coin 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //翻译
             case "trans": {
               console.log("index: 检测到 /trans 命令，进入 trans逻辑");
               const { handleTrans } = await import("./commands/trans");
@@ -233,7 +237,7 @@ export default {
               console.log(`index: /trans 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //回声
             case "echo": {
               console.log("index: 检测到 /echo 命令，进入 echo逻辑");
               const { handleEcho } = await import("./commands/echo");
@@ -242,7 +246,7 @@ export default {
               console.log(`index: /echo 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //调用次数查询
             case "like": {
               console.log("index: 检测到 /like 命令，进入 like 逻辑");
               const { handleLike } = await import("./commands/like");
@@ -251,7 +255,7 @@ export default {
               console.log(`index: /like 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            //决斗
             case "duel": {
               console.log("index: 检测到 /duel 命令，进入 duel 逻辑");
               const { handleDuel } = await import("./commands/duel");
@@ -260,7 +264,7 @@ export default {
               console.log(`index: /duel 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            // groll
             case "groll": {
               console.log("index: 检测到 /groll 命令，进入 groll 逻辑");
               const { handleGroll } = await import("./commands/groll");
@@ -269,7 +273,7 @@ export default {
               console.log(`index: /groll 处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            // 21点游戏
             case "21": {
               console.log("index: 检测到 /21点 命令，进入 21 逻辑");
               const { handle21 } = await import("./commands/21");
@@ -278,7 +282,7 @@ export default {
               console.log(`index: 21处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            // 新闻
             case "news": {
               console.log(`index: 检查到news命令`);
               const { handleNews } = await import("./commands/news");
@@ -287,15 +291,16 @@ export default {
               console.log(`index: news处理完成`);
               return new Response("OK", { status: 200 });
             }
-
+            // 默认提示
             default: {
+              
               console.log("index: 未知命令，发送默认帮助提示");
               const { handleDefaultHelp } = await import("./commands/help");
               await handleDefaultHelp(parsedMessage, env);
 
               // 删除触发命令的原始消息（保持与其它 case 一致的行为）
               try {
-                await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+ //               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               } catch (e) {
                 console.warn("index: 删除触发命令消息失败（可忽略）", e);
               }
