@@ -371,7 +371,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
               (c.threadIds == null || c.threadIds.length === 0 || c.threadIds.includes(threadNum))
           );
           const place = cfg?.placeName || `房间 ${threadNum}`;
-          return `🗳  ${escapeHtml(place)}：${bal} 💰`;
+          return `🗳  ${escapeHtml(place)}：${bal} 💰。\n`;
         });
 
       const overallTotal = treasuryBal + totalUserBal + totalRoomBal;
@@ -379,8 +379,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-        (roomLines.length > 0 ? roomLines.join("\n") : "（无房间余额）")+
-        `\n 📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。` 
+        (roomLines.length > 0 ? roomLines.join(" ") : "（无房间余额）")+
+        ` 📊 总计（宝库 + 用户 + 房间）：${overallTotal} 💰。` 
         ;
 
       await TgMessage.sendText(env, {
