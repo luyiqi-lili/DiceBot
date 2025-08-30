@@ -136,4 +136,64 @@ export async function handleLike(parsedMessage: ParsedUpdate, env: EnvLike) {
   });
 }
 
+/**
+ * incrementUsageCount
+ * - 在每次用户“调用”机器人（符合你在 index.ts 的判定逻辑）时调用一次
+ * - 将键名设为 "count:<userId>"，值为 JSON { count: number, firstName: string }
+ */
+export async function incrementUsageCount(parsedMessage: ParsedUpdate, env: { TGBOTCOUNT: KVNamespace } & EnvLike): Promise<void> {
+  try {
+    if (!parsedMessage || parsedMessage.type !== "message" || !parsedMessage.message) return;
+
+    const from = parsedMessage.from ?? parsedMessage.message.from;
+    if (!from || typeof from.id === "undefined") return;
+
+    const userId = String(from.id);
+    const firstName = from.first_name ?? "";
+
+    const key = `count:${userId}`;
+
+    // 读取旧值，兼容纯数字或 JSON
+    let raw = null;
+    try {
+      raw = await env.TGBOTCOUNT.get(key);
+    } catch (e) {
+      console.warn("[incrementUsageCount] 读取 KV 失败", e);
+      raw = null;
+    }
+
+    let record: { count: number; firstName?: string } = { count: 0 };
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object" && typeof parsed.count === "number") {
+          record.count = parsed.count;
+          record.firstName = typeof parsed.firstName === "string" ? parsed.firstName : (record.firstName || "");
+        } else {
+          // 可能是旧版纯数字字符串
+          record.count = parseInt(String(raw), 10) || 0;
+        }
+      } catch {
+        // 解析失败，尝试当成纯数字
+        record.count = parseInt(String(raw), 10) || 0;
+      }
+    }
+
+    // 增加计数并更新 firstName（以最新为准）
+    record.count = (record.count || 0) + 1;
+    record.firstName = firstName;
+
+    // 写回 KV
+    try {
+      await env.TGBOTCOUNT.put(key, JSON.stringify(record));
+      console.log(`[incrementUsageCount] 更新 ${key} -> ${record.count} (${record.firstName})`);
+    } catch (e) {
+      console.error("[incrementUsageCount] 写入 KV 失败", e);
+    }
+  } catch (err) {
+    console.error("[incrementUsageCount] 未知异常", err);
+  }
+}
+
+
 export default handleLike;

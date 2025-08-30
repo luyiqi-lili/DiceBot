@@ -1,8 +1,9 @@
 /* index.ts */
 
 
-import TgMessage, { ParsedUpdate } from './lib/tgMessage';
+import TgMessage from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
+import { incrementUsageCount } from "./commands/like";
 
 export type Env = {
   TOKEN: string;
@@ -12,6 +13,7 @@ export type Env = {
   COIN_KV: KVNamespace
   BOOK_STORE: KVNamespace
   FISHING_RECORD_KV: KVNamespace
+  TGBOTCOUNT: KVNamespace
 };
 
 export default {
@@ -139,13 +141,14 @@ export default {
       }
 
       //4.2 处理消息
-      //TOOD 后续迁移全部的消息
       case 'message': {
 
         console.log("main:isCommand", parsedMessage.isCommand);
         if (parsedMessage.isCommand) {
 
           console.log("main:command", parsedMessage.command);
+          await incrementUsageCount(parsedMessage, env);
+
           switch (parsedMessage.command) {
 
             case "book": {
@@ -329,38 +332,6 @@ export default {
     ) {
       console.log("➖ 文本不不是以 @Bot 用户名，或者/r 开头，忽略");
       return new Response("OK", { status: 200 });
-    }
-
-    else {
-
-      const userId = msg.from.id;
-      const firstName = msg.from.first_name || "";
-      const key = `count:${userId}`;
-      // 读取原始记录（可能是旧版的纯数字）
-      const prev = await env.TGBOTCOUNT.get(key);
-      let record;
-      if (prev) {
-        try {
-          // 尝试解析为 JSON
-          record = JSON.parse(prev);
-          if (typeof record.count !== 'number') {
-            // 如果结构不符，退回到旧版数值
-            record = { count: parseInt(prev, 10) || 0 };
-          }
-        } catch (e) {
-          // 旧版数据为纯数字字符串
-          record = { count: parseInt(prev, 10) || 0 };
-        }
-      } else {
-        record = { count: 0 };
-      }
-      // 更新记录
-      record.count += 1;
-      record.firstName = firstName;
-      // 写回 KV，使用 JSON 格式
-      await env.TGBOTCOUNT.put(key, JSON.stringify(record));
-
-
     }
 
     console.log("➡️ 将处理文本 =", text);
