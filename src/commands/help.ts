@@ -79,6 +79,11 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
         { text: "/coin ", switch_inline_query_current_chat: `/coin ` },
         { text: "/coin pray", switch_inline_query_current_chat: `/coin pray` },
         { text: "/fate", switch_inline_query_current_chat: `/fate` },
+      ], [
+        {
+          text: "删除消息",
+          callback_data: JSON.stringify({ type: "delete_message" })
+        }
       ]
     ]
   };
@@ -139,6 +144,11 @@ export async function handleDefaultHelp(parsed: ParsedUpdate, env: EnvLike & { B
             text: "✨ 查看帮助咒语 ✨",
             // 方便用户把 /help 带到当前对话
             switch_inline_query_current_chat: "/help"
+          }
+        ], [
+          {
+            text: "删除消息",
+            callback_data: JSON.stringify({ type: "delete_message" })
           }
         ]
       ]
