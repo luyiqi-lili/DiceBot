@@ -1,306 +1,483 @@
-interface CoinResponse {
-  method: string;
-  chat_id: number;
-  text: string;
-  parse_mode?: string;
+// commands/coin.ts
+import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import { escapeHtml } from "../lib/util";
+import { payConfigs } from "../lib/liveConfig";
+import {
+  getBalance,
+  setBalance,
+  payoutFromTreasuryAllowNegative,
+  getTreasury,
+  addToTreasury,
+  takeFromTreasury,
+  TREASURY_KEY
+} from "../lib/coinService";
+
+/**
+ * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
+ */
+type CoinEnv = EnvLike & {
+  COIN_KV: KVNamespace;
+  BOT_USERNAME?: string;
+};
+
+/* ------------------------- 全局配置（统一在顶部） ------------------------- */
+
+
+// 管理员白名单（可分权限）
+const ADMIN_UIDS_CHECK: number[] = [8080375150];
+const ADMIN_UIDS_TAKE: number[] = [8080375150];
+const ADMIN_UIDS_CREATE: number[] = [8080375150];
+
+/** 费率计算（和你原来的阶梯规则一致） */
+function calcTransferFeeRate(targetBal: number): number {
+  if (targetBal < 100) return 0;
+  if (targetBal < 300) return 0.1;
+  if (targetBal < 500) return 0.3;
+  if (targetBal < 700) return 0.5;
+  if (targetBal < 900) return 0.7;
+  return 0.9;
 }
 
-// 随机整数，包含 min 和 max
+/**
+ * 转账：fromId -> toId
+ * - 若余额不足返回 { ok:false, reason }
+ * - 成功返回 { ok:true, fee, fromNew, toNew }（手续费自动写入艾丽莎宝库 TREASURY_KEY）
+ */
+async function transfer(
+  kv: KVNamespace,
+  fromId: string,
+  toId: string,
+  amount: number
+): Promise<{ ok: boolean; reason?: string; fee?: number; fromNew?: number; toNew?: number }> {
+  if (amount <= 0) return { ok: false, reason: "invalid amount" };
+  const senderBal = await getBalance(kv, fromId);
+  if (senderBal < amount) return { ok: false, reason: "insufficient" };
+
+  const targetBal = await getBalance(kv, toId);
+  const rate = calcTransferFeeRate(targetBal);
+  const fee = Math.floor(amount * rate);
+
+  // 扣款
+  await setBalance(kv, fromId, senderBal - amount);
+  // 收款
+  await setBalance(kv, toId, targetBal + amount - fee);
+  // 手续费入艾丽莎宝库
+  await addToTreasury(kv, fee);
+
+  return {
+    ok: true,
+    fee,
+    fromNew: senderBal - amount,
+    toNew: targetBal + amount - fee
+  };
+}
+
+/** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */
+async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
+  let total = 0;
+  let cursor: string | undefined = undefined;
+  do {
+    const opts: any = cursor ? { cursor } : {};
+    const res = await (kv as any).list(opts);
+    cursor = res.cursor;
+    for (const k of (res.keys || [])) {
+      const name: string = k.name;
+      if (name === TREASURY_KEY) continue;
+      if (name.includes("||")) continue;
+      if (/^\d+$/.test(name)) {
+        const v = await getBalance(kv, name);
+        total += v;
+      }
+    }
+  } while (cursor);
+  return total;
+}
+
+/* ------------------------- 原有命令处理（使用上面导出函数） ------------------------- */
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
-const payConfigs = [
 
-  {
-    "chatId": -1002742074355,
-    "threadIds": [182],
-    "placeName": "天狐宫的祈愿箱",
-    "enabled": true,
-    "successMessage": "${userName}将 ${amount} 💰投入${place}。"
-    +"<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
-    +"拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
-    +"心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
-    +"${place}现已累积 ${total} 💰。"
-  },
-  {
-    "chatId": -1002848481881,
-    "threadIds": [66],
-    "placeName": "天狐宫的祈愿箱",
-    "enabled": true,
-    "successMessage": "${userName}将 ${amount} 💰投入${place}。"
-    +"<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
-    +"拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
-    +"心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
-    +"${place}现已累积 ${total} 💰。"
-  }
-  /*  {
-      "chatId": -1002742074355,
-      "threadIds": [345],
-      "placeName": "桌游室的收银台",
-      "enabled": true,
-      "successMessage": "${userName} 往${place}放入 ${amount} 💰。${place}现在有 ${total} 💰。"
-    },
-    
-  {
-    "chatId": -1002848481881,
-    "threadIds": [66],
-    "placeName": "骰娘调校房的黑箱子",
-    "enabled": true,
-    "successMessage": "${userName} 向${place}投了 ${amount} 💰，现在累计 ${total} 💰。"
-  }*/
-]
+export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
+  const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
+  const threadId =
+    parsedMessage.threadId ??
+    parsedMessage.message?.message_thread_id ??
+    parsedMessage.message?.reply_to_message?.message_thread_id ??
+    undefined;
+  const from = parsedMessage.from ?? parsedMessage.message?.from;
 
-
-export async function handleCoin(msg: any, env: Env): Promise<Partial<CoinResponse>> {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id.toString();
-  const userName = msg.from.first_name || "你";
-
-  // 去除 @BotUsername 提及（如有）
-  let text = msg.text.trim();
-  const botMention = `@${env.BOT_USERNAME}`;
-  if (text.startsWith(botMention)) text = text.slice(botMention.length).trim();
-  const parts = text.split(/\s+/);
-  if (parts[0] !== "/coin") return {};
-
-  const sub = parts[1]?.toLowerCase();
-
-  const todayD = new Date();
-
-  const duringEvent = (todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17"));
-  const duringTrans = (todayD >= new Date("2025-08-15") && todayD <= new Date("2026-08-18"));
-
-
-  // 余额读写
-  async function getBalance(id: string): Promise<number> {
-    const raw = await env.COIN_KV.get(id);
-    return raw ? parseInt(raw, 10) : 0;
-  }
-  async function setBalance(id: string, bal: number) {
-    await env.COIN_KV.put(id, bal.toString());
+  if (!chatId || !from) {
+    console.error("[coin] 找不到 chatId 或 from，跳过");
+    return;
   }
 
-  // ——— 查询余额 ———
+  const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.slice() : [];
+  const userId = String(from.id);
+  const userName = String(from.first_name ?? from.username ?? "你");
+  const safeUserName = escapeHtml(userName);
+  const kv = env.COIN_KV;
+  const sub = (args[0] || "").toLowerCase();
+
+  // — 查询余额（默认无子命令）
   if (!sub) {
-    const bal = await getBalance(userId);
-    return {
-      method: "sendMessage",
+    const bal = await getBalance(kv, userId);
+    await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `${userName}，你目前有 ${bal} 💰。`,
+      text: `${safeUserName}，你目前有 ${bal} 💰。`,
       parse_mode: "HTML",
-    };
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // ——— 每日祈祷 ———
+  // pray
   if (sub === "pray") {
-    // —— 新增：仅允许在特定群组和主题中使用 pray —— 
-    const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id;
     const allowed =
-      (chatId === -1002848481881 && [66].includes(threadId)) ||
-      (chatId === -1002742074355 && [62].includes(threadId));
+      (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
+      (chatId === -1002742074355 && [62].includes(threadId ?? 0));
     if (!allowed) {
-      return {
-        method: "sendMessage",
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text:
-          `✨ 这里的神圣气息过于微弱，女神未能听闻你的心愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+        text: `✨ 这里的神圣气息过于微弱，女神未能听闻你的心愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
         parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-
 
     const prayKey = `coin_pray:${userId}`;
-    const last = await env.COIN_KV.get(prayKey);
+    const last = await kv.get(prayKey);
     const today = new Date().toISOString().split("T")[0];
     if (last === today) {
-      return {
-        method: "sendMessage",
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
+        text: `🙏 ${safeUserName}，你今天已经祈祷过了，明天再来吧！`,
         parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-    // 活动期间（2025-08-12 — 2025-08-17）提高祈祷奖励为 11-20
 
+    const todayD = new Date();
+    const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
+    const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
-    const gain = (duringEvent)
-      ? randomInt(11, 20)
-      : randomInt(1, 10);
-    const bal = await getBalance(userId);
+    const bal = await getBalance(kv, userId);
     const newBal = bal + gain;
-    await setBalance(userId, newBal);
-    await env.COIN_KV.put(prayKey, today);
-    return {
-      method: "sendMessage",
+    await payoutFromTreasuryAllowNegative(kv, gain);
+    await setBalance(kv, userId, newBal);
+    try {
+      await kv.put(prayKey, today);
+    } catch (e) {
+      /* ignore */
+    }
+
+    await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
       parse_mode: "HTML",
-    };
+      message_thread_id: threadId
+    });
+    return;
   }
-  const threadId = msg.message_thread_id ?? msg.reply_to_message?.message_thread_id ?? 0;
 
-  if (sub === "pay") {
-
-
-
-
-    // 查找配置，判断当前房间/主题是否允许 pay
+  // pay
+  if (sub === "pay" || sub === "give") {
     const cfg = payConfigs.find((c) => {
       if (c.chatId !== chatId) return false;
       if (!c.threadIds || c.threadIds.length === 0) return true;
-      return c.threadIds.includes(threadId);
+      return c.threadIds.includes(threadId ?? 0);
     });
 
     if (!cfg || cfg.enabled === false) {
-      return {
-        method: "sendMessage",
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${userName}，此房间暂不支持投币 (pay)。`,
+        text: `❌ ${safeUserName}，此房间暂不支持投币 (pay)。`,
         parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-    const amount = parseInt(parts[2] || "", 10);
+
+    const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
-      const roomBal = await getBalance(roomKey);
-      const place = cfg?.placeName || `房间 ${threadId}`;
-      return {
-        method: "sendMessage",
+      const roomBal = await getBalance(kv, roomKey);
+      const place = cfg.placeName || `房间 ${threadId}`;
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `📥 ${place} 当前有 ${roomBal} 💰。`,
+        text: `📥 ${escapeHtml(place)} 当前有 ${roomBal} 💰。`,
         parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-    if (isNaN(amount) || amount <= 0) {
-      return {
-        method: "sendMessage",
-        chat_id: chatId,
-        text: `❌ ${userName}，请指定正确的投币数量，例如：<code>/coin pay 1</code>。`,
-        parse_mode: "HTML",
-      };
-    }
-    // 检查并扣除用户余额
-    const senderBal = await getBalance(userId);
-    if (senderBal < amount) {
-      return {
-        method: "sendMessage",
-        chat_id: chatId,
-        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
-        parse_mode: "HTML",
-      };
-    }
-    const newSenderBal = senderBal - amount;
-    await setBalance(userId, newSenderBal);
 
-    // 更新房间余额（只计数，无法取出），使用通用的 getBalance/setBalance，key 为 chatId||threadId
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的投币数量，例如：<code>/coin pay 1</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const senderBal = await getBalance(kv, userId);
+    if (senderBal < amount) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你的余额不足，当前只有 ${senderBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+    await setBalance(kv, userId, senderBal - amount);
+
     const roomKey = `${chatId}||${threadId ?? 0}`;
-    const oldRoomBal = await getBalance(roomKey);
+    const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
-    await setBalance(roomKey, newRoomBal);
+    
+    await addToTreasury(kv, amount);
+    await setBalance(kv, roomKey, newRoomBal);
 
     const place = cfg.placeName || `房间 ${threadId}`;
-
-    // 成功文案支持预设模板变量：${userName}, ${place}, ${amount}, ${total}, ${threadId}
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
     const textOut = template
-      .replace(/\$\{userName\}/g, userName)
-      .replace(/\$\{place\}/g, place)
+      .replace(/\$\{userName\}/g, escapeHtml(userName))
+      .replace(/\$\{place\}/g, escapeHtml(place))
       .replace(/\$\{amount\}/g, String(amount))
       .replace(/\$\{total\}/g, String(newRoomBal))
       .replace(/\$\{threadId\}/g, String(threadId));
 
-    return {
-      method: "sendMessage",
+    await TgMessage.sendText(env, {
       chat_id: chatId,
       text: textOut,
       parse_mode: "HTML",
-    };
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // ——— 转账，并由接收者支付阶梯手续费 ———
+  // send (转账) — 使用 transfer()，手续费自动入艾丽莎宝库
   if (sub === "send") {
-    if (!duringTrans) {
-      return {
-        method: "sendMessage",
-        chat_id: chatId,
-        text: `❌ ${userName}，转账功能升级中，敬请期待。`,
-        parse_mode: "HTML",
-      };
-    }
 
-    const amount = parseInt(parts[2] || "", 10);
+    const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount) || amount <= 0) {
-      return {
-        method: "sendMessage",
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${userName}，请指定正确的转账数量，例如：<code>/coin send 50</code>。`,
+        text: `❌ ${safeUserName}，请指定正确的转账数量，例如：<code>/coin send 50</code>。`,
         parse_mode: "HTML",
-      };
-    }
-    const target = msg.reply_to_message?.from;
-    if (!target) {
-      return {
-        method: "sendMessage",
-        chat_id: chatId,
-        text: `❌ ${userName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
-        parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
 
-    // 1. 检查并扣除发送者余额
-    const senderBal = await getBalance(userId);
-    if (senderBal < amount) {
-      return {
-        method: "sendMessage",
+    // 获取被回复用户
+    const repliedFrom = parsedMessage.message?.reply_to_message?.from;
+    if (!repliedFrom || !parsedMessage.isReply) {
+      await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
+        text: `❌ ${safeUserName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
         parse_mode: "HTML",
-      };
+        message_thread_id: threadId
+      });
+      return;
     }
-    const newSenderBal = senderBal - amount;
-    await setBalance(userId, newSenderBal);
 
-    // 2. 读取接收者原始余额 oldBal
-    const targetId = target.id.toString();
-    const oldBal = await getBalance(targetId);
+    const result = await transfer(kv, userId, String(repliedFrom.id), amount);
+    if (!result.ok) {
+      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
+      return;
+    }
 
-    // 3. 确定阶梯费率（示例）
-    let rate: number;
-    if (oldBal < 100) rate = 0;        // 0%
-    else if (oldBal < 300) rate = 0.1;   // 10%
-    else if (oldBal < 500) rate = 0.3;  // 30%
-    else if (oldBal < 700) rate = 0.5;  // 50%
-    else if (oldBal < 900) rate = 0.7;  // 70%
-    else rate = 0.9;                       // 90%
-
-    // 4. 计算手续费（向下取整）
-    const fee = Math.floor(amount * rate);
-    // 5. 更新接收者余额：oldBal + amount - fee
-    const newTargetBal = oldBal + amount - fee;
-    await setBalance(targetId, newTargetBal);
-
-    const targetName = target.first_name || "TA";
-    return {
-      method: "sendMessage",
+    const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? "TA"));
+    const feePercent = result.fee && amount ? Math.round((result.fee / amount) * 100) : 0;
+    await TgMessage.sendText(env, {
       chat_id: chatId,
       text:
-        `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
-        `📊 ${targetName} 原有余额 ${oldBal} 💰，适用费率 ${(rate * 100).toFixed(0)}%，手续费 ${fee} 💰。\n` +
-        `✅ 转账后 ${targetName} 新余额：${newTargetBal} 💰；\n` +
-        `🪙 你的新余额：${newSenderBal} 💰。`,
+        `💸 ${escapeHtml(userName)} 向 ${targetName} 转账 ${amount} 💰。\n` +
+        `📊 ${targetName} 原有余额 ${result.toNew! - (amount - result.fee!)} 💰，适用费率 ${feePercent}%，手续费 ${result.fee} 💰（已入艾丽莎宝库）。\n` +
+        `✅ 转账后 ${targetName} 新余额：${result.toNew} 💰；\n` +
+        `🪙 你的新余额：${result.fromNew} 💰。`,
       parse_mode: "HTML",
-    };
+      message_thread_id: threadId
+    });
+    return;
   }
 
-  // ——— 未知子命令 ———
-  return {
-    method: "sendMessage",
+  /* ------------------------- 管理命令：check / take / create ------------------------- */
+
+  // /coin check
+  if (sub === "check") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin check。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 如果回复某人：查询该人余额
+    const repliedFrom = parsedMessage.message?.reply_to_message?.from;
+    if (repliedFrom && parsedMessage.isReply) {
+      const targetId = String(repliedFrom.id);
+      const bal = await getBalance(kv, targetId);
+      const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? targetId));
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `👤 ${targetName} 的余额：${bal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 否则返回艾丽莎宝库与所有用户合计
+    try {
+      const treasuryBal = await getTreasury(kv);
+      const totalUserBal = await sumAllUserBalances(kv);
+
+
+      const text =
+        `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
+        `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
+        ` 📊 总计（宝库  + 房间）：${treasuryBal+totalUserBal} 💰。` 
+        ;
+
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    } catch (e) {
+      console.error("[coin] /coin check 列表或计算失败", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 查询失败：无法遍历账户数据，请稍后重试或联系管理员。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+  }
+
+  // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
+  if (sub === "take") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin take。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const amount = parseInt(args[1] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 目标：如果是回复某人则转给被回复的人，
+    let targetUid = userId;
+    let targetLabel = escapeHtml(userName);
+    if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
+      const r = parsedMessage.message.reply_to_message.from;
+      targetUid = String(r.id);
+      targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
+    }
+
+    const treasuryBal = await getTreasury(kv);
+    if (treasuryBal < amount) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 艾丽莎宝库余额不足，当前只有 ${treasuryBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 扣除艾丽莎宝库并增加目标账户
+    await takeFromTreasury(kv, amount);
+    const oldTargetBal = await getBalance(kv, targetUid);
+    const newTargetBal = oldTargetBal + amount;
+    await setBalance(kv, targetUid, newTargetBal);
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${treasuryBal - amount} 💰。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
+
+  // /coin create <amount>
+  if (sub === "create") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin create。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const amount = parseInt(args[1] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    await addToTreasury(kv, amount);
+    const newTre = await getTreasury(kv);
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
+
+  // 未知子命令
+  await TgMessage.sendText(env, {
     chat_id: chatId,
     text:
       `❓ 不支持的子命令，请用：\n` +
       `<code>/coin</code> 查询余额\n` +
       `<code>/coin pray</code> 今日祈祷\n` +
-      `<code>/coin send 50</code> 回复消息支付 50 💰`,
+      `<code>/coin send 50</code> 回复消息支付 50 💰\n` +
+      `<code>/coin check</code> （管理员查询艾丽莎宝库/用户合计/回复某人查看其余额）\n` +
+      `<code>/coin take 100</code> （管理员从艾丽莎宝库取款）\n` +
+      `<code>/coin create 1000</code> （管理员向艾丽莎宝库注入）`,
     parse_mode: "HTML",
-  };
+    message_thread_id: threadId
+  });
+  return;
 }
+
+export default handleCoin;

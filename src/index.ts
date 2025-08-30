@@ -1,395 +1,314 @@
-import { handleEcho } from "./commands/echo";
-import { handleRoll } from "./commands/roll";
-import { handleGroll } from "./commands/groll";
-import { handleHelp } from "./commands/help";
-import { handleDuel } from "./commands/duel";
-import { handleLike } from "./commands/like";
-import { handleNews } from "./commands/news";
-import { handleBook } from "./commands/book";
-import { handleTrans } from "./commands/trans";
-import { handle21 } from "./commands/21";
-import { recordAffection } from "./commands/handleAffinity";
-import { handleRose } from "./commands/rose";
-import { handleTopicEdited } from "./commands/topicEditHandler";
-import { handleCoin } from "./commands/coin";
-import { handleDeleteMessage } from "./commands/deleteMessage";
-import { handleFate } from "./commands/fate";
-import { handleFish } from "./commands/fish";
+/* index.ts */
 
+
+import TgMessage from './lib/tgMessage';
+import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
+import { incrementUsageCount } from "./commands/like";
+
+export type Env = {
+  TOKEN: string;
+  BOT_USERNAME: string;
+  NEWS_STORE: KVNamespace
+  TOPIC_KV: KVNamespace
+  COIN_KV: KVNamespace
+  BOOK_STORE: KVNamespace
+  FISHING_RECORD_KV: KVNamespace
+  TGBOTCOUNT: KVNamespace
+  AFFECTION_KV: KVNamespace
+};
 
 export default {
   async fetch(request, env) {
-    console.log("📥 收到请求", {
+
+    //1. 日记记录原始请求
+    console.log("index: 收到请求", {
       method: request.method,
       url: request.url,
       headers: Object.fromEntries(request.headers)
     });
 
+    //2. 直接相应非post请求
     if (request.method !== "POST") {
-      console.log("➡️ 非 POST 请求，返回存活内容");
+      console.log("index: 非 POST 请求，返回存活内容");
       return new Response("I am alive", { status: 200 });
     }
 
-    let update;
+    //3. 解析请求
+    //TODO:  update在全部命令迁移完成后要取消
+    let parsedMessage;
     try {
-      update = await request.json();
-      console.log("✅ 解析请求 JSON 成功", update);
+      parsedMessage = TgMessage.parseUpdate(await request.json(), env.BOT_USERNAME);
+      console.log("index: 解析请求 JSON 成功");
     } catch (e) {
-      console.error("❌ 无法解析 JSON", e);
+      console.error("index: 无法解析 JSON", e);
       return new Response("Bad Request", { status: 400 });
     }
 
-    if (update.callback_query) {
-      const cq = update.callback_query;
+    // 4.白名单群组检查
+    if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
+      console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
+      return new Response("OK", { status: 200 });
+    }
 
-      // ① 先回答 callback_query，去掉客户端的加载状态
-      await fetch(
-        `https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            callback_query_id: cq.id,
-            // 不显示任何提示：
-            show_alert: false
-          })
+    //5. 分别处理 callback_query 和 message 和 topic_edited
+    console.log("index:parsedMessage.type", parsedMessage.type);
+    
+    switch (parsedMessage.type) {
+      //5.1 处理房间修改
+      case 'topic_edited': {
+        console.log("index: 检测到 topic_edited，尝试处理话题标题编辑");
+        try {
+          const { handleTopicEdited } = await import("./commands/topicEditHandler");
+          const editResponse = await handleTopicEdited(parsedMessage, env);
+          if (editResponse) {
+            return editResponse; // 如果 handler 返回 Response（按需），则直接返回
+          }
+        } catch (e) {
+          console.error("❌ handleTopicEdited(topic_edited) 失败", e);
         }
-      );
-
-      // ② 再处理回调命令
-      let payload: any;
-      if (cq.data.startsWith("duel_accept") || /\/duel\b/.test(cq.message.text || "")) {
-        payload = handleDuel(cq, env);
-        console.log("➡️ [callback] handleDuel 返回 payload:", payload);
-      } else if (
-        cq.data.startsWith("groll_accept") ||
-        cq.data.startsWith("groll_end")) {
-        payload = handleGroll(cq, env);
-        console.log("➡️ [callback] handleGroll 返回 payload:", payload);
-      } else if (
-        cq.data.startsWith("21_draw") ||
-        cq.data.startsWith("21_next")
-      ) {
-        payload = handle21(cq, env);
-      } else if (cq.data?.startsWith("fish_pull:")) {
-        payload = await handleFish(cq, env);
-      }
-      else if (cq.data === "delete_message") {
-        payload = await handleDeleteMessage(cq, env);
-      }
-
-      else {
-        console.log("ℹ️ 未知 callback_data，忽略");
+        // 如果没有被 handleTopicEdited 消化，继续不做其它处理（返回 OK）
         return new Response("OK", { status: 200 });
       }
 
-      const method = payload.method || "sendMessage";
-      delete payload.method;
-      console.log(`➡️ [callback] 准备调用 ${method} 接口`, payload);
-      try {
-        const apiRes = await fetch(
-          `https://api.telegram.org/bot${env.TOKEN}/${method}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          }
-        );
-        const json = await apiRes.json();
-        console.log(`✅ [callback] ${method} API 成功`, json);
-      } catch (e) {
-        console.error(`❌ [callback] ${method} API 调用失败`, e);
-      }
+      //5.2 处理 callback_query
+      case 'callback_query': {
 
-      return new Response("OK", { status: 200 });
-    }
-    try {
-      const editResponse = await handleTopicEdited(update, env);
-      if (editResponse) return editResponse;
-
-    }
-    catch (e) {
-      console.error(`❌ [callback] ${method} 标题更新失败`, e);
-
-      return new Response("OK", { status: 200 });
-    }
-
-
-
-    const msg = update.message ?? update.channel_post;
-    if (!msg) {
-      console.log("➖ 无 message 或 channel_post，忽略本次更新");
-      return new Response("OK", { status: 200 });
-    }
-
-    const text = msg.text;
-    if (!text) {
-      console.log("➖ 消息中无 text 字段，忽略");
-      return new Response("OK", { status: 200 });
-    }
-
-    const chatId =
-      // 如果是普通消息，就用 msg.chat.id
-      msg.chat?.id
-      // 如果是回调，就退而求其次用 msg.message.chat.id
-      ?? msg.message.chat.id;
-    // ✅ 只允许在指定群组中响应
-    const ALLOWED_CHAT_IDS = new Set([
-      -1002742074355,
-      -1002848481881
-    ]);
-
-    if (!ALLOWED_CHAT_IDS.has(chatId)) {
-      console.log(`🚫 chatId ${chatId} 不在允许响应的群组内，跳过处理`);
-      return new Response("OK", { status: 200 });
-    }
-    const threadId =
-      msg.message_thread_id
-      ?? msg.message?.message_thread_id;
-
-    console.log(`🔍 检查是否包含 @${env.BOT_USERNAME}`);
-
-
-    if (
-      !text.trim().startsWith(`@${env.BOT_USERNAME}`) &&
-      !text.trim().startsWith("/r")
-    ) {
-      console.log("➖ 文本不不是以 @Bot 用户名，或者/r 开头，忽略");
-      return new Response("OK", { status: 200 });
-    }
-
-    else {
-
-      const userId = msg.from.id;
-      const firstName = msg.from.first_name || "";
-      const key = `count:${userId}`;
-      // 读取原始记录（可能是旧版的纯数字）
-       const prev = await env.TGBOTCOUNT.get(key);
-      let record;
-      if (prev) {
-        try {
-          // 尝试解析为 JSON
-          record = JSON.parse(prev);
-          if (typeof record.count !== 'number') {
-            // 如果结构不符，退回到旧版数值
-            record = { count: parseInt(prev, 10) || 0 };
-          }
-        } catch (e) {
-          // 旧版数据为纯数字字符串
-          record = { count: parseInt(prev, 10) || 0 };
-        }
-      } else {
-        record = { count: 0 };
-      }
-      // 更新记录
-      record.count += 1;
-      record.firstName = firstName;
-      // 写回 KV，使用 JSON 格式
-       await env.TGBOTCOUNT.put(key, JSON.stringify(record));
- 
-
-    }
-
-    console.log("➡️ 将处理文本 =", text);
-
-    let payload: any = {
-      chat_id: chatId,
-      parse_mode: "HTML"
-    };
-
-    if (threadId) {
-      payload.message_thread_id = threadId;
-      console.log("📌 附加 message_thread_id 到响应消息");
-    }
-
-    if (/\/echo\b/.test(text)) {
-      console.log("📢 检测到 /echo 命令");
-      const userName = msg.from?.first_name || "某人";
-      payload.text = handleEcho(text, userName);
-    } else if (/^\/rh\b/.test(text)) {
-      console.log("🎲 检测到 /rh 命令，进行隐藏掷骰");
-      const userName = msg.from?.first_name || "某人";
-      const rollResult = handleRoll(text.replace(/^\/rh/, "/roll"), userName);  // 替换为 /roll 处理逻辑
-
-      // 发群组提示（可选）
-      await fetch(`https://api.telegram.org/bot${env.TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          message_thread_id: threadId,
-          parse_mode: "HTML",
-          text: `🎲 已将掷骰结果发送至 <b>${userName}</b> 的私聊。`
-        })
-      });
-
-      // 发私聊消息
-      await fetch(`https://api.telegram.org/bot${env.TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: msg.from.id,
-          parse_mode: "HTML",
-          text: `🎲 <b>你的隐藏掷骰结果</b>：\n${rollResult}`
-        })
-      });
-
-      return new Response("OK", { status: 200 });
-    } else if (/\/fate\b/.test(text)) {
-      console.log("🔮 检测到 /fate 命令，开始发送媒体组");
-      console.log("🔮 检测到 /fate 命令，开始处理 handleFate 返回的 payload");
-      try {
-        // 1. 调用 handleFate，拿到完整 payload，包括 method 字段
-        const payload = await handleFate(msg, env);
-        const method = payload.method || 'sendMessage';
-        // 2. 删除 method 字段，剩下的就是请求 body
-        delete payload.method;
-        console.log(`➡️ 调用 Telegram API 方法：${method}`, payload);
-
-        if (threadId) {
-          payload.message_thread_id = threadId;
-          console.log("📌 [fate] 附加 message_thread_id:", threadId);
-        }
-
-
-        // 3. 根据 method 动态请求
-        const apiRes = await fetch(
-          `https://api.telegram.org/bot${env.TOKEN}/${method}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          }
-        );
-        const data = await apiRes.json();
-        console.log(`✅ ${method} API 返回`, data);
-      } catch (err) {
-        console.error("❌ /fate 处理失败", err);
-      }
-      return new Response("OK", { status: 200 });
-
-
-    } else if (/\/rose\b/.test(text)) {
-      console.log("🎲 检测到 /rose 命令，进入 Rose 逻辑");
-      payload = { ...payload, ...(await handleRose(msg, env)) };
-    } else if (/\/r/.test(text)) {
-      console.log("🎯 检测到 /roll 命令");
-      const userName = msg.from?.first_name || "某人";
-      payload.text = handleRoll(text, userName);
-    } else if (/\/groll\b/.test(text)) {
-      console.log("🎲 检测到 /groll 命令，进入 Groll 逻辑");
-      payload = { ...payload, ...handleGroll(msg, env) };
-    } else if (/\/21\b/.test(text)) {
-      console.log("🎲 检测到 /21点 命令，进入 21 逻辑");
-      payload = { ...payload, ...handle21(msg, env) };
-    } else if (/\/duel\b/.test(text)) {
-      console.log("⚔️ 检测到 /duel 命令，进入决斗逻辑");
-      payload = { ...payload, ...handleDuel(msg, env) };
-    } else if (/\/fish\b/.test(text)) {
-      payload = { ...payload, ...(await handleFish(msg, env)) };
-    } else if (/\/like\b/.test(text)) {
-      // 调用我们在下一步定义的 handleLike
-      const res = await handleLike(msg, env);
-      payload.text = res.text;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    } else if (/\/help\b/.test(text)) {
-      console.log("ℹ️ 检测到 /help 命令，返回完整帮助信息");
-      const helpResponse = handleHelp(env.BOT_USERNAME);
-      payload.text = helpResponse.text;
-      payload.parse_mode = helpResponse.parse_mode;
-      payload.reply_markup = helpResponse.reply_markup;
-    } else if (/\/trans\b/.test(text)) {
-      console.log("🌐 检测到 /trans 命令，进入翻译逻辑");
-      const res = await handleTrans(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
-    } else if (/\/news\b/.test(text)) {
-      console.log("📰 检测到 /news 命令，进入新闻逻辑");
-      const res = await handleNews(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    } else if (/\/book\b/.test(text)) {
-      console.log("📰 检测到 /book 命令，进入书签逻辑");
-      const res = await handleBook(msg, env);
-      payload.text = res.text;
-      if (res.parse_mode) payload.parse_mode = res.parse_mode;
-      if (res.reply_markup) payload.reply_markup = res.reply_markup;
-    } else if (/\/coin\b/.test(text)) {
-      // 新增 coin 命令
-      const res = await handleCoin(msg, env);
-      payload = { ...payload, ...res };
-
-    } else if (/\/whoami\b/.test(text)) {
-      console.log("🆔 检测到 /whoami 命令");
-
-      // 用户基本信息
-      const userId = msg.from.id;
-      const userName = msg.from.first_name || "";
-
-      // 群组信息
-      const chatId = msg.chat.id;
-      const chatTitle = msg.chat.title || "(无群名)";
-
-      // 主题 / 线程 信息（Telegram 论坛群组专用）
-      // message_thread_id 在普通群里通常是 undefined
-      const threadId =
-        msg.message_thread_id
-        ?? msg.message?.message_thread_id;
-
-      // 构造输出文本
-      let replyText = `你的用户 ID：<code>${userId}</code>\n` +
-        `你的用户名：<code>${userName}</code>\n` +
-        `群组 ID：<code>${chatId}</code>\n` +
-        `群组名称：<code>${chatTitle}</code>\n`;
-
-      if (threadId) {
-        replyText += `主题 ID：<code>${threadId}</code>\n`;
-      }
-
-      payload.text = replyText;
-      payload.parse_mode = "HTML";
-
-    }
-    else {
-      // 未识别命令 —— 提示用户输入 /help 查询
-      const responses = [
-        "呜哇，这个咒语骰娘听不懂欸～是不是念错啦？<i>（歪头）</i> 用 <b>/help</b> 咒语看看都有哪些能用的呢！✨",
-        "诶诶？咒语不在词典里欸，骰娘好困惑！<i>快用</i> /help <i>来检查一下正确咒语吧～</i>🌟",
-        "骰娘耳朵竖起来听咒语了，可是……没听懂耶🥺 是不是写错啦？<b>用 /help 咒语召唤帮助之书！📖</b>",
-        "呀！你的咒语好像失败啦！骰娘感受到一股混沌的魔力呢～不如用 <b>/help</b> 检查一下正确咒语吧🎀",
-        "唔……骰娘尝试解析咒语中……失败了！可能咒语太古老啦～来试试 <b>/help</b>，看看现代用法！🔮"
-      ];
-
-      const randomIndex = Math.floor(Math.random() * responses.length);
-      payload.text = responses[randomIndex];
-      payload.parse_mode = "HTML";
-      payload.reply_markup = {
-        inline_keyboard: [
-          [
-            {
-              text: "✨ 查看帮助咒语 ✨",
-              switch_inline_query_current_chat: "/help"
+        const callbackQuery = parsedMessage.callbackQuery;
+        console.log("index:parsedMessage.callbackQuery", callbackQuery);
+        const callbackData = parsedMessage.callbackData;
+        console.log("index:parsedMessage.callbackData", callbackData);
+        // 处理回调命令
+        // TODO 回调都改成json格式
+        // ✅ 新逻辑：JSON 格式 callback
+        if (typeof callbackData === "object" && callbackData.type) {
+          console.log("index:parsedMessage.callbackData.type", callbackData.type);
+          switch (callbackData.type) {
+            case "21": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 21 点回调", callbackData);
+              // 引入新的 handler
+              const { handle21Callback } = await import("./commands/21");
+              await handle21Callback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
             }
-          ]
-        ]
-      };
-    }
+            case "duel": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 duel 点回调", callbackData);
+              // 引入新的 handler
+              const { handleDuelCallback } = await import("./commands/duel");
+              await handleDuelCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+            case "fish": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 fish 点回调", callbackData);
+              // 引入新的 handler
+              const { handleFishCallback } = await import("./commands/fish");
+              await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+            case "groll": {
+              // callbackQuery 为 parsedMessage.callbackQuery
+              // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
+              console.log("➡️ 处理 groll回调", callbackData);
+              // 引入新的 handler
+              const { handleGrollCallback } = await import("./commands/groll");
+              await handleGrollCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
 
+            case "delete_message":
+              {
+                const chat_id = callbackQuery.message.chat.id;
+                const message_id = callbackQuery.message.message_id;
 
-    try {
-      const apiRes = await fetch(
-        `https://api.telegram.org/bot${env.TOKEN}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+                await TgMessage.deleteMessage(env, chat_id, message_id);
+                await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+                  text: "消息已删除",
+                  show_alert: true
+                });
+
+                // 已处理完成，直接返回
+                return new Response("OK", { status: 200 });
+              }
+
+            default:
+              console.log("ℹ️ 未知 callback type，忽略", callbackData);
+              return new Response("OK", { status: 200 });
+          }
         }
-      );
-      const json = await apiRes.json();
-      console.log("✅ sendMessage API 成功", json);
-    } catch (e) {
-      console.error("❌ sendMessage API 调用失败", e);
+      }
+
+      //5.3 处理消息
+      case 'message': {
+
+        console.log("main:isCommand", parsedMessage.isCommand);
+        if (parsedMessage.isCommand) {
+
+          //5.3.0 首先添加用户调用计数
+          console.log("main:command", parsedMessage.command);
+          await incrementUsageCount(parsedMessage, env);
+
+          switch (parsedMessage.command) {
+            //书签
+            case "book": {
+              console.log("index: 检测到 /book 命令，进入 book逻辑");
+              const { handleBook } = await import("./commands/book");
+              await handleBook(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /book 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //UID查询 
+            case "whoami": {
+              console.log("index: 检测到 / whoami 命令，进入 whoami 逻辑");
+              const { handleWhoami } = await import("./commands/whoami");
+              await handleWhoami(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: / whoami 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //抽卡
+            case "fate": {
+              console.log("index: 检测到 /fate 命令，进入 fate逻辑");
+              const { handleFate } = await import("./commands/fate");
+              await handleFate(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /fate 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //送花
+            case "rose": {
+              console.log("index: 检测到 /rose 命令，进入 rose逻辑");
+              const { handleRose } = await import("./commands/rose");
+              await handleRose(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /rose 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //骰点
+            case "roll":
+            case "r":
+            case "rd":
+            case "rh": {
+              console.log("index: 检测到 /roll 命令，进入 roll逻辑");
+              const { handleRoll } = await import("./commands/roll");
+              await handleRoll(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /roll 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //帮助
+            case "help": {
+              console.log("index: 检测到 /help 命令，进入 help逻辑");
+              const { handleHelp } = await import("./commands/help");
+              await handleHelp(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /help 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //钓鱼
+            case "fish": {
+              console.log("index: 检测到 /fish 命令，进入 fish 逻辑");
+              const { handleFish } = await import("./commands/fish");
+              await handleFish(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /fish 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //货币
+            case "coin": {
+              console.log("index: 检测到 /coin 命令，进入 coin逻辑");
+              const { handleCoin } = await import("./commands/coin");
+              await handleCoin(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /coin 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //翻译
+            case "trans": {
+              console.log("index: 检测到 /trans 命令，进入 trans逻辑");
+              const { handleTrans } = await import("./commands/trans");
+              await handleTrans(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /trans 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //回声
+            case "echo": {
+              console.log("index: 检测到 /echo 命令，进入 echo逻辑");
+              const { handleEcho } = await import("./commands/echo");
+              await handleEcho(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /echo 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //调用次数查询
+            case "like": {
+              console.log("index: 检测到 /like 命令，进入 like 逻辑");
+              const { handleLike } = await import("./commands/like");
+              await handleLike(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /like 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            //决斗
+            case "duel": {
+              console.log("index: 检测到 /duel 命令，进入 duel 逻辑");
+              const { handleDuel } = await import("./commands/duel");
+              await handleDuel(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /duel 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            // groll
+            case "groll": {
+              console.log("index: 检测到 /groll 命令，进入 groll 逻辑");
+              const { handleGroll } = await import("./commands/groll");
+              await handleGroll(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /groll 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            // 21点游戏
+            case "21": {
+              console.log("index: 检测到 /21点 命令，进入 21 逻辑");
+              const { handle21 } = await import("./commands/21");
+              await handle21(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: 21处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            // 新闻
+            case "news": {
+              console.log(`index: 检查到news命令`);
+              const { handleNews } = await import("./commands/news");
+              await handleNews(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: news处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            // 默认提示
+            default: {
+              
+              console.log("index: 未知命令，发送默认帮助提示");
+              const { handleDefaultHelp } = await import("./commands/help");
+              await handleDefaultHelp(parsedMessage, env);
+              try {
+ //               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              } catch (e) {
+                console.warn("index: 删除触发命令消息失败（可忽略）", e);
+              }
+
+              return new Response("OK", { status: 200 });
+            }
+
+          }
+        }
+      }
     }
 
     return new Response("OK", { status: 200 });
