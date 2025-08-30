@@ -1,7 +1,8 @@
 // src/commands/fish.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { CoinEnv, TREASURY_KEY, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury,payoutFromTreasuryAllowNegative } from "./coin";
+import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury,payoutFromTreasuryAllowNegative } from "../lib/coinService";
 import { fishList } from "../lib/liveConfig";
+import {escapeHtml}  from "../lib/util";
 
 /**
  * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
@@ -10,14 +11,7 @@ export type FishEnv = CoinEnv & {
     FISHING_RECORD_KV: KVNamespace;
 };
 
-/* ------------------------- 辅助函数 ------------------------- */
-function escapeHtml(text: string) {
-    return (text ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-}
-
+ 
 function nowDateYMD(): string {
     return new Date().toISOString().split("T")[0];
 }

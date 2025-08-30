@@ -1,9 +1,10 @@
 // commands/fate.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { MAJOR_ARCANA } from "../lib/liveConfig";
+import {escapeHtml}  from "../lib/util";
 
 // 从 coin 模块复用 KV 操作函数
-import { getBalance, deductFromBalance, addToTreasury } from "./coin";
+import { getBalance, deductFromBalance, addToTreasury } from "../lib/coinService";
 
 type Env = {
     TOKEN: string;
@@ -11,11 +12,7 @@ type Env = {
     COIN_KV: KVNamespace;
     GOOGLE_API_KEYS?: string[];
 };
-
-function escapeHtml(s: string) {
-    if (!s) return "";
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
+ 
 
 export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> {
     console.log("🔮 [handleFate] invoked, parsed.command:", parsed.command, "textPreview:", parsed.textPreview);

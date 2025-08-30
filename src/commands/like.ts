@@ -1,15 +1,9 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { likeTextMapFriend } from "../lib/liveConfig";
+import {escapeHtml}  from "../lib/util";
 
 // 示例 daughter id 集合（请根据实际替换/扩展）
 const daughterUserIds = new Set<number>([10]);
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 /**
  * 重构后的 handleLike：

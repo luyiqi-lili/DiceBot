@@ -1,11 +1,5 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+import {escapeHtml}  from "../lib/util";
 
 /**
  * 将原始文本解析为 roll 输入参数（例如 "2d6+1" 或 "{红 白 绿}"）

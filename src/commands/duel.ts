@@ -1,5 +1,6 @@
 // commands/duel.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import {escapeHtml}  from "../lib/util";
 
 /**
  * Duel 精简版（callback_data 只保留短字段）
@@ -24,11 +25,7 @@ type ShortCb = {
 const reply_delete = {
   inline_keyboard: [[{ text: "删除消息", callback_data: JSON.stringify({ type: "delete_message" }) }]]
 };
-
-function escapeHtml(s: string) {
-  if (!s) return "";
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
+ 
 
 function pickDisplayNameFromParsed(parsed: ParsedUpdate) {
   return parsed.from?.first_name || "决斗者";
@@ -199,7 +196,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
   }
 
   if (!isTarget) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: `只有被挑战的  ${expectedTargetIdent} 和 ${parsedTargetName}  才能接受此决斗。`, show_alert: true });
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `只有被挑战的  ${expectedTargetIdent} 才能接受此决斗。`, show_alert: true });
     return;
   }
 

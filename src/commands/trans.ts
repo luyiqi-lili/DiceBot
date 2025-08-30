@@ -1,4 +1,7 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import {escapeHtml}  from "../lib/util";
+
+
 type GeminiResponse = {
   candidates?: Array<{
     content?: {
@@ -6,13 +9,6 @@ type GeminiResponse = {
     };
   }>;
 };
-
-function escapeHtml(text: string) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 /**
  * 重构后的 handleTrans：

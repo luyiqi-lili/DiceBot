@@ -1,5 +1,6 @@
 // commands/topicEditHandler.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import {escapeHtml}  from "../lib/util";
 
 /**
  * Env 扩展类型 (Worker bindings)
@@ -10,13 +11,6 @@ export type TopicEnv = EnvLike & {
   TOPIC_KV: KVNamespace;
   TOKEN?: string;
 };
-
-function escapeHtml(text: string) {
-  return (text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 /**
  * 处理论坛话题标题编辑事件（forum_topic_edited）

@@ -1,6 +1,6 @@
 // commands/book.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import  { deleteMarkup } from "../lib/util";
+import { deleteMarkup } from "../lib/util";
 export type Env = EnvLike & {
   BOOK_STORE: KVNamespace;
 };

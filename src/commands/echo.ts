@@ -1,5 +1,6 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { attitudeResponses } from "../lib/liveConfig";
+import {escapeHtml}  from "../lib/util";
 
 // 黑名单用户名列表（请按需修改）
 const blacklist = [
@@ -14,14 +15,7 @@ const specialPatterns = [
   // 在此添加更多通配符模式
 ];
 const specialResponse = "...";
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
+ 
 /**
  * 重构后的 handleEcho
  * - 接收 parsedMessage

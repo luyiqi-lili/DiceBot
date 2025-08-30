@@ -238,3 +238,40 @@ export const attitudeResponses = {
     "魔王听了都说内行，但我们是人类阵营的❌"
   ]
 };
+
+
+/* ------------------------- payConfigs（保留你的原始内容） ------------------------- */
+export interface PayConfig {
+  chatId: number;
+  threadIds?: number[];
+  placeName?: string;
+  enabled?: boolean;
+  successMessage?: string;
+}
+
+export const payConfigs: PayConfig[] = [
+  {
+    chatId: -1002742074355,
+    threadIds: [182],
+    placeName: "天狐宫的祈愿箱",
+    enabled: true,
+    successMessage:
+      "${userName}将 ${amount} 💰投入${place}." +
+      "<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
+      + "拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
+      + "心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
+      + "${place}现已累积 ${total} 💰。"
+  },
+  {
+    chatId: -1002848481881,
+    threadIds: [66],
+    placeName: "天狐宫的祈愿箱",
+    enabled: true,
+    successMessage:
+      "${userName}将 ${amount} 💰投入${place}." +
+      "<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
+      + "拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
+      + "心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
+      + "${place}现已累积 ${total} 💰。"
+  }
+];

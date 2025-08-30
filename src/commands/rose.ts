@@ -1,10 +1,12 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import {escapeHtml}  from "../lib/util";
+
 import {
   CoinEnv,
   getBalance as coinGetBalance,
   deductFromBalance,
   addToTreasury
-} from "./coin";
+} from "../lib/coinService";
 
 /**
  * 环境类型：在 CoinEnv 基础上要求 AFFECTION_KV
@@ -12,13 +14,6 @@ import {
 export type RoseEnv = CoinEnv & {
   AFFECTION_KV: KVNamespace;
 };
-
-function escapeHtml(text: string) {
-  return (text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
 
 function scoreToEmoji(score: number): string {
   if (score < 10) return "";

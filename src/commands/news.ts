@@ -1,5 +1,6 @@
 // commands/news.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import {escapeHtml}  from "../lib/util";
 
 type Env = {
   TOKEN: string;
@@ -7,14 +8,6 @@ type Env = {
   NEWS_STORE: KVNamespace;
 };
 
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function getDateStr(date = new Date()) {
   return date.toISOString().slice(0, 10).replace(/-/g, "");

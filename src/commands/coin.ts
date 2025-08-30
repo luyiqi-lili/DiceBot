@@ -1,105 +1,35 @@
 // commands/coin.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import { escapeHtml } from "../lib/util";
+import { payConfigs } from "../lib/liveConfig";
+import {
+  getBalance,
+  setBalance,
+  payoutFromTreasuryAllowNegative,
+  getTreasury,
+  addToTreasury,
+  takeFromTreasury,
+  TREASURY_KEY
+} from "../lib/coinService";
 
 /**
  * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
  */
-export type CoinEnv = EnvLike & {
+type CoinEnv = EnvLike & {
   COIN_KV: KVNamespace;
   BOT_USERNAME?: string;
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
-// 艾丽莎宝库键
-export const TREASURY_KEY = "__treasury__";
+
 
 // 管理员白名单（可分权限）
-export const ADMIN_UIDS_CHECK: number[] = [8080375150];
-export const ADMIN_UIDS_TAKE: number[] = [8080375150];
-export const ADMIN_UIDS_CREATE: number[] = [8080375150];
-
-/* ------------------------- payConfigs（保留你的原始内容） ------------------------- */
-export interface PayConfig {
-  chatId: number;
-  threadIds?: number[];
-  placeName?: string;
-  enabled?: boolean;
-  successMessage?: string;
-}
-
-export const payConfigs: PayConfig[] = [
-  {
-    chatId: -1002742074355,
-    threadIds: [182],
-    placeName: "天狐宫的祈愿箱",
-    enabled: true,
-    successMessage:
-      "${userName}将 ${amount} 💰投入${place}." +
-      "<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
-      + "拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
-      + "心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
-      + "${place}现已累积 ${total} 💰。"
-  },
-  {
-    chatId: -1002848481881,
-    threadIds: [66],
-    placeName: "天狐宫的祈愿箱",
-    enabled: true,
-    successMessage:
-      "${userName}将 ${amount} 💰投入${place}." +
-      "<blockquote expandable>铜钱在掌心里带着一丝凉意，双手合握着硬币，轻轻投下。铜钱落下时撞击木格的声响，清脆而短促，细微的回音在殿内回荡，彷佛整座神社都听见了他的愿望，像是把心意托付给神明的回应。"
-      + "拉动铃绳，铃铛随着力道震颤，清冽而悠长，声音化作无形的狐鸣，穿梭于屋檐与杉木林间。双手在胸前合十，闭眼低首。两次轻拍掌声回响，像是驱散尘世之音，也像是在召唤守护此地的狐灵。"
-      + "心跳与手心的温度，似乎与远处的狐火呼应，燃成一点点无形的光。最后，再次深深鞠躬，感受到自己也被那无形的狐影注视着。临走时，不起眼的小狐灵悄悄的跟了过去守护着。</blockquote>"
-      + "${place}现已累积 ${total} 💰。"
-  }
-];
-
-/* ------------------------- 公共工具函数（导出供其它模块复用） ------------------------- */
-function escapeHtml(text: string) {
-  return (text ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-/** 读取余额（KV） */
-export async function getBalance(kv: KVNamespace, id: string): Promise<number> {
-  try {
-    const raw = await kv.get(id);
-    return raw ? parseInt(raw, 10) || 0 : 0;
-  } catch (e) {
-    console.warn("[coin] getBalance KV 读取失败", e);
-    return 0;
-  }
-}
-
-/** 写入余额（KV） */
-export async function setBalance(kv: KVNamespace, id: string, bal: number): Promise<void> {
-  try {
-    await kv.put(id, String(bal));
-  } catch (e) {
-    console.error("[coin] setBalance KV 写入失败", e);
-  }
-}
-
-/** 增加账户余额，返回新余额 */
-export async function addToBalance(kv: KVNamespace, id: string, delta: number): Promise<number> {
-  const cur = await getBalance(kv, id);
-  const next = cur + delta;
-  await setBalance(kv, id, next);
-  return next;
-}
-
-/** 从账户扣款，若余额不足返回 false，否则扣款并返回 true */
-export async function deductFromBalance(kv: KVNamespace, id: string, amount: number): Promise<boolean> {
-  const cur = await getBalance(kv, id);
-  if (cur < amount) return false;
-  await setBalance(kv, id, cur - amount);
-  return true;
-}
+const ADMIN_UIDS_CHECK: number[] = [8080375150];
+const ADMIN_UIDS_TAKE: number[] = [8080375150];
+const ADMIN_UIDS_CREATE: number[] = [8080375150];
 
 /** 费率计算（和你原来的阶梯规则一致） */
-export function calcTransferFeeRate(targetBal: number): number {
+function calcTransferFeeRate(targetBal: number): number {
   if (targetBal < 100) return 0;
   if (targetBal < 300) return 0.1;
   if (targetBal < 500) return 0.3;
@@ -113,7 +43,7 @@ export function calcTransferFeeRate(targetBal: number): number {
  * - 若余额不足返回 { ok:false, reason }
  * - 成功返回 { ok:true, fee, fromNew, toNew }（手续费自动写入艾丽莎宝库 TREASURY_KEY）
  */
-export async function transfer(
+async function transfer(
   kv: KVNamespace,
   fromId: string,
   toId: string,
@@ -132,8 +62,7 @@ export async function transfer(
   // 收款
   await setBalance(kv, toId, targetBal + amount - fee);
   // 手续费入艾丽莎宝库
-  const oldTre = await getBalance(kv, TREASURY_KEY);
-  await setBalance(kv, TREASURY_KEY, oldTre + fee);
+  await addToTreasury(kv, fee);
 
   return {
     ok: true,
@@ -143,36 +72,8 @@ export async function transfer(
   };
 }
 
-/* 艾丽莎宝库相关操作 */
-export async function getTreasury(kv: KVNamespace): Promise<number> {
-  return await getBalance(kv, TREASURY_KEY);
-}
-export async function addToTreasury(kv: KVNamespace, amount: number): Promise<number> {
-  return await addToBalance(kv, TREASURY_KEY, amount);
-}
-export async function takeFromTreasury(kv: KVNamespace, amount: number): Promise<boolean> {
-  return await deductFromBalance(kv, TREASURY_KEY, amount);
-}
-/**
- * 从国库支付（允许出现负值）
- * - 返回新的国库余额（可能小于0）
- */
-export async function payoutFromTreasuryAllowNegative(kv: KVNamespace, amount: number): Promise<number> {
-    const curRaw = await kv.get(TREASURY_KEY);
-    const cur = curRaw ? parseInt(curRaw, 10) || 0 : 0;
-    const next = cur - amount;
-    await kv.put(TREASURY_KEY, String(next));
-    return next;
-}
-
-/** 凭空注入艾丽莎宝库（create） */
-export async function createTreasury(kv: KVNamespace, amount: number): Promise<number> {
-  return await addToTreasury(kv, amount);
-}
-
-
 /** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */
-export async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
+async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
   let total = 0;
   let cursor: string | undefined = undefined;
   do {
@@ -264,7 +165,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const bal = await getBalance(kv, userId);
     const newBal = bal + gain;
-    await payoutFromTreasuryAllowNegative(kv,gain);
+    await payoutFromTreasuryAllowNegative(kv, gain);
     await setBalance(kv, userId, newBal);
     try {
       await kv.put(prayKey, today);
@@ -494,7 +395,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
     }
 
-    const treasuryBal = await getBalance(kv, TREASURY_KEY);
+    const treasuryBal = await getTreasury(kv);
     if (treasuryBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -506,7 +407,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 扣除艾丽莎宝库并增加目标账户
-    await setBalance(kv, TREASURY_KEY, treasuryBal - amount);
+    await takeFromTreasury(kv, amount);
     const oldTargetBal = await getBalance(kv, targetUid);
     const newTargetBal = oldTargetBal + amount;
     await setBalance(kv, targetUid, newTargetBal);
@@ -544,7 +445,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    await createTreasury(kv, amount);
+    await addToTreasury(kv, amount);
     const newTre = await getTreasury(kv);
     await TgMessage.sendText(env, {
       chat_id: chatId,
