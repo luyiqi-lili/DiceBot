@@ -1,8 +1,8 @@
 // src/commands/fish.ts
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury,payoutFromTreasuryAllowNegative } from "../lib/coinService";
+import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury, payoutFromTreasuryAllowNegative } from "../lib/coinService";
 import { fishList } from "../lib/liveConfig";
-import {escapeHtml}  from "../lib/util";
+import { escapeHtml } from "../lib/util";
 
 /**
  * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
@@ -11,7 +11,7 @@ export type FishEnv = CoinEnv & {
     FISHING_RECORD_KV: KVNamespace;
 };
 
- 
+
 function nowDateYMD(): string {
     return new Date().toISOString().split("T")[0];
 }
@@ -26,7 +26,9 @@ function nowDateYMD(): string {
 type FishingRecord = {
     date: string;
     count: number;
-    results: Array<{ baitCost: number; hooked: boolean; fishValue: string | number }>;
+    results: Array<{
+        messageId: any; baitCost: number; hooked: boolean; fishValue: string | number
+    }>;
 };
 
 async function getFishingRecord(kv: KVNamespace, id: string): Promise<FishingRecord> {
@@ -59,7 +61,7 @@ function showFishingRecord(record: FishingRecord): string {
         // 最新的显示在最上面
         const rev = [...record.results].reverse();
         rev.forEach((r, idx) => {
-            resultText += `<b>第${todayCount- idx}次:</b> 花费 ${r.baitCost}💰, `;
+            resultText += `<b>第${todayCount - idx}次:</b> 花费 ${r.baitCost}💰, `;
             if (r.hooked) {
                 resultText += `钓到 ${r.fishValue}`;
             } else {
@@ -74,7 +76,7 @@ function showFishingRecord(record: FishingRecord): string {
     return resultText;
 }
 
- 
+
 /* ------------------------- callback 处理函数 ------------------------- */
 /**
  * 处理 callback_query（parsedMessage.callbackQuery 的内容）
@@ -109,6 +111,20 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     }
     await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `奋力拉杆中...`, show_alert: true });
 
+    // 2) 立刻清空按钮（快速响应界面，减少用户重复点击）
+    try {
+        const origText = callbackQuery.message?.text ?? callbackQuery.message?.caption ?? "";
+        await TgMessage.editMessageText(env, {
+            chat_id: chatId,
+            message_id: messageId,
+            text: origText,
+            parse_mode: "HTML",
+            reply_markup: { inline_keyboard: [] }
+        });
+    } catch (e) {
+        // 忽略编辑失败（按钮可能已被移除）
+    }
+
     // 时间计算：使用机器人原始消息 date（秒）
     const startTs = callbackQuery.message?.date ?? Math.floor(Date.now() / 1000);
     const nowTs = Math.floor(Date.now() / 1000);
@@ -122,6 +138,13 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     const ownerIdStr = String(ownerId);
     const currentBal = await coinGetBalance(env.COIN_KV, ownerIdStr);
     const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
+
+    if (fishingRecord.results.some(r => r.messageId === messageId)) {
+        await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `该次钓鱼已处理，忽略重复点击。`, show_alert: true });
+        return;
+    }
+
+
 
     // 计次上限（10 次）
     if (fishingRecord.count >= 10) {
@@ -137,8 +160,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
     // 先判定失败 / 过强导致鱼跑了
     if (score < 100) {
-        fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0 });
-        fishingRecord.count += 1;
+        fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId }); fishingRecord.count += 1;
         await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 
         const fishingRecordText = showFishingRecord(fishingRecord);
@@ -158,7 +180,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     }
 
     if (score > 1000) {
-        fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0 });
+        fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId });
         fishingRecord.count += 1;
         await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 
@@ -216,12 +238,12 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         const newTre = await payoutFromTreasuryAllowNegative(env.COIN_KV, payout);
 
         resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${chosen.value} 💰渔获，最新余额 ${newOwnerBal}💰。\n`;
-       // resultText += `（国库支付 ${payout}💰；国库余额 ${newTre} 💰）\n`;
+        // resultText += `（国库支付 ${payout}💰；国库余额 ${newTre} 💰）\n`;
     } else {
         resultText += `😣 有鱼咬住了，但它挣脱了！～\n\n 本次花费 ${baitCost}💰鱼饵，没有渔获，最新余额 ${currentBal}💰 \n`;
     }
 
-    fishingRecord.results.push({ baitCost, hooked, fishValue: hooked ? chosen.name : 0 });
+    fishingRecord.results.push({ baitCost, hooked, fishValue: hooked ? chosen.name : 0,messageId });
     fishingRecord.count += 1;
     await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 
