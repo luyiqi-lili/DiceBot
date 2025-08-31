@@ -1,6 +1,6 @@
 // commands/whoami.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import {escapeHtml}  from "../lib/util";
+import {escapeHtml,deleteMarkup}  from "../lib/util";
 
 /**
  * whoami: 显示用户 / 被回复消息发送者的基本信息
@@ -55,7 +55,8 @@ export async function handleWhoami(parsed: ParsedUpdate, env: EnvLike): Promise<
             chat_id: chatId,
             text: replyText,
             parse_mode: "HTML",
-            message_thread_id: threadId
+            message_thread_id: threadId,
+            reply_markup: deleteMarkup
         });
     } catch (err) {
         console.error("[whoami] 发送消息失败", err);
