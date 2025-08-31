@@ -24,8 +24,8 @@ type CoinEnv = EnvLike & {
 
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150];
-const ADMIN_UIDS_TAKE: number[] = [8080375150];
+const ADMIN_UIDS_CHECK: number[] = [8080375150,7804622477];
+const ADMIN_UIDS_TAKE: number[] = [8080375150,7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150];
 
 /** 费率计算（和你原来的阶梯规则一致） */
