@@ -296,9 +296,9 @@ export function getCastDesc(strength: number): string {
     switch (true) {
         case (strength <= 15):
             return pick([
-                "你谨慎地抛出鱼线，水面泛起细微波纹，仿佛在进行一场静谧的祈祷。",
+                "谨慎地抛出鱼线，水面泛起细微波纹，仿佛在进行一场静谧的祈祷。",
                 "轻柔一挥，浮漂安静落下，犹如月光洒在湖面。",
-                "你的动作带着克制，湖水回应以宁静的涟漪。"
+                "动作带着克制，湖水回应以宁静的涟漪。"
             ]);
         case (strength <= 20):
             return pick([
@@ -310,7 +310,7 @@ export function getCastDesc(strength: number): string {
             return pick([
                 "动作娴熟，浮漂划破水面，仿佛一枚魔法符文悄然生效。",
                 "渔线落水时泛起微光，像是召唤仪式的起始。",
-                "你的投掷干净利落，仿佛战士的利刃出鞘。"
+                "投掷干净利落，仿佛战士的利刃出鞘。"
             ]);
         case (strength <= 30):
             return pick([
@@ -328,7 +328,7 @@ export function getCastDesc(strength: number): string {
             return pick([
                 "一记饱含力量的抛竿，激起的水花犹如龙之吐息。",
                 "鱼线如雷霆坠落，湖面震颤片刻。",
-                "你的投掷带着战士的豪迈，仿佛宣告挑战的开始。"
+                "投掷带着战士的豪迈，仿佛宣告挑战的开始。"
             ]);
         case (strength <= 45):
             return pick([
@@ -340,7 +340,7 @@ export function getCastDesc(strength: number): string {
             return pick([
                 "这一抛，似乎刻下了某种契约，湖面浮现短暂的魔法纹路。",
                 "水面闪现神秘符号，如同古老的封印被触动。",
-                "你的抛竿带着咒术般的气息，仿佛将命运写入水中。"
+                "抛竿带着咒术般的气息，仿佛将命运写入水中。"
             ]);
         case (strength <= 55):
             return pick([
@@ -352,7 +352,7 @@ export function getCastDesc(strength: number): string {
             return pick([
                 "如战士投掷长枪，你的抛投撕开湖面，带来令人心悸的涟漪。",
                 "那一瞬，水波犹如被巨兽的鳍掀动。",
-                "你的投掷带着杀伐之气，仿佛某种试炼的前兆。"
+                "投掷带着杀伐之气，仿佛某种试炼的前兆。"
             ]);
         case (strength <= 65):
             return pick([
@@ -368,7 +368,7 @@ export function getCastDesc(strength: number): string {
             ]);
         case (strength <= 75):
             return pick([
-                "你的动作与天地同调，水面激荡如神明的回应。",
+                "动作与天地同调，水面激荡如神明的回应。",
                 "渔线坠落时，天地间的元素为之一振。",
                 "仿佛自然本身在守望你的抛投。"
             ]);
@@ -410,9 +410,9 @@ export function getCastDesc(strength: number): string {
             ]);
         case (strength <= 110):
             return pick([
-                "你以超凡之力抛出渔线，仿佛向世界宣告——命运的战役已然开始！",
+                "以超凡之力抛出渔线，仿佛向世界宣告——命运的战役已然开始！",
                 "那一瞬，天地回响，湖泊化为神话的舞台。",
-                "你的抛投撕裂长空，像是勇者与世界立下的誓约。"
+                "抛投撕裂长空，像是勇者与世界立下的誓约。"
             ]);
         default:
             return "渔线飞出常理之外，天地为之震颤。";
