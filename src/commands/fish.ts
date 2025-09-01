@@ -451,7 +451,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
             castDesc = "动作娴熟，浮漂划破水面，仿佛一枚魔法符文悄然生效。";
             break;
         case (strength <= 30):
-            castDesc = "你抬腕一挥，抛出的瞬间带着淡淡光辉，如同勇者试探前方命运。";
+            castDesc = "抬腕一挥，抛出的瞬间带着淡淡光辉，如同勇者试探前方命运。";
             break;
         case (strength <= 35):
             castDesc = "抛投稳健，水花如星尘散开，湖底仿佛传来远古的心跳声。";
@@ -493,13 +493,13 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
             castDesc = "渔线闪烁着光芒坠落，水下传来犹如巨兽苏醒的低鸣。";
             break;
         case (strength <= 100):
-            castDesc = "你的抛投撕裂空气，湖面震颤，天地间似乎响起战鼓。";
+            castDesc = "抛投撕裂空气，湖面震颤，天地间似乎响起战鼓。";
             break;
         case (strength <= 105):
             castDesc = "这一击超越凡人极限，抛竿之处迸发圣光，湖心泛起旋涡。";
             break;
         case (strength <= 110):
-            castDesc = "你以超凡之力抛出渔线，仿佛向世界宣告——命运的战役已然开始！";
+            castDesc = "超凡之力抛出渔线，仿佛向世界宣告——命运的战役已然开始！";
             break;
         default:
             castDesc = "渔线飞出常理之外，天地为之震颤。";
