@@ -442,7 +442,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     let castDesc: string;
     switch (true) {
         case (strength <= 15):
-            castDesc = "你谨慎地抛出鱼线，水面泛起细微波纹，仿佛在进行一场静谧的祈祷。";
+            castDesc = "水面泛起细微波纹，仿佛在进行一场静谧的祈祷。";
             break;
         case (strength <= 20):
             castDesc = "渔线描绘出柔和的弧线，如同森林精灵的低语，轻轻落入水中。";
