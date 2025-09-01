@@ -164,7 +164,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `只有发起者本人可以拉杆`, show_alert: true });
         return;
     }
-    
+
     // 时间计算：使用机器人原始消息 date（秒）
     const startTs = callbackQuery.message?.date ?? Math.floor(Date.now() / 1000);
     const nowTs = Math.floor(Date.now() / 1000);
@@ -353,7 +353,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
             // 接受 20250830 或 2025-08-30 两种格式
             const raw = dateArg.replace(/[^0-9]/g, "");
             if (raw.length === 8) {
-                date = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+                date = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
             } else {
                 // 非法格式，回复提示
                 await TgMessage.sendText(env, {
@@ -436,32 +436,76 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     await addToPondBait(env.FISHING_RECORD_KV, today, baitCost);
 
     // 随机 strength（或允许传入固定值），你原来用 random strength
-    const strength = Math.floor(Math.random() * 100) + 1;
+    const strength = Math.floor(Math.random() * 100) + 11;
 
     // 生成抛竿描述（保留原文案）
-    const castDesc = (() => {
-        if (strength <= 10) {
-            return "轻轻一抛，水面只泛起细碎涟漪，仿佛在对你低声耳语。";
-        } else if (strength <= 20) {
-            return "划出一道优雅的弧线，浮漂微颤，风中夹着松香与海盐的气息。";
-        } else if (strength <= 30) {
-            return "动作稳健，鱼线划破空气，落点处闪过一丝银色光芒。";
-        } else if (strength <= 40) {
-            return "一记有力的抛投，水面溅起弧形水花，仿佛惊动了湖底的守护灵。";
-        } else if (strength <= 50) {
-            return "力道十足，鱼线如弓弦绷直，周遭的空气也为之一振。";
-        } else if (strength <= 60) {
-            return "蛮力与技巧并存，抛出之处泛起层层涟漪，似乎呼唤着深处巨影。";
-        } else if (strength <= 70) {
-            return "这一抛带着烈风，鱼线像流星穿过晨雾，远方水域开始不安。";
-        } else if (strength <= 80) {
-            return "宛如英雄挥矛，鱼线直刺深海，水下传来低沉的回应。";
-        } else if (strength <= 100) {
-            return "强势一挥，几乎卷起周遭的风声，水面裂出一道光缝，古老鱼群被惊起。";
-        } else {
-            return "以超凡之力甩出渔线！饵远飞天际！";
-        }
-    })();
+    let castDesc: string;
+    switch (true) {
+        case (strength <= 15):
+            castDesc = "你谨慎地抛出鱼线，水面泛起细微波纹，仿佛在进行一场静谧的祈祷。";
+            break;
+        case (strength <= 20):
+            castDesc = "渔线描绘出柔和的弧线，如同森林精灵的低语，轻轻落入水中。";
+            break;
+        case (strength <= 25):
+            castDesc = "动作娴熟，浮漂划破水面，仿佛一枚魔法符文悄然生效。";
+            break;
+        case (strength <= 30):
+            castDesc = "你抬腕一挥，抛出的瞬间带着淡淡光辉，如同勇者试探前方命运。";
+            break;
+        case (strength <= 35):
+            castDesc = "抛投稳健，水花如星尘散开，湖底仿佛传来远古的心跳声。";
+            break;
+        case (strength <= 40):
+            castDesc = "一记饱含力量的抛竿，激起的水花犹如龙之吐息般震荡开来。";
+            break;
+        case (strength <= 45):
+            castDesc = "鱼线宛如神圣的长矛，刺破空气，带着誓约般的沉重落下。";
+            break;
+        case (strength <= 50):
+            castDesc = "这一抛，似乎刻下了某种契约，湖面浮现短暂的魔法纹路。";
+            break;
+        case (strength <= 55):
+            castDesc = "力道与心意合一，鱼线划破长空，远处传来不明的共鸣。";
+            break;
+        case (strength <= 60):
+            castDesc = "如战士投掷长枪，你的抛投撕开湖面，带来令人心悸的涟漪。";
+            break;
+        case (strength <= 65):
+            castDesc = "仿佛是仪式的咏唱，鱼线坠落之处，湖面闪烁奇异光彩。";
+            break;
+        case (strength <= 70):
+            castDesc = "带着风暴之势抛出，空气中回荡着古老吟唱的回声。";
+            break;
+        case (strength <= 75):
+            castDesc = "这一瞬，你的动作与天地同调，水面激荡如神明的回应。";
+            break;
+        case (strength <= 80):
+            castDesc = "鱼线犹如流星坠落，水下的黑影似乎被命运唤醒。";
+            break;
+        case (strength <= 85):
+            castDesc = "抛竿带着破魔之力，水面短暂裂开，如同次元的门扉。";
+            break;
+        case (strength <= 90):
+            castDesc = "宛若勇者施展奥义，湖面骤然静止，仿佛等待宿敌的出现。";
+            break;
+        case (strength <= 95):
+            castDesc = "渔线闪烁着光芒坠落，水下传来犹如巨兽苏醒的低鸣。";
+            break;
+        case (strength <= 100):
+            castDesc = "你的抛投撕裂空气，湖面震颤，天地间似乎响起战鼓。";
+            break;
+        case (strength <= 105):
+            castDesc = "这一击超越凡人极限，抛竿之处迸发圣光，湖心泛起旋涡。";
+            break;
+        case (strength <= 110):
+            castDesc = "你以超凡之力抛出渔线，仿佛向世界宣告——命运的战役已然开始！";
+            break;
+        default:
+            castDesc = "渔线飞出常理之外，天地为之震颤。";
+            break;
+    }
+
 
     const initText =
         `${userName} 花费 ${baitCost} 💰 的鱼饵后，抛出渔线，${castDesc}\n\n` +
