@@ -24,7 +24,7 @@ type CoinEnv = EnvLike & {
 
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150,7804622477];
+const ADMIN_UIDS_CHECK: number[] = [8080375150,7804622477,7476641553];
 const ADMIN_UIDS_TAKE: number[] = [8080375150,7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150];
 
