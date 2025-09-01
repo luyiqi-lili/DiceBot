@@ -4,6 +4,11 @@
 import TgMessage from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from "./commands/like";
+import { runCoinCheck } from "./cron/cron";
+
+
+
+
 
 export type Env = {
   TOKEN: string;
@@ -18,6 +23,11 @@ export type Env = {
 };
 
 export default {
+
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(runCoinCheck(env));
+  },
+  
   async fetch(request, env) {
 
     //1. 日记记录原始请求
@@ -52,7 +62,7 @@ export default {
 
     //5. 分别处理 callback_query 和 message 和 topic_edited
     console.log("index:parsedMessage.type", parsedMessage.type);
-    
+
     switch (parsedMessage.type) {
       //5.1 处理房间修改
       case 'topic_edited': {
@@ -293,12 +303,12 @@ export default {
             }
             // 默认提示
             default: {
-              
+
               console.log("index: 未知命令，发送默认帮助提示");
               const { handleDefaultHelp } = await import("./commands/help");
               await handleDefaultHelp(parsedMessage, env);
               try {
- //               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+                //               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               } catch (e) {
                 console.warn("index: 删除触发命令消息失败（可忽略）", e);
               }
