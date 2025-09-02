@@ -1,6 +1,6 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury, payoutFromTreasuryAllowNegative } from "../lib/coinService";
-import { fishList } from "../lib/liveConfig";
+import { fishList, getCastDesc } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
 
 /**
@@ -164,7 +164,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `只有发起者本人可以拉杆`, show_alert: true });
         return;
     }
-    
+
     // 时间计算：使用机器人原始消息 date（秒）
     const startTs = callbackQuery.message?.date ?? Math.floor(Date.now() / 1000);
     const nowTs = Math.floor(Date.now() / 1000);
@@ -353,7 +353,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
             // 接受 20250830 或 2025-08-30 两种格式
             const raw = dateArg.replace(/[^0-9]/g, "");
             if (raw.length === 8) {
-                date = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+                date = `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
             } else {
                 // 非法格式，回复提示
                 await TgMessage.sendText(env, {
@@ -436,32 +436,12 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     await addToPondBait(env.FISHING_RECORD_KV, today, baitCost);
 
     // 随机 strength（或允许传入固定值），你原来用 random strength
-    const strength = Math.floor(Math.random() * 100) + 1;
+    const strength = Math.floor(Math.random() * 100) + 11;
 
     // 生成抛竿描述（保留原文案）
-    const castDesc = (() => {
-        if (strength <= 10) {
-            return "轻轻一抛，水面只泛起细碎涟漪，仿佛在对你低声耳语。";
-        } else if (strength <= 20) {
-            return "划出一道优雅的弧线，浮漂微颤，风中夹着松香与海盐的气息。";
-        } else if (strength <= 30) {
-            return "动作稳健，鱼线划破空气，落点处闪过一丝银色光芒。";
-        } else if (strength <= 40) {
-            return "一记有力的抛投，水面溅起弧形水花，仿佛惊动了湖底的守护灵。";
-        } else if (strength <= 50) {
-            return "力道十足，鱼线如弓弦绷直，周遭的空气也为之一振。";
-        } else if (strength <= 60) {
-            return "蛮力与技巧并存，抛出之处泛起层层涟漪，似乎呼唤着深处巨影。";
-        } else if (strength <= 70) {
-            return "这一抛带着烈风，鱼线像流星穿过晨雾，远方水域开始不安。";
-        } else if (strength <= 80) {
-            return "宛如英雄挥矛，鱼线直刺深海，水下传来低沉的回应。";
-        } else if (strength <= 100) {
-            return "强势一挥，几乎卷起周遭的风声，水面裂出一道光缝，古老鱼群被惊起。";
-        } else {
-            return "以超凡之力甩出渔线！饵远飞天际！";
-        }
-    })();
+    let castDesc: string;
+    castDesc= getCastDesc(strength);
+
 
     const initText =
         `${userName} 花费 ${baitCost} 💰 的鱼饵后，抛出渔线，${castDesc}\n\n` +
