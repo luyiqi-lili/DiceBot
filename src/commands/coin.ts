@@ -24,8 +24,8 @@ type CoinEnv = EnvLike & {
 
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150,7804622477,7476641553,1019896885];
-const ADMIN_UIDS_TAKE: number[] = [8080375150,7804622477];
+const ADMIN_UIDS_CHECK: number[] = [8080375150, 7804622477, 7476641553, 1019896885];
+const ADMIN_UIDS_TAKE: number[] = [8080375150, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150];
 
 /** 费率计算（和你原来的阶梯规则一致） */
@@ -163,9 +163,14 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
     const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
+
     const bal = await getBalance(kv, userId);
-    const newBal = bal + gain;
-    await payoutFromTreasuryAllowNegative(kv, gain);
+
+    const rate = calcTransferFeeRate(bal);
+    let fee = Math.floor(gain * rate);
+    fee = 0;
+    const newBal = bal + gain - fee;
+    await payoutFromTreasuryAllowNegative(kv, gain - fee);
     await setBalance(kv, userId, newBal);
     try {
       await kv.put(prayKey, today);
@@ -175,7 +180,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      text: `✨ ${safeUserName}，你祈祷获得了 ${gain - fee} 💰，当前余额 ${newBal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -239,7 +244,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const roomKey = `${chatId}||${threadId ?? 0}`;
     const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
-    
+
     await addToTreasury(kv, amount);
     await setBalance(kv, roomKey, newRoomBal);
 
@@ -347,7 +352,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-        ` 📊 总计（宝库  + 房间）：${treasuryBal+totalUserBal} 💰。` 
+        ` 📊 总计（宝库  + 房间）：${treasuryBal + totalUserBal} 💰。`
         ;
 
       await TgMessage.sendText(env, {

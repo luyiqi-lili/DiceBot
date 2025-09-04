@@ -59,7 +59,7 @@ async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
  */
 export async function runCoinCheck(env: CronEnv, opts?: { chat_id?: number; message_thread_id?: number }) {
   const chatId = opts?.chat_id ?? -1002848481881;
-  const threadId = opts?.message_thread_id ?? 66;
+  const threadId = opts?.message_thread_id ?? 8346;
   const kv = env.COIN_KV;
 
   log("开始执行 coin check", { chatId, threadId });
