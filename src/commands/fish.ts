@@ -3,6 +3,8 @@ import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, ad
 import { fishList, getCastDesc } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
 
+
+const maxRecode=20;
 /**
  * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
  */
@@ -127,7 +129,7 @@ function showFishingRecord(record: FishingRecord): string {
     } else {
         resultText += `今天还没有任何渔获哦~\n`;
     }
-    resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 10 次）`;
+    resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 ${maxRecode} 次）`;
     return resultText;
 }
 
@@ -186,12 +188,12 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
 
 
-    // 计次上限（10 次）
-    if (fishingRecord.count >= 10) {
+    // 计次上限
+    if (fishingRecord.count >= maxRecode) {
         await TgMessage.editMessageText(env, {
             chat_id: chatId,
             message_id: messageId,
-            text: `❌ ${escapeHtml(String(callbackQuery.from?.first_name ?? "你"))}，今天已经钓了10次，不能再钓了。`,
+            text: `❌ ${escapeHtml(String(callbackQuery.from?.first_name ?? "你"))}，今天已经钓了${maxRecode}次，不能再钓了。`,
             parse_mode: "HTML",
             reply_markup: { inline_keyboard: [] }
         });
@@ -402,10 +404,10 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
     // 读取记录、检查次数
     const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
-    if (fishingRecord.count >= 10) {
+    if (fishingRecord.count >= maxRecode) {
         await TgMessage.sendText(env, {
             chat_id: chatId,
-            text: `❌ ${userName}，今天已经钓了10次，不能再钓了。`,
+            text: `❌ ${userName}，今天已经钓了${maxRecode}次，不能再钓了。`,
             parse_mode: "HTML",
             message_thread_id: threadId
         });
