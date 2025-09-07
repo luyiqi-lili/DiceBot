@@ -281,14 +281,19 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     //如果传了UID
-    let targetID = parseInt(args[2] || "", 10);
-    if (isNaN(targetID)) {
+    const targetID = parseInt(args[2] || "", 10);
+    if (!isNaN(targetID)) {
+      const targetName = (await TgMessage.fetchChatMember(env, chatId, targetID)).first_name;
+      if (isNaN(targetName)) {
+                await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
+        return;
+
+      }
       const result = await transfer(kv, userId, targetID.toString(), amount);
       if (!result.ok) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
         return;
       }
-      const targetName = (await TgMessage.fetchChatMember(env, chatId, targetID)).first_name;
       const feePercent = result.fee && amount ? Math.round((result.fee / amount) * 100) : 0;
       await TgMessage.sendText(env, {
         chat_id: chatId,
