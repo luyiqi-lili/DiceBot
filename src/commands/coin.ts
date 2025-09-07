@@ -28,7 +28,7 @@ const ADMIN_UIDS_CHECK: number[] = [8080375150, 7804622477, 7476641553, 10198968
 const ADMIN_UIDS_TAKE: number[] = [8080375150, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150];
 
-/** 费率计算（和你原来的阶梯规则一致） */
+/** 费率计算 */
 function calcTransferFeeRate(targetBal: number): number {
   if (targetBal < 100) return 0;
   if (targetBal < 300) return 0.1;
