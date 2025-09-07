@@ -1,5 +1,5 @@
 // commands/coin.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike, } from "../lib/tgMessage";
 import { escapeHtml } from "../lib/util";
 import { payConfigs } from "../lib/liveConfig";
 import {
@@ -280,6 +280,36 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
+    //如果传了UID
+    const targetID = parseInt(args[2] || "", 10);
+    if (!isNaN(targetID)) {
+      const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
+      const targetName = userInfo.first_name;
+      console.log(`🔔 [userInfo] ${targetName}`);
+      console.log(`🔔 [targetName] ${targetName}`);
+      if ((targetName==`用户${targetID}`)) {
+        await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
+        return;
+
+      }
+      const result = await transfer(kv, userId, targetID.toString(), amount);
+      if (!result.ok) {
+        await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
+        return;
+      }
+      const feePercent = result.fee && amount ? Math.round((result.fee / amount) * 100) : 0;
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text:
+          `💸 ${escapeHtml(userName)} 向 ${targetName} 转账 ${amount} 💰。\n` +
+          `📊 ${targetName} 原有余额 ${result.toNew! - (amount - result.fee!)} 💰，适用费率 ${feePercent}%，手续费 ${result.fee} 💰（已入艾丽莎宝库）。\n` +
+          `✅ 转账后 ${targetName} 新余额：${result.toNew} 💰；\n` +
+          `🪙 你的新余额：${result.fromNew} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
     // 获取被回复用户
     const repliedFrom = parsedMessage.message?.reply_to_message?.from;
     if (!repliedFrom || !parsedMessage.isReply) {
@@ -291,6 +321,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
+
 
     const result = await transfer(kv, userId, String(repliedFrom.id), amount);
     if (!result.ok) {
