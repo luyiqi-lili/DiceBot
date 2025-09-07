@@ -98,7 +98,7 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
     }
 
     // 取内容：优先 text -> caption -> 来自媒体的简单标记
-    let content = reply.text ?? reply.caption ?? "";
+    let content = reply.text ?? reply.caption ??rest[0] ??"";
     if (!content) {
       // 简单媒体描述
       if (reply.photo) content = "[图片]";
