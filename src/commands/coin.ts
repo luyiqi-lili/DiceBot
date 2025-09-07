@@ -285,7 +285,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!isNaN(targetID)) {
       const targetName = (await TgMessage.fetchChatMember(env, chatId, targetID)).first_name;
       if (isNaN(targetName)) {
-                await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
+        await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
         return;
 
       }
@@ -306,8 +306,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         message_thread_id: threadId
       });
       return;
-
-
     }
     // 获取被回复用户
     const repliedFrom = parsedMessage.message?.reply_to_message?.from;
