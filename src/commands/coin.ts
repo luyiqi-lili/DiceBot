@@ -283,7 +283,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     //如果传了UID
     const targetID = parseInt(args[2] || "", 10);
     if (!isNaN(targetID)) {
-      const targetName = (await TgMessage.fetchChatMember(env, chatId, targetID)).first_name;
+      const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
+      const targetName = userInfo.first_name;
+      console.log(`🔔 [userInfo] ${userInfo}`);
+      console.log(`🔔 [targetName] ${targetName}`);
       if (isNaN(targetName)) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
         return;
