@@ -285,9 +285,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!isNaN(targetID)) {
       const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
       const targetName = userInfo.first_name;
-      console.log(`🔔 [userInfo] ${userInfo}`);
+      console.log(`🔔 [userInfo] ${targetName}`);
       console.log(`🔔 [targetName] ${targetName}`);
-      if (targetName) {
+      if ((targetName==`用户${targetID}`)) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
         return;
 
