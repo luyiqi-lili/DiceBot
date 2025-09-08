@@ -330,7 +330,7 @@ export default {
           }
         }
         else{
-          await handleBackup(parsedMessage, env);
+          //await handleBackup(parsedMessage, env);
 
         }
       }
