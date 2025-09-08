@@ -24,10 +24,10 @@ type CoinEnv = EnvLike & {
 
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150, 7804622477, 7476641553, 1019896885];
-const ADMIN_UIDS_TAKE: number[] = [8080375150, 7804622477];
-const ADMIN_UIDS_CREATE: number[] = [8080375150];
-const ADMIN_UIDS_REMOVE: number[] = [8080375150];
+const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
+const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
+const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
+const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953];
 
 /** 费率计算 */
 function calcTransferFeeRate(targetBal: number): number {
