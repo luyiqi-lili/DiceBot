@@ -81,7 +81,7 @@ function getLargestPhotoFileId(photoArr: any[]) {
 }
 
 async function sendSenderLabel(env: EnvLike, dest: BackupTarget, senderLabel: string) {
-  const opts: any = { chat_id: dest.chat_id, text: `${senderLabel} :（原始发送）` };
+  const opts: any = { chat_id: dest.chat_id, text: `${senderLabel} :` };
   if (dest.threadId !== undefined) opts.message_thread_id = dest.threadId;
   try {
     log('发送原始发送者说明到目标', { dest, text: opts.text });
@@ -96,7 +96,7 @@ async function sendSenderLabel(env: EnvLike, dest: BackupTarget, senderLabel: st
 /**
  * handleBackup
  * - 尽量将各种类型的消息由 bot 重新发送到目标群组/话题
- * - 重新发送非纯文本消息前会先发送一条说明："Firstname Lastname :（原始发送）"，表示此消息的原始发送者
+ * - 重新发送非纯文本消息前会先发送一条说明："Firstname Lastname :"，表示此消息的原始发送者
  * - 优先使用原始的 file_id（避免下载/上传），并尽量把原始发送者作为 caption/说明带上
  */
 export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
@@ -246,15 +246,6 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
               log('发送贴纸到目标', { dest, sendStickerOpts });
               const resSticker = await TgMessage.send(env, 'sendSticker', sendStickerOpts);
               results.push({ dest, resSticker });
-
-              // 可选：附加一条贴纸说明（包含 emoji），保留兼容性
-              const emoji = safeString(sticker.emoji || '');
-              const stickerText = `${senderLabel} : [sticker${emoji ? ' ' + emoji : ''}]`;
-              const textOpts: any = { chat_id: dest.chat_id, text: stickerText };
-              if (dest.threadId !== undefined) textOpts.message_thread_id = dest.threadId;
-              log('发送贴纸说明文本到目标', { dest, textOpts });
-              const resText = await TgMessage.send(env, 'sendMessage', textOpts);
-              results.push({ dest, resText });
               continue;
             }
           }
