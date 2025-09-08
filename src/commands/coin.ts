@@ -287,8 +287,13 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const targetName = userInfo.first_name;
       console.log(`🔔 [userInfo] ${targetName}`);
       console.log(`🔔 [targetName] ${targetName}`);
-      if ((targetName==`用户${targetID}`)) {
+      if ((targetName == `用户${targetID}`)) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
+        return;
+
+      }
+      if ((targetID == parseInt(userId))) {
+        await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败，目标${targetID} 和转账${userId} 不能相同`, parse_mode: "HTML", message_thread_id: threadId });
         return;
 
       }
@@ -323,6 +328,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
 
+    if (((repliedFrom.id) == parseInt(userId))) {
+      await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败，目标${repliedFrom.id} 和转账${userId} 不能相同`, parse_mode: "HTML", message_thread_id: threadId });
+      return;
+
+    }
     const result = await transfer(kv, userId, String(repliedFrom.id), amount);
     if (!result.ok) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
