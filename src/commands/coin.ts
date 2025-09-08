@@ -482,7 +482,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       text: `
 ——裁决之钟敲响。
 内务部:
-    自【${targetLabel}】处收缴 ${amount} 💰，感谢您缴纳税款，我们迫切期待下一次的贡献。
+　　自【${targetLabel}】处收缴 ${amount} 💰，感谢您缴纳税款，我们迫切期待下一次的贡献。
 `,
       parse_mode: "HTML",
       message_thread_id: threadId
