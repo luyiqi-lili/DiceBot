@@ -24,9 +24,10 @@ type CoinEnv = EnvLike & {
 
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150, 7804622477, 7476641553, 1019896885];
-const ADMIN_UIDS_TAKE: number[] = [8080375150, 7804622477];
-const ADMIN_UIDS_CREATE: number[] = [8080375150];
+const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
+const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
+const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
+const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
 
 /** 费率计算 */
 function calcTransferFeeRate(targetBal: number): number {
@@ -331,7 +332,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (((repliedFrom.id) == parseInt(userId))) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败，目标${repliedFrom.id} 和转账${userId} 不能相同`, parse_mode: "HTML", message_thread_id: threadId });
       return;
-
     }
     const result = await transfer(kv, userId, String(repliedFrom.id), amount);
     if (!result.ok) {
@@ -414,6 +414,82 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
   }
+
+  // /coin take <amount> — 扣除某人的coin（仅 ADMIN_UIDS）
+  if (sub === "remove") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_REMOVE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin remove。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const amount = parseInt(args[1] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+    let targetUid;
+    let targetLabel;
+    // 目标：如果是回复某人则转给被回复的人，
+    if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
+      const r = parsedMessage.message.reply_to_message.from;
+      targetUid = String(r.id);
+      targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
+    } else {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 请回复消息进行扣款 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+
+    }
+
+
+    const treasuryBal = await getTreasury(kv);
+    const oldTargetBal = await getBalance(kv, targetUid);
+
+
+    if (oldTargetBal < amount) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 扣除艾丽莎宝库并增加目标账户
+    await addToTreasury(kv, amount);
+
+    const newTargetBal = oldTargetBal - amount;
+    await setBalance(kv, targetUid, newTargetBal);
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `
+——裁决之钟敲响。
+内务部:
+　　自【${targetLabel}】处收缴 ${amount} 💰，感谢您缴纳税款，我们迫切期待下一次的贡献。
+`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
+
 
   // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
   if (sub === "take") {

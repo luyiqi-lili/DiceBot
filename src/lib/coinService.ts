@@ -1,5 +1,5 @@
 // lib/coinService.ts
-import  {  EnvLike } from "../lib/tgMessage";
+import { EnvLike } from "../lib/tgMessage";
 
 /**
  * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
@@ -64,11 +64,11 @@ export async function takeFromTreasury(kv: KVNamespace, amount: number): Promise
  * - 返回新的国库余额（可能小于0）
  */
 export async function payoutFromTreasuryAllowNegative(kv: KVNamespace, amount: number): Promise<number> {
-    const curRaw = await kv.get(TREASURY_KEY);
-    const cur = curRaw ? parseInt(curRaw, 10) || 0 : 0;
-    const next = cur - amount;
-    await kv.put(TREASURY_KEY, String(next));
-    return next;
+  const curRaw = await kv.get(TREASURY_KEY);
+  const cur = curRaw ? parseInt(curRaw, 10) || 0 : 0;
+  const next = cur - amount;
+  await kv.put(TREASURY_KEY, String(next));
+  return next;
 }
 
 /** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */

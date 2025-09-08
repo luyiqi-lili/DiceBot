@@ -48,6 +48,10 @@
 				{
 					"binding": "COIN_KV", // 货币 KV
 					"id": "8d91b0d1ec1d4625be3e68ec2c63efc6"
+				},
+				{
+					"binding": "ITEM_STORE", // 货币 KV
+					"id": "84193feb14c64ea28b52e0798e71bae0"
 				}
 			],
 			"vars": {
@@ -105,6 +109,10 @@
 				{
 					"binding": "COIN_KV", // 货币 KV
 					"id": "1e14b44d75d749e6a4e553fb661fc3d0"
+				},
+				{
+					"binding": "ITEM_STORE", // 货币 KV
+					"id": "8be14408cf784bf7852e2ab865fc20a2"
 				}
 			],
 			"vars": {

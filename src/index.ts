@@ -5,6 +5,7 @@ import TgMessage from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from "./commands/like";
 import { runCoinCheck } from "./cron/cron";
+import { handleBackup } from './lib/backup';
 
 
 
@@ -20,6 +21,7 @@ export type Env = {
   FISHING_RECORD_KV: KVNamespace
   TGBOTCOUNT: KVNamespace
   AFFECTION_KV: KVNamespace
+  ITEM_STORE: KVNamespace
 };
 
 export default {
@@ -44,7 +46,6 @@ export default {
     }
 
     //3. 解析请求
-    //TODO:  update在全部命令迁移完成后要取消
     let parsedMessage;
     try {
       parsedMessage = TgMessage.parseUpdate(await request.json(), env.BOT_USERNAME);
@@ -190,6 +191,16 @@ export default {
               console.log(`index: /fate 处理完成`);
               return new Response("OK", { status: 200 });
             }
+
+            case "item": {
+              console.log("index: 检测到 / item 命令，进入 item 逻辑");
+              const { handleItem } = await import("./commands/item");
+              await handleItem(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /fate 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
             //送花
             case "rose": {
               console.log("index: 检测到 /rose 命令，进入 rose逻辑");
@@ -317,6 +328,10 @@ export default {
             }
 
           }
+        }
+        else{
+          await handleBackup(parsedMessage, env);
+
         }
       }
     }
