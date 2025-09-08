@@ -297,21 +297,6 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
       reply_markup: deleteMarkup
     });
 
-    // 私信（可选）给接收者：提示（尝试 fetchChatMember 以显示名字）
-    try {
-      const member = await TgMessage.fetchChatMember(env, chatId, targetId);
-      // 给接收者在当前群组线程发送一条提示（也可以选择私聊，但这里不做私聊）
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `📬 ${member.first_name}，你收到来自 ${fromName} 的物品：<a href="${item.link}">${item.remark || "物品"}</a>（共 ${targetList.length} 件）`,
-        parse_mode: "HTML",
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-    } catch (e) {
-      console.log("[Item] fetchChatMember 或 通知接收者 失败", e);
-    }
-
     return;
   }
 
