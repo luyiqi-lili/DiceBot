@@ -5,6 +5,7 @@ import TgMessage from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from "./commands/like";
 import { runCoinCheck } from "./cron/cron";
+import { handleBackup } from './lib/backup';
 
 
 
@@ -45,7 +46,6 @@ export default {
     }
 
     //3. 解析请求
-    //TODO:  update在全部命令迁移完成后要取消
     let parsedMessage;
     try {
       parsedMessage = TgMessage.parseUpdate(await request.json(), env.BOT_USERNAME);
@@ -328,6 +328,10 @@ export default {
             }
 
           }
+        }
+        else{
+          await handleBackup(parsedMessage, env);
+
         }
       }
     }
