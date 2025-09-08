@@ -486,3 +486,37 @@ export function getCastDesc(strength: number): string {
   }
 }
 
+export type BackupTarget = { chat_id: number; threadId?: number };
+export type BackupMapping = { from: { chat_id: number; threadId?: number }; to: BackupTarget[] };
+
+// 示例 backupConfig — 请根据实际需要替换/扩展此常量
+// 说明：
+// - from.chat_id 必填，用于匹配来源群组/频道
+// - from.threadId 可选，若指定则只在该 threadId 下匹配；未指定则匹配整个 chat
+// - to 是目标数组，可包含多个目的地（chat_id + 可选 threadId）
+export const backupConfig: BackupMapping[] = [
+  // 示例：整个群组 -1001111111111 的消息都会被备份到 -1002222222222 和 -1003333333333
+  {
+    from: { chat_id: -1001111111111 },
+    to: [
+      { chat_id: -1002222222222 },
+      { chat_id: -1003333333333 }
+    ]
+  },
+  // 示例：测试群
+  {
+    from: { chat_id: -1002848481881, threadId: 66 },
+    to: [
+      { chat_id: -1002661676227, threadId: 2 }
+    ]
+  },
+
+  //紫罗大群
+  {
+    from: { chat_id: -2742074355, threadId: 302677 },
+    to: [
+      { chat_id: -3066803437, threadId: 4 }
+    ]
+  },
+
+];
