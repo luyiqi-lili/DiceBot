@@ -141,7 +141,7 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
                   type: 'photo',
                   media: fileId,
                   // 仅在第一张图片上保留文字/说明
-                  caption: parsed.text || msg.caption || undefined
+                  caption: text ||parsed.text || msg.caption || undefined
                 }
               ];
 
