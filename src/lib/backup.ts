@@ -76,8 +76,10 @@ function buildBackupText(parsed: ParsedUpdate) {
  * handleBackup
  * - 在收到普通消息（非命令）时调用
  * - 根据 backupConfig 匹配来源（chat_id + 可选 threadId），匹配到则把构造好的文本消息发送到对应目标
- * - 不使用 forwardMessage（避免被原群组限制），而是由 bot 直接发送文本，格式如：
- *     Firstname Lastname : 消息内容
+ * - 支持把图片（若存在 photo）以 media_group 的形式发送，使用原始 file_id（尽量保留原图）
+ * - 注意：Telegram webhook 会把同一 media group 的每张图片作为独立的 message 发送（共享 media_group_id），
+ *   若需要完整重组整个 media_group（多张图一次性发送），建议在外部做短时缓冲并按 media_group_id 聚合；
+ *   这里实现为：当单条消息包含 photo 时，使用该 message 的最大尺寸 file_id 发送一个包含单张图片的 media_group。
  *
  * 返回值：
  * - 若找到匹配并执行发送，返回每次 send 的 API 响应数组（包含成功或失败信息）
@@ -103,6 +105,7 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
 
     const srcChatId = parsed.chatId;
     const srcThreadId = parsed.threadId;
+    const msg = parsed.message;
 
     // 找到所有匹配的 mapping（chatId 匹配，且当 mapping 指定 threadId 时需相等）
     const matched = backupConfig.filter(m => m.from.chat_id === srcChatId && (m.from.threadId === undefined || m.from.threadId === srcThreadId));
@@ -113,20 +116,57 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
     }
 
     const text = buildBackupText(parsed);
-    log('找到备份配置，准备发送文本备份', { srcChatId, srcThreadId, text, matchedCount: matched.length });
+    log('找到备份配置，准备发送备份', { srcChatId, srcThreadId, text, matchedCount: matched.length });
 
     const results: any[] = [];
+
+    // 如果消息包含 photo，尝试使用原始 file_id 发送为 media group（至少单张图片）
+    const isPhoto = Array.isArray(msg.photo) && msg.photo.length > 0;
+
+    // helper: 选择最大的 file_id（通常最后一个元素是最大尺寸）
+    function getLargestPhotoFileId(photoArr: any[]) {
+      if (!Array.isArray(photoArr) || photoArr.length === 0) return null;
+      const p = photoArr[photoArr.length - 1];
+      return p.file_id || null;
+    }
 
     for (const m of matched) {
       for (const dest of m.to) {
         try {
+          if (isPhoto) {
+            const fileId = getLargestPhotoFileId(msg.photo);
+            if (fileId) {
+              const media: any[] = [
+                {
+                  type: 'photo',
+                  media: fileId,
+                  // 仅在第一张图片上保留文字/说明
+                  caption: parsed.text || msg.caption || undefined
+                }
+              ];
+
+              const sendOpts: any = {
+                chat_id: dest.chat_id,
+                media
+              };
+              if (dest.threadId !== undefined) sendOpts.message_thread_id = dest.threadId;
+
+              log('发送 media_group 到目标', { dest, sendOpts });
+              const res = await TgMessage.send(env, 'sendMediaGroup', sendOpts);
+              results.push({ dest, res });
+              log('发送 media_group 结果', { dest, res });
+              continue; // 已处理该目标，继续下一个目标
+            }
+          }
+
+          // 如果不是 photo，或无法获取 file_id，则回退到发送纯文本备份
           const sendOpts: any = {
             chat_id: dest.chat_id,
             text
           };
           if (dest.threadId !== undefined) sendOpts.message_thread_id = dest.threadId;
 
-          log('发送备份到目标', { dest, sendOpts });
+          log('发送备份到目标（文本回退）', { dest, sendOpts });
           const res = await TgMessage.send(env, 'sendMessage', sendOpts);
           results.push({ dest, res });
           log('发送结果', { dest, res });
