@@ -27,6 +27,7 @@ type CoinEnv = EnvLike & {
 const ADMIN_UIDS_CHECK: number[] = [8080375150, 7804622477, 7476641553, 1019896885];
 const ADMIN_UIDS_TAKE: number[] = [8080375150, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150];
+const ADMIN_UIDS_REMOVE: number[] = [8080375150];
 
 /** 费率计算 */
 function calcTransferFeeRate(targetBal: number): number {
@@ -414,6 +415,83 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
   }
+
+  // /coin take <amount> — 扣除某人的coin（仅 ADMIN_UIDS）
+  if (sub === "remove") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_REMOVE.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin remove。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const amount = parseInt(args[1] || "", 10);
+    if (isNaN(amount) || amount <= 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+    let targetUid;
+    let targetLabel;
+    // 目标：如果是回复某人则转给被回复的人，
+    if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
+      const r = parsedMessage.message.reply_to_message.from;
+      targetUid = String(r.id);
+      targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
+    } else {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 请回复消息进行扣款 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+
+    }
+
+
+    const treasuryBal = await getTreasury(kv);
+    const oldTargetBal = await getBalance(kv, targetUid);
+
+
+    if (oldTargetBal < amount) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 扣除艾丽莎宝库并增加目标账户
+    await addToTreasury(kv, amount);
+
+    const newTargetBal = oldTargetBal - amount;
+    await setBalance(kv, targetUid, newTargetBal);
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `——裁决之钟敲响。\n
+            执行官【${safeUserName}】宣读神圣制令：\n
+            自【${targetLabel}】处收取 ${amount} 💰，奉献艾丽莎宝库。\n
+            【${targetLabel}】之余额：${newTargetBal} 💰。\n
+            艾丽莎宝库盈余增长至 ${treasuryBal + amount} 💰。\n
+            命运之秤，得以维系。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
+
 
   // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS）
   if (sub === "take") {
