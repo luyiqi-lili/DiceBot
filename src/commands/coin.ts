@@ -483,7 +483,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     自【${targetLabel}】处没收 ${amount} 💰，感谢您缴纳税款，我们迫切期待下一次的贡献。
 
-                                                                            内务部`,
+                                       内务部`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
