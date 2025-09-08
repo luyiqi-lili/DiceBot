@@ -511,7 +511,7 @@ export const backupConfig: BackupMapping[] = [
     ]
   },
 
-  /*
+  
   //紫罗大群
   //匹配区
   {
@@ -835,5 +835,5 @@ export const backupConfig: BackupMapping[] = [
       { chat_id: -1003066803437, threadId: 14 }
     ]
   },
-*/
+
 ];
