@@ -27,7 +27,7 @@ type CoinEnv = EnvLike & {
 const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
 const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
-const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953];
+const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
 
 /** 费率计算 */
 function calcTransferFeeRate(targetBal: number): number {
@@ -332,7 +332,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (((repliedFrom.id) == parseInt(userId))) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败，目标${repliedFrom.id} 和转账${userId} 不能相同`, parse_mode: "HTML", message_thread_id: threadId });
       return;
-
     }
     const result = await transfer(kv, userId, String(repliedFrom.id), amount);
     if (!result.ok) {
