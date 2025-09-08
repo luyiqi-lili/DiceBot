@@ -480,11 +480,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `——裁决之钟敲响。
-    审判厅的【${safeUserName}】宣读神圣制令：
-    自【${targetLabel}】处收取 ${amount} 💰，奉献艾丽莎宝库。
-    【${targetLabel}】之余额：${newTargetBal} 💰。
-    艾丽莎宝库盈余增长至 ${treasuryBal + amount} 💰。
-命运之秤，得以维系。`,
+
+  自【${targetLabel}】处没收 ${amount} 💰，感谢您缴纳税款，我们迫切期待下一次的贡献。
+
+                                       内务部`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
