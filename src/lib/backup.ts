@@ -70,7 +70,7 @@ function buildBackupText(parsed: ParsedUpdate) {
     content = `[${t}]`;
   }
 
-  return `${sender} :\n  ${content}`;
+  return `${sender} :\n    ${content}`;
 }
 
 // helper: 选择最大的 file_id（通常最后一个元素是最大尺寸）
