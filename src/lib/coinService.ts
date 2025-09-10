@@ -22,7 +22,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
   let uname 
   console.log(`ID: ${id} `);
   console.log(`INT_ID: ${parseInt(id,10)} `);
-  if (isNaN(parseInt(id,10))) {
+  if (!isNaN(parseInt(id,10))) {
     uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id,10))).first_name
       console.log(`uname: ${uname} `);
 
