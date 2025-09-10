@@ -2,7 +2,7 @@
 
 
 import TgMessage, { EnvLike } from "../lib/tgMessage";
- 
+
 /**
  * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
  */
@@ -11,11 +11,34 @@ export type CoinEnv = EnvLike & {
   BOT_USERNAME?: string;
 };
 
+
+/* ------------------------- 全局配置（统一在顶部） ------------------------- */
+// 艾丽莎宝库键
+export const TREASURY_KEY = "__treasury__";
+
 /** 日志，user 因为 变动 amout coin */
-async function SendTransLog(env: EnvLike, amount: number, id: String, event: String): Promise<boolean> {
+async function SendTransLog(env: EnvLike, amount: number, id: string, event: String): Promise<boolean> {
+
+  let uname: string = (await TgMessage.fetchChatMember(env, -1002742074355, parseInt(id))).first_name
+  switch (id) {
+    case TREASURY_KEY: {
+      uname = "艾莉莎宝库";
+    }
+    case '-1002742074355||62': {
+      uname = "紫罗兰教堂的募捐箱";
+    }
+    case '-1002742074355||182': {
+      uname = "天狐宫的祈愿箱";
+    }
+    case '-1002848481881||66': {
+      uname = "紫罗兰教堂的募捐箱(测试)";
+    }
+
+  }
+
   await TgMessage.sendText(env, {
     chat_id: -1002848481881,
-    text: ` ${id}user 因为  ${event} 变动 ${amount}`,
+    text: ` ${uname} 因为  ${event}  ${amount}`,
     parse_mode: "HTML",
     message_thread_id: 12084
   });
@@ -23,11 +46,6 @@ async function SendTransLog(env: EnvLike, amount: number, id: String, event: Str
 
   return false;
 }
-
-/* ------------------------- 全局配置（统一在顶部） ------------------------- */
-// 艾丽莎宝库键
-export const TREASURY_KEY = "__treasury__";
-
 /** 读取余额（KV） */
 export async function getBalance(kv: KVNamespace, id: string): Promise<number> {
   try {
@@ -49,27 +67,27 @@ async function setBalance(kv: KVNamespace, id: string, bal: number): Promise<voi
 }
 
 /** 增加账户余额，返回新余额 */
-export async function addToBalance(env: EnvLike,kv: KVNamespace, id: string, delta: number, event: String): Promise<number> {
+export async function addToBalance(env: EnvLike, kv: KVNamespace, id: string, delta: number, event: String): Promise<number> {
   const cur = await getBalance(kv, id);
   const next = cur + delta;
-  await SendTransLog(env,delta,id,event);
+  await SendTransLog(env, delta, id, event||' 增加 ');
   await setBalance(kv, id, next);
   return next;
 }
 
 /** 从账户扣款，若余额不足返回 false，否则扣款并返回 true */
-export async function deductFromBalance(env: EnvLike,kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
+export async function deductFromBalance(env: EnvLike, kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
   const cur = await getBalance(kv, id);
-  if (cur < amount) return false;  
-  await SendTransLog(env,amount,id,event);
+  if (cur < amount) return false;
+  await SendTransLog(env, amount, id, event||' 扣减 ');
   await setBalance(kv, id, cur - amount);
   return true;
 }
 
 /** 从账户扣款，若余额不足返回 false，否则扣款并返回 true */
-export async function deductFromBalanceAllowNegative(env: EnvLike,kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
-  const cur = await getBalance(kv, id);  
-  await SendTransLog(env,amount,id,event);
+export async function deductFromBalanceAllowNegative(env: EnvLike, kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
+  const cur = await getBalance(kv, id);
+  await SendTransLog(env, amount, id, event||' 扣减 ');
   await setBalance(kv, id, cur - amount);
   return true;
 }
@@ -79,21 +97,21 @@ export async function deductFromBalanceAllowNegative(env: EnvLike,kv: KVNamespac
 export async function getTreasury(kv: KVNamespace): Promise<number> {
   return await getBalance(kv, TREASURY_KEY);
 }
-export async function addToTreasury(env: EnvLike,kv: KVNamespace, amount: number, event: String): Promise<number> {
-  
-  return await addToBalance(env,kv, TREASURY_KEY, amount, event);
+export async function addToTreasury(env: EnvLike, kv: KVNamespace, amount: number, event: String): Promise<number> {
+
+  return await addToBalance(env, kv, TREASURY_KEY, amount, event);
 }
-export async function takeFromTreasury(env: EnvLike,kv: KVNamespace, amount: number, event: String): Promise<boolean> {
-  
-  return await deductFromBalance(env,kv, TREASURY_KEY, amount, event);
+export async function takeFromTreasury(env: EnvLike, kv: KVNamespace, amount: number, event: String): Promise<boolean> {
+
+  return await deductFromBalance(env, kv, TREASURY_KEY, amount, event);
 }
 /**
  * 从国库支付（允许出现负值）
  * - 返回新的国库余额（可能小于0）
  */
-export async function payoutFromTreasuryAllowNegative(env: EnvLike,kv: KVNamespace, amount: number, event: String): Promise<boolean> {
-  
-  return await deductFromBalanceAllowNegative(env,kv, TREASURY_KEY, amount, event);
+export async function payoutFromTreasuryAllowNegative(env: EnvLike, kv: KVNamespace, amount: number, event: String): Promise<boolean> {
+
+  return await deductFromBalanceAllowNegative(env, kv, TREASURY_KEY, amount, event);
 
 }
 
