@@ -10,6 +10,12 @@ export type CoinEnv = EnvLike & {
   COIN_KV: KVNamespace;
   BOT_USERNAME?: string;
 };
+const nameMap: Record<string, string> = {
+  '__treasury__': "艾莉莎宝库",
+  '-1002742074355||62': "紫罗兰教堂的募捐箱",
+  '-1002742074355||182': "天狐宫的祈愿箱",
+  '-1002848481881||66': "紫罗兰教堂的募捐箱(测试)"
+};
 
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
@@ -19,29 +25,15 @@ export const TREASURY_KEY = "__treasury__";
 /** 日志，user 因为 变动 amout coin */
 async function SendTransLog(env: EnvLike, amount: number, id: string, event: String): Promise<boolean> {
 
-  let uname 
+  let uname
   console.log(`ID: ${id} `);
-  console.log(`INT_ID: ${parseInt(id,10)} `);
-  if (!isNaN(parseInt(id,10))) {
-    uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id,10))).first_name
-      console.log(`uname: ${uname} `);
+  console.log(`INT_ID: ${Number(id)} `);
+  if (!isNaN(Number(id))) {
+    uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id, 10))).first_name
+    console.log(`uname: ${uname} `);
 
   } else {
-    switch (id) {
-      case '__treasury__': {
-        uname = "艾莉莎宝库";
-      }
-      case '-1002742074355||62': {
-        uname = "紫罗兰教堂的募捐箱";
-      }
-      case '-1002742074355||182': {
-        uname = "天狐宫的祈愿箱";
-      }
-      case '-1002848481881||66': {
-        uname = "紫罗兰教堂的募捐箱(测试)";
-      }
-
-    }
+    uname = nameMap[id] ?? id;
   }
 
 
