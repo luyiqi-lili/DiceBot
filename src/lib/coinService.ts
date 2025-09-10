@@ -28,7 +28,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
 
   } else {
     switch (id) {
-      case TREASURY_KEY: {
+      case '__treasury__': {
         uname = "艾莉莎宝库";
       }
       case '-1002742074355||62': {
