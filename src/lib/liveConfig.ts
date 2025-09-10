@@ -117,9 +117,7 @@ export const fishList = [
   { name: "🐟大马哈鱼", hookRate: 0.35, value: 2 },
   { name: "🦂海蠍子", hookRate: 0.35, value: 2 },
   { name: "🐂海公牛", hookRate: 0.35, value: 2 },
-
-
-
+  
   { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
   { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
   { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
@@ -834,6 +832,13 @@ export const backupConfig: BackupMapping[] = [
     from: { chat_id: -1002742074355, threadId: 184 },
     to: [
       { chat_id: -1003066803437, threadId: 14 }
+    ]
+  },
+  //内务部 https://t.me/c/2742074355//638715  https://t.me/c/3066803437//2028
+  {
+    from: { chat_id: -1002742074355, threadId: 638714 },
+    to: [
+      { chat_id: -1003066803437, threadId: 2027 }
     ]
   },
 
