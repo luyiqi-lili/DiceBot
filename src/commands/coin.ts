@@ -457,10 +457,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
 
-    const treasuryBal = await getTreasury(kv);
+
     const oldTargetBal = await getBalance(kv, targetUid);
 
-
+/*
     if (oldTargetBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -470,7 +470,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
-
+*/
     // 扣除艾丽莎宝库并增加目标账户
     await addToTreasury(kv, amount);
 
