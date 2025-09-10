@@ -465,19 +465,20 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
 
 
+
     const oldTargetBal = await getBalance(kv, targetUid);
 
-    /*
-        if (oldTargetBal < amount) {
-          await TgMessage.sendText(env, {
-            chat_id: chatId,
-            text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
-            parse_mode: "HTML",
-            message_thread_id: threadId
-          });
-          return;
-        }
-    */
+/*
+    if (oldTargetBal < amount) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+*/
     // 扣除艾丽莎宝库并增加目标账户
     await addToTreasury(env,kv, amount,"内务部税款");
 
