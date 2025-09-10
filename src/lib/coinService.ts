@@ -22,7 +22,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
   let uname 
 
   if (isNaN(parseInt(id))) {
-    uname = (await TgMessage.fetchChatMember(env, -1002742074355, parseInt(id))).first_name
+    uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id))).first_name
   } else {
     switch (id) {
       case TREASURY_KEY: {
@@ -44,7 +44,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
 
   await TgMessage.sendText(env, {
     chat_id: -1002848481881,
-    text: ` ${uname} 因为  ${event}  ${amount}`,
+    text: `${id}  ${uname} 因为  ${event}  ${amount}`,
     parse_mode: "HTML",
     message_thread_id: 12084
   });
