@@ -19,9 +19,9 @@ export const TREASURY_KEY = "__treasury__";
 /** 日志，user 因为 变动 amout coin */
 async function SendTransLog(env: EnvLike, amount: number, id: string, event: String): Promise<boolean> {
 
-  let uname: string = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id))).first_name
+  let uname 
 
-  if (isNaN(parseInt(uname))) {
+  if (isNaN(parseInt(id))) {
     uname = (await TgMessage.fetchChatMember(env, -1002742074355, parseInt(id))).first_name
   } else {
     switch (id) {
