@@ -20,9 +20,12 @@ export const TREASURY_KEY = "__treasury__";
 async function SendTransLog(env: EnvLike, amount: number, id: string, event: String): Promise<boolean> {
 
   let uname 
+  console.log(`ID: ${id} `);
+  console.log(`INT_ID: ${parseInt(id,10)} `);
+  if (isNaN(parseInt(id,10))) {
+    uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id,10))).first_name
+      console.log(`uname: ${uname} `);
 
-  if (isNaN(parseInt(id))) {
-    uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id))).first_name
   } else {
     switch (id) {
       case TREASURY_KEY: {
