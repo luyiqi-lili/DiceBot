@@ -135,7 +135,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
 
         // 解析成功后尝试从用户扣费并把钱转入国库
         try {
-            const deducted = await deductFromBalance(env.COIN_KV, String(fromId), 5);
+            const deducted = await deductFromBalance(env,env.COIN_KV, String(fromId), 5,"占卜费");
             if (!deducted) {
                 const failText = `❌ 扣费失败（余额不足或系统错误），解析已生成但未能扣款。请先充值后重试。`;
                 if (processingMsgId) {
@@ -147,7 +147,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             }
 
             // 将这笔钱加入国库（艾丽莎宝库）
-            await addToTreasury(env.COIN_KV, 5);
+            await addToTreasury(env,env.COIN_KV, 5,"占卜费");
 
             // 获取新余额用于提示
             const newBal = await getBalance(env.COIN_KV, String(fromId));

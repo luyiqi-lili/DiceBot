@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { CoinEnv, getBalance as coinGetBalance, setBalance as coinSetBalance, addToTreasury, payoutFromTreasuryAllowNegative } from "../lib/coinService";
+import { CoinEnv, getBalance as coinGetBalance, addToBalance, addToTreasury, payoutFromTreasuryAllowNegative, deductFromBalance } from "../lib/coinService";
 import { fishList, getCastDesc } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
 
@@ -286,9 +286,9 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         const payout = chosen.value;
         const newOwnerBal = currentBal + payout;
         // 给用户加钱（我们选择复用 coinSetBalance，注意 coinSetBalance 会直接写回用户 KV）
-        await coinSetBalance(env.COIN_KV, ownerIdStr, newOwnerBal);
+        await addToBalance(env,env.COIN_KV, ownerIdStr, payout,"渔获");
         // 国库扣款（可能为负）
-        const newTre = await payoutFromTreasuryAllowNegative(env.COIN_KV, payout);
+        const newTre = await payoutFromTreasuryAllowNegative(env,env.COIN_KV, payout,"渔获");
 
         // 更新鱼塘当日 payout
         const today = nowDateYMD();
@@ -427,11 +427,10 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     }
 
     // 扣除用户余额（直接用 coinSetBalance）
-    const newBalAfterPay = currentBal - baitCost;
-    await coinSetBalance(env.COIN_KV, ownerIdStr, newBalAfterPay);
+    await deductFromBalance(env,env.COIN_KV, ownerIdStr,  baitCost,"鱼饵");
 
     // 把鱼饵费用计入艾丽莎宝库（若要计费可使用 addToTreasury）
-    await addToTreasury(env.COIN_KV, baitCost);
+    await addToTreasury(env,env.COIN_KV, baitCost,"鱼饵");
 
     // 同时把鱼饵消耗计入鱼塘当天汇总
     const today = nowDateYMD();
