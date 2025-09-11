@@ -39,7 +39,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
 
   await TgMessage.sendText(env, {
     chat_id: -1002848481881,
-    text: `UID:${id}  ${uname} 因为  ${event}  ${amount}`,
+    text: `UID:\`${id}\`  ${uname} 因为  ${event}  ${amount}`,
     parse_mode: "HTML",
     message_thread_id: 12084
   });
