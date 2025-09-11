@@ -30,6 +30,11 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
   console.log(`INT_ID: ${Number(id)} `);
   if (!isNaN(Number(id))) {
     uname = (await TgMessage.fetchChatMember(env, -1002742074355, parseInt(id, 10))).first_name
+    if (!isNaN(Number(uname))) {
+      uname = (await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id, 10))).first_name
+    }
+
+
     console.log(`uname: ${uname} `);
 
   } else {
@@ -39,7 +44,7 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
 
   await TgMessage.sendText(env, {
     chat_id: -1002848481881,
-    text: `UID:\`${id}\`  ${uname} 因为  ${event}  ${amount}`,
+    text: `UID:<code>${id}</code>  ${uname} 因为  ${event}  ${amount}`,
     parse_mode: "HTML",
     message_thread_id: 12084
   });
