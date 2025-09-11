@@ -41,14 +41,14 @@ async function SendTransLog(env: EnvLike, amount: number, id: string, event: Str
     uname = nameMap[id] ?? id;
   }
 
-
+/*
   await TgMessage.sendText(env, {
     chat_id: -1002848481881,
     text: `${uname} ${event} ${amount}\nUID: <code class="language-python">${id}</code>`,
     parse_mode: "HTML",
     message_thread_id: 12084
   });
-
+*/
 
   return false;
 }
