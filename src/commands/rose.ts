@@ -120,7 +120,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     // 非免费时间：尝试支付 30 💰（扣钱并将款项记入国库）
     const amount = 30;
-    const ok = await deductFromBalance(env.COIN_KV, String(fromId), amount);
+    const ok = await deductFromBalance(env,env.COIN_KV, String(fromId), amount,"送花消费");
     if (!ok) {
       // 查询余额并提示
       const bal = await coinGetBalance(env.COIN_KV, String(fromId));
@@ -134,7 +134,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     }
 
     // 扣款成功后把钱转入国库
-    await addToTreasury(env.COIN_KV, amount);
+    await addToTreasury(env,env.COIN_KV, amount,"送花消费");
 
     // 记录好感度变化
     score += 160;

@@ -387,14 +387,14 @@ const TgMessage = {
       if (res && res.ok && res.result && (res.result as any).user) {
         const u = (res.result as any).user;
         return {
-          first_name: u.first_name || `用户${userId}`,
+          first_name: u.first_name || `${userId}`,
           username: (u.username as string) || ''
         };
       }
-      return { first_name: `用户${userId}`, username: '' };
+      return { first_name: `${userId}`, username: '' };
     } catch (e) {
       log('fetchChatMember 异常', e);
-      return { first_name: `用户${userId}`, username: '' };
+      return { first_name: `${userId}`, username: '' };
     }
   }
 };
