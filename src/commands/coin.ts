@@ -252,7 +252,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
 
-    await addToTreasury(env,kv, amount,"祈福支出");
+    await addToTreasury(env,kv, amount,"祈福收入");
     
     await addToBalance(env,kv, roomKey, amount,"祈福计数");
 
