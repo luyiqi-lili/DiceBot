@@ -503,13 +503,15 @@ export const backupConfig: BackupMapping[] = [
     ]
   },
   // 示例：测试群
+
+/*
   {
     from: { chat_id: -1002848481881, threadId: 66 },
     to: [
       { chat_id: -1002661676227, threadId: 2 }
     ]
   },
-
+*/
   
   //紫罗大群
   //匹配区
