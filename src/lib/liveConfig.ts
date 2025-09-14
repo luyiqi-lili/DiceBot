@@ -83,6 +83,13 @@ export const fishList = [
   { name: "🌀钻头贝", hookRate: 0.40, value: 1 },
   { name: "👑鲤鱼王", hookRate: 0.40, value: 1 },
   { name: "🐟大鱼", hookRate: 0.40, value: 1 },
+  { name: "🐟变异鱼", hookRate: 0.40, value: 1 },
+  { name: "🦑黑口鱼", hookRate: 0.40, value: 1 },
+  { name: "🐠美味小鱼", hookRate: 0.40, value: 1 },
+  { name: "🐡长嘴泥鳅", hookRate: 0.40, value: 1 },
+  { name: "🐟彩鳍鱼", hookRate: 0.40, value: 1 },
+  { name: "🐠鼠尾鱼", hookRate: 0.40, value: 1 },
+  { name: "🐟滑皮鲭鱼", hookRate: 0.40, value: 1 },
 
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
   { name: "🦀三钳蟹", hookRate: 0.35, value: 2 },
@@ -117,7 +124,12 @@ export const fishList = [
   { name: "🐟大马哈鱼", hookRate: 0.35, value: 2 },
   { name: "🦂海蠍子", hookRate: 0.35, value: 2 },
   { name: "🐂海公牛", hookRate: 0.35, value: 2 },
-  
+  { name: "🔥火鳞鳝鱼", hookRate: 0.35, value: 2 },
+  { name: "🐡刺须鲶鱼", hookRate: 0.35, value: 2 },
+  { name: "🐠大鼠尾鱼", hookRate: 0.35, value: 2 },
+  { name: "🐟银头鲑鱼", hookRate: 0.35, value: 2 },
+  { name: "🐠石鳞鳕鱼", hookRate: 0.35, value: 2 },
+
   { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
   { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
   { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
@@ -131,6 +143,15 @@ export const fishList = [
   { name: "🕷️海蜘蛛", hookRate: 0.30, value: 3 },
   { name: "💍珍珠贝", hookRate: 0.30, value: 3 },
   { name: "🦪枸杞生蚝", hookRate: 0.30, value: 3 },
+  { name: "🐟光滑大鱼", hookRate: 0.30, value: 3 },
+  { name: "🌙夜鳞鲷鱼", hookRate: 0.30, value: 3 },
+  { name: "🐟红鳃鱼", hookRate: 0.30, value: 3 },
+  { name: "🐠斑点黄尾鱼", hookRate: 0.30, value: 3 },
+  { name: "🐟夏日鲈鱼", hookRate: 0.30, value: 3 },
+  { name: "☀️阳鳞鲑鱼", hookRate: 0.30, value: 3 },
+  { name: "⚡石鳞鳗", hookRate: 0.30, value: 3 },
+  { name: "❄️冬鱿鱼", hookRate: 0.30, value: 3 },
+
 
   { name: "🔱朗基努斯鱼", hookRate: 0.27, value: 4 },
   { name: "🧚仙女海马", hookRate: 0.27, value: 4 },
