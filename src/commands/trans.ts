@@ -1,6 +1,10 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { escapeHtml } from "../lib/util";
 
+type Env = EnvLike & {
+  GOOGLE_API_KEYS?: string[];
+};
+
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -15,7 +19,7 @@ type GeminiResponse = {
  * - 接收 parsedMessage（ParsedUpdate）
  * - 直接用 TgMessage.sendText 发送回复到原群/主题或私聊（按需求）
  */
-export async function handleTrans(parsedMessage: ParsedUpdate, env: EnvLike) {
+export async function handleTrans(parsedMessage: ParsedUpdate, env: Env) {
   console.log("[Trans] 🔍 进入 handleTrans (parsed)");
 
   const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
@@ -80,26 +84,25 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: EnvLike) {
 
   console.log("[Trans] 📤 发送翻译请求 payload:", JSON.stringify({ promptPreview: payload.contents[0].parts[0].text.slice(0, 200) }));
 
-  // GOOGLE_API_KEY 可能存在于 env（视你的 worker binding 而定）
-  const googleKey = (env as any).GOOGLE_API_KEY;
-  if (!googleKey) {
-    console.error("[Trans] ❌ 未配置 GOOGLE_API_KEY");
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: "⚠️ 翻译服务未配置（缺少 GOOGLE_API_KEY），请联系管理员。",
-      message_thread_id: threadId
-    });
+  // GOOGLE_API_KEY[]
+
+  const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
+  if (!apiKeys.length) {
+    const failText = `❌ 抱歉，当前无法进行牌义解析（缺少 API Key）。`;
+    await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
     return;
   }
 
   try {
+    const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+
     const apiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": googleKey
+          "x-goog-api-key": randomKey
         },
         body: JSON.stringify(payload)
       }
