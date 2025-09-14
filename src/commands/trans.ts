@@ -97,7 +97,7 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env) {
     const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
 
     const apiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent`,
       {
         method: "POST",
         headers: {
