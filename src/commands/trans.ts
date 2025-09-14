@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import {escapeHtml}  from "../lib/util";
+import { escapeHtml } from "../lib/util";
 
 
 type GeminiResponse = {
@@ -106,6 +106,8 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: EnvLike) {
     );
 
     const json = (await apiRes.json()) as GeminiResponse;;
+    console.log("[Trans] ✅ 翻译响应（完整）:", json);
+
     console.log("[Trans] ✅ 收到翻译响应（截取）:", JSON.stringify(json?.candidates?.[0]?.content?.parts?.[0]?.text)?.slice(0, 300));
 
     const translation = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
