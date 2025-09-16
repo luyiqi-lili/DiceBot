@@ -18,7 +18,7 @@ export type RoseEnv = CoinEnv & {
 function scoreToEmoji(score: number): string {
   if (score < 10) return "";
   let units = Math.floor(score / 10);
-  const emojis = ["🌱", "🍃", "🌷", "🌹", "💓", "💖", "💝"];
+  const emojis = ["🌱", "🍃", "🌷", "🌹", "💓", "💖", "💝", "❤️‍🔥"];
 
   let result = "";
   let place = 0;
