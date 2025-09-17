@@ -132,9 +132,10 @@ export const fishList = [
   { name: "🐟银头鲑鱼", hookRate: 0.35, value: 2 },
   { name: "🐠石鳞鳕鱼", hookRate: 0.35, value: 2 },
   { name: "🍗章鱼哥的腿", hookRate: 0.35, value: 2 },
+  { name: "🐈🐟“猫", hookRate: 0.35, value: 2 },
   
 
-  { name: "🐟弧光鱼", hookRate: 0.30, value: 3 },
+  { name: "🥛“兰兰乳业”鲜奶", hookRate: 0.30, value: 3 },
   { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
   { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
   { name: "<tg-spoiler>⚡震动棒</tg-spoiler>", hookRate: 0.30, value: 3 },
@@ -157,6 +158,7 @@ export const fishList = [
   { name: "❄️冬鱿鱼", hookRate: 0.30, value: 3 },
 
 
+  { name: "🪑酒馆的凳子", hookRate: 0.27, value: 4 },
   { name: "🔱朗基努斯鱼", hookRate: 0.27, value: 4 },
   { name: "🧚仙女海马", hookRate: 0.27, value: 4 },
   { name: "🐾肉球海豹", hookRate: 0.27, value: 4 },
@@ -166,6 +168,7 @@ export const fishList = [
   { name: "🐳斯卡蒂", hookRate: 0.27, value: 4 },
   { name: "🧹小皮的扫把", hookRate: 0.27, value: 4 },
 
+  { name: "🍱小白的便当", hookRate: 0.25, value: 5 },
   { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
   { name: "<tg-spoiler>🛏️充气娃娃</tg-spoiler>", hookRate: 0.25, value: 5 },
   { name: "🦑毒刺乌贼", hookRate: 0.25, value: 5 },
