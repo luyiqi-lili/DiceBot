@@ -91,6 +91,8 @@ export const fishList = [
   { name: "🐠鼠尾鱼", hookRate: 0.40, value: 1 },
   { name: "🐟滑皮鲭鱼", hookRate: 0.40, value: 1 },
   { name: "🍟薯条", hookRate: 0.40, value: 1 },
+  { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
+  { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
 
   { name: "👙小七的胖次", hookRate: 0.35, value: 2 },
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
@@ -133,8 +135,10 @@ export const fishList = [
   { name: "🐠石鳞鳕鱼", hookRate: 0.35, value: 2 },
   { name: "🍗章鱼哥的腿", hookRate: 0.35, value: 2 },
   { name: "🐈🐟“猫", hookRate: 0.35, value: 2 },
+  { name: "🔭破损望远镜", hookRate: 0.35, value: 2 },
   
 
+  { name: "🐙章鱼小丸子", hookRate: 0.30, value: 3 },
   { name: "🥛“兰兰乳业”鲜奶", hookRate: 0.30, value: 3 },
   { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
   { name: "🪼夜光水母", hookRate: 0.30, value: 3 },
@@ -183,6 +187,11 @@ export const fishList = [
   { name: "🐟巨嘴金鱼", hookRate: 0.25, value: 5 },
   { name: "🥕闪闪的胡萝卜", hookRate: 0.25, value: 5 },
   { name: "🥭可爱的芒果", hookRate: 0.25, value: 5 },
+  { name: "🎞️远星的胶片", hookRate: 0.25, value: 5 },
+  { name: "🌔圆月模型", hookRate: 0.25, value: 5 },
+
+  
+  { name: "🫙纸星瓶", hookRate: 0.23, value: 6 },
 
   { name: "🐬彩虹海豚", hookRate: 0.20, value: 7 },
   { name: "🌊风暴海鲈", hookRate: 0.20, value: 7 },
@@ -192,9 +201,13 @@ export const fishList = [
   { name: "🛡️骑士鱼", hookRate: 0.20, value: 7 },
   { name: "💖爱心鱼", hookRate: 0.20, value: 7 },
   { name: "🐠阴蒂鱼", hookRate: 0.20, value: 7 },
+
+  
+  { name: "💐厄尔庇斯花", hookRate: 0.18, value: 8 },
   
   { name: "🪷花", hookRate: 0.16, value: 10 },
   { name: "🚛泥头车", hookRate: 0.16, value: 10 },
+  { name: "🌠翻折的祈愿星", hookRate: 0.16, value: 10 },
 
   { name: "🐉红蛟", hookRate: 0.15, value: 11 },
   { name: "🧬远古海马", hookRate: 0.15, value: 11 },
@@ -211,10 +224,11 @@ export const fishList = [
   
   { name: "🐙章鱼哥", hookRate: 0.11, value: 12 },
 
+  { name: "📒琉璃的回忆相册", hookRate: 0.10, value: 13 },
   { name: "📔花音的秘密笔记本", hookRate: 0.10, value: 13 },
   { name: "🦈龙牙鲨", hookRate: 0.10, value: 13 },
   { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
-  { name: "🐱猫鱼", hookRate: 0.10, value: 13 }
+  { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
 ];
 
 export type LikeTextEntry = {
