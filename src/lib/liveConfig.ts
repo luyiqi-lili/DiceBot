@@ -92,6 +92,7 @@ export const fishList = [
   { name: "🐟滑皮鲭鱼", hookRate: 0.40, value: 1 },
   { name: "🍟薯条", hookRate: 0.40, value: 1 },
 
+  { name: "👙小七的胖次", hookRate: 0.35, value: 2 },
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
   { name: "🦀三钳蟹", hookRate: 0.35, value: 2 },
   { name: "🦐樱花虾", hookRate: 0.35, value: 2 },
