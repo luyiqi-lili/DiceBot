@@ -138,6 +138,7 @@ export const fishList = [
   { name: "🔭破损望远镜", hookRate: 0.35, value: 2 },
   
 
+  { name: "🎁哥布林人偶", hookRate: 0.30, value: 3 },
   { name: "🐙章鱼小丸子", hookRate: 0.30, value: 3 },
   { name: "🥛“兰兰乳业”鲜奶", hookRate: 0.30, value: 3 },
   { name: "🐟兔鱼", hookRate: 0.30, value: 3 },
