@@ -29,7 +29,7 @@ export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(runCoinCheck(env));
   },
-  
+
   async fetch(request, env) {
 
     //1. 日记记录原始请求
@@ -192,7 +192,7 @@ export default {
               return new Response("OK", { status: 200 });
             }
 
-      /*      case "item": {
+            case "item": {
               console.log("index: 检测到 / item 命令，进入 item 逻辑");
               const { handleItem } = await import("./commands/item");
               await handleItem(parsedMessage, env);
@@ -200,7 +200,7 @@ export default {
               console.log(`index: /fate 处理完成`);
               return new Response("OK", { status: 200 });
             }
-*/
+
             //送花
             case "rose": {
               console.log("index: 检测到 /rose 命令，进入 rose逻辑");
@@ -329,7 +329,7 @@ export default {
 
           }
         }
-        else{
+        else {
           await handleBackup(parsedMessage, env);
 
         }
