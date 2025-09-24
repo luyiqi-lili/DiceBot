@@ -92,8 +92,9 @@ export const fishList = [
   { name: "🐟滑皮鲭鱼", hookRate: 0.40, value: 1 },
   { name: "🍟薯条", hookRate: 0.40, value: 1 },
   { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
-  { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
+  { name: "💧水", hookRate: 0.40, value: 1 },
 
+  { name: "🍤炸虾", hookRate: 0.35, value: 2 },
   { name: "👙小七的胖次", hookRate: 0.35, value: 2 },
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
   { name: "🦀三钳蟹", hookRate: 0.35, value: 2 },
@@ -161,8 +162,9 @@ export const fishList = [
   { name: "☀️阳鳞鲑鱼", hookRate: 0.30, value: 3 },
   { name: "⚡石鳞鳗", hookRate: 0.30, value: 3 },
   { name: "❄️冬鱿鱼", hookRate: 0.30, value: 3 },
+  { name: "🍏被嫌弃的苹果", hookRate: 0.30, value: 3 },
 
-
+  { name: "🐸奇怪的青蛙", hookRate: 0.27, value: 4 },
   { name: "🪑酒馆的凳子", hookRate: 0.27, value: 4 },
   { name: "🔱朗基努斯鱼", hookRate: 0.27, value: 4 },
   { name: "🧚仙女海马", hookRate: 0.27, value: 4 },
@@ -205,6 +207,8 @@ export const fishList = [
 
   
   { name: "💐厄尔庇斯花", hookRate: 0.18, value: 8 },
+  
+  { name: "⛄️琪露诺的雪人", hookRate: 0.17, value: 9 },
   
   { name: "🪷花", hookRate: 0.16, value: 10 },
   { name: "🚛泥头车", hookRate: 0.16, value: 10 },
