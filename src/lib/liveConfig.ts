@@ -93,7 +93,10 @@ export const fishList = [
   { name: "🍟薯条", hookRate: 0.40, value: 1 },
   { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
   { name: "💧水", hookRate: 0.40, value: 1 },
+  { name: "💵两Coin", hookRate: 0.40, value: 1 },
+  
 
+  { name: "🍜“何意味”泡面", hookRate: 0.35, value: 2 },
   { name: "🍤炸虾", hookRate: 0.35, value: 2 },
   { name: "👙小七的胖次", hookRate: 0.35, value: 2 },
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
@@ -139,6 +142,7 @@ export const fishList = [
   { name: "🔭破损望远镜", hookRate: 0.35, value: 2 },
   
 
+  { name: "🥮三黄QQ弹弹香芋抹茶糯叽叽月饼", hookRate: 0.30, value: 3 },
   { name: "🎁哥布林人偶", hookRate: 0.30, value: 3 },
   { name: "🐙章鱼小丸子", hookRate: 0.30, value: 3 },
   { name: "🥛“兰兰乳业”鲜奶", hookRate: 0.30, value: 3 },
@@ -175,6 +179,7 @@ export const fishList = [
   { name: "🐳斯卡蒂", hookRate: 0.27, value: 4 },
   { name: "🧹小皮的扫把", hookRate: 0.27, value: 4 },
 
+  { name: "🥄银勺子", hookRate: 0.25, value: 5 },
   { name: "🍱小白的便当", hookRate: 0.25, value: 5 },
   { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
   { name: "<tg-spoiler>🛏️充气娃娃</tg-spoiler>", hookRate: 0.25, value: 5 },
@@ -213,6 +218,7 @@ export const fishList = [
   { name: "🪷花", hookRate: 0.16, value: 10 },
   { name: "🚛泥头车", hookRate: 0.16, value: 10 },
   { name: "🌠翻折的祈愿星", hookRate: 0.16, value: 10 },
+  { name: "🏆金奖杯！", hookRate: 0.16, value: 10 },
 
   { name: "🐉红蛟", hookRate: 0.15, value: 11 },
   { name: "🧬远古海马", hookRate: 0.15, value: 11 },
