@@ -75,7 +75,7 @@ export async function handleMigrate(parsed: ParsedUpdate, env: Env): Promise<voi
     // 如果你的 DO idFromName 使用其他名字，请改成匹配的名称。
     const DO_NAME = "coins";
 
-    const sendNotify = true; // 控制是否在每条迁移前后发送 TG 消息（true 会比较啰嗦）
+    const sendNotify = false; // 控制是否在每条迁移前后发送 TG 消息（true 会比较啰嗦）
     const previewLen = 300;
 
     let cursor: string | undefined = undefined;
