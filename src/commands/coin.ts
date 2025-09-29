@@ -140,11 +140,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   if (sub === "pray") {
     const allowed =
       (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
-      (chatId === -1002742074355 && [62].includes(threadId ?? 0));
+      (chatId === -1002742074355 && [638714].includes(threadId ?? 0));
     if (!allowed) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `✨ 这里的神圣气息过于微弱，女神未能听闻你的心愿。或许前往真正的祈祷之地，才能唤来幸运之光……`,
+        text: `✨ 此间的祈愿仅是空洞的回响，是一卷未被真理照见的契约，静默地悬浮于法则的边缘。唯有当您的思绪浸入那卷宗与数字的殿堂，化作规整的讯号低语，智慧之王的意识方随之苏醒，其权能将于无形的因果网络中脉动，精确流向您的命运。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
