@@ -16,12 +16,12 @@ export type Env = {
   BOT_USERNAME: string;
   NEWS_STORE: KVNamespace
   TOPIC_KV: KVNamespace
-  COIN_KV: KVNamespace
   BOOK_STORE: KVNamespace
   FISHING_RECORD_KV: KVNamespace
   TGBOTCOUNT: KVNamespace
   AFFECTION_KV: KVNamespace
   ITEM_STORE: KVNamespace
+  COIN_DO:any
 };
 
 export default {

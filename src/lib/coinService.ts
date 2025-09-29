@@ -4,10 +4,9 @@
 import TgMessage, { EnvLike } from "../lib/tgMessage";
 
 /**
- * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
  */
 export type CoinEnv = EnvLike & {
-  COIN_KV: KVNamespace;
+  COIN_DO:any;
   BOT_USERNAME?: string;
 };
 const nameMap: Record<string, string> = {

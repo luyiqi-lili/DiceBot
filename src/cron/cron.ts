@@ -4,16 +4,16 @@
   - 可以作为独立 Worker 的入口（导出 default.scheduled）
   - 也可以在你的现有 index.ts 中 import { runCoinCheck } from './cron/cron' 并在 scheduled 中调用
 
-  注意：请保证 env.COIN_KV 可用，并且 coinService 中至少导出 getTreasury 和 TREASURY_KEY
 */
 
 import TgMessage, { EnvLike } from "../lib/tgMessage";
 import { getTreasury, TREASURY_KEY } from "../lib/coinService";
+import { createDOAdapter } from "../lib/doAdapter";
 
 // 扩展 env 类型
 type CronEnv = EnvLike & {
-  COIN_KV: KVNamespace;
-  BOT_USERNAME?: string;
+   BOT_USERNAME?: string;
+   COIN_DO:any
 };
 
 // 简单 logger
@@ -60,7 +60,7 @@ async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
 export async function runCoinCheck(env: CronEnv, opts?: { chat_id?: number; message_thread_id?: number }) {
   const chatId = opts?.chat_id ?? -1002848481881;
   const threadId = opts?.message_thread_id ?? 8346;
-  const kv = env.COIN_KV;
+  const kv = createDOAdapter(env, env.COIN_DO, "coins");
 
   log("开始执行 coin check", { chatId, threadId });
 
