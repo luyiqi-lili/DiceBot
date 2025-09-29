@@ -23,6 +23,7 @@ export type Env = {
   ITEM_STORE: KVNamespace
   COIN_DO:any
 };
+export { CoinDO } from './durableObjects/coin_do';
 
 export default {
 
