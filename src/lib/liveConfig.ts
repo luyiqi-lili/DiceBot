@@ -94,9 +94,12 @@ export const fishList = [
   { name: "🧵浸湿的丝线", hookRate: 0.40, value: 1 },
   { name: "💧水", hookRate: 0.40, value: 1 },
   { name: "💵两Coin", hookRate: 0.40, value: 1 },
-  
+  { name: "😋杂鱼", hookRate: 0.40, value: 1 },
+
 
   { name: "🍜“何意味”泡面", hookRate: 0.35, value: 2 },
+  { name: "🐒海猴", hookRate: 0.35, value: 2 },
+  { name: "🦐虾头", hookRate: 0.35, value: 2 },
   { name: "🍤炸虾", hookRate: 0.35, value: 2 },
   { name: "👙小七的胖次", hookRate: 0.35, value: 2 },
   { name: "🐚回音海螺", hookRate: 0.35, value: 2 },
@@ -140,8 +143,9 @@ export const fishList = [
   { name: "🍗章鱼哥的腿", hookRate: 0.35, value: 2 },
   { name: "🐈🐟“猫", hookRate: 0.35, value: 2 },
   { name: "🔭破损望远镜", hookRate: 0.35, value: 2 },
-  
 
+
+  { name: "🧶猫鱼的猫毛", hookRate: 0.30, value: 3 },
   { name: "🥮三黄QQ弹弹香芋抹茶糯叽叽月饼", hookRate: 0.30, value: 3 },
   { name: "🎁哥布林人偶", hookRate: 0.30, value: 3 },
   { name: "🐙章鱼小丸子", hookRate: 0.30, value: 3 },
@@ -179,6 +183,8 @@ export const fishList = [
   { name: "🐳斯卡蒂", hookRate: 0.27, value: 4 },
   { name: "🧹小皮的扫把", hookRate: 0.27, value: 4 },
 
+  { name: "🕶很酷不说话鱼", hookRate: 0.25, value: 5 },
+  { name: "🥚小母龙的蛋", hookRate: 0.25, value: 5 },
   { name: "🥄银勺子", hookRate: 0.25, value: 5 },
   { name: "🍱小白的便当", hookRate: 0.25, value: 5 },
   { name: "🐟岩崖飞鱼", hookRate: 0.25, value: 5 },
@@ -198,9 +204,10 @@ export const fishList = [
   { name: "🎞️远星的胶片", hookRate: 0.25, value: 5 },
   { name: "🌔圆月模型", hookRate: 0.25, value: 5 },
 
-  
+
   { name: "🫙纸星瓶", hookRate: 0.23, value: 6 },
 
+  { name: "🍀幸運葉子", hookRate: 0.20, value: 7 },
   { name: "🐬彩虹海豚", hookRate: 0.20, value: 7 },
   { name: "🌊风暴海鲈", hookRate: 0.20, value: 7 },
   { name: "🌹玫瑰海胆", hookRate: 0.20, value: 7 },
@@ -210,11 +217,13 @@ export const fishList = [
   { name: "💖爱心鱼", hookRate: 0.20, value: 7 },
   { name: "🐠阴蒂鱼", hookRate: 0.20, value: 7 },
 
-  
+
   { name: "💐厄尔庇斯花", hookRate: 0.18, value: 8 },
-  
+  { name: "🧸琉璃的小熊玩偶", hookRate: 0.18, value: 8 },
+
+  { name: "🐈哈基喵", hookRate: 0.17, value: 9 },
   { name: "⛄️琪露诺的雪人", hookRate: 0.17, value: 9 },
-  
+
   { name: "🪷花", hookRate: 0.16, value: 10 },
   { name: "🚛泥头车", hookRate: 0.16, value: 10 },
   { name: "🌠翻折的祈愿星", hookRate: 0.16, value: 10 },
@@ -232,7 +241,7 @@ export const fishList = [
   { name: "🦑黄金乌贼", hookRate: 0.15, value: 11 },
   { name: "🐋触须鲸", hookRate: 0.15, value: 11 },
 
-  
+
   { name: "🐙章鱼哥", hookRate: 0.11, value: 12 },
 
   { name: "📒琉璃的回忆相册", hookRate: 0.10, value: 13 },
@@ -240,6 +249,8 @@ export const fishList = [
   { name: "🦈龙牙鲨", hookRate: 0.10, value: 13 },
   { name: "🐍巨角蟒", hookRate: 0.10, value: 13 },
   { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
+  { name: "🧚‍♀️湖中精灵", hookRate: 0.10, value: 13 },
+  { name: "💣教堂の“小男孩”", hookRate: 0.10, value: 13 },
 ];
 
 export type LikeTextEntry = {
@@ -567,15 +578,15 @@ export const backupConfig: BackupMapping[] = [
   },
   // 示例：测试群
 
-/*
-  {
-    from: { chat_id: -1002848481881, threadId: 66 },
-    to: [
-      { chat_id: -1002661676227, threadId: 2 }
-    ]
-  },
-*/
-  
+  /*
+    {
+      from: { chat_id: -1002848481881, threadId: 66 },
+      to: [
+        { chat_id: -1002661676227, threadId: 2 }
+      ]
+    },
+  */
+
   //紫罗大群
   //匹配区
   {
