@@ -17,7 +17,7 @@
 			},
 			"triggers": {
 				"crons": [
-			//		"59 7 1 1 1"
+					//		"59 7 1 1 1"
 				]
 			},
 			"kv_namespaces": [
@@ -52,6 +52,22 @@
 				{
 					"binding": "ITEM_STORE", // 货币 KV
 					"id": "84193feb14c64ea28b52e0798e71bae0"
+				}
+			],
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "COIN_DO",
+						"class_name": "CoinDO"
+					}
+				]
+			},
+			"migrations": [
+				{
+					"tag": "v1",
+					"new_sqlite_classes": [
+						"CoinDO"
+					]
 				}
 			],
 			"vars": {

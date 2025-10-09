@@ -16,13 +16,15 @@ export type Env = {
   BOT_USERNAME: string;
   NEWS_STORE: KVNamespace
   TOPIC_KV: KVNamespace
-  COIN_KV: KVNamespace
   BOOK_STORE: KVNamespace
   FISHING_RECORD_KV: KVNamespace
   TGBOTCOUNT: KVNamespace
   AFFECTION_KV: KVNamespace
   ITEM_STORE: KVNamespace
+  COIN_DO: any
+  COIN_KV: KVNamespace
 };
+export { CoinDO } from './durableObjects/coin_do';
 
 export default {
 
@@ -165,6 +167,16 @@ export default {
 
           switch (parsedMessage.command) {
             //书签
+            
+            
+            case "migrate": {
+              console.log("index: 检测到 /book 命令，进入 book逻辑");
+              const { handleMigrate } = await import("./commands/migrate");
+              await handleMigrate(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /migrate 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");

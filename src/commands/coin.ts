@@ -13,13 +13,12 @@ import {
   deductFromBalance,
   deductFromBalanceAllowNegative
 } from "../lib/coinService";
+import { createDOAdapter } from "../lib/doAdapter";
 
-/**
- * 扩展 env 类型（至少需要 COIN_KV 和 BOT_USERNAME）
- */
+ 
 type CoinEnv = EnvLike & {
-  COIN_KV: KVNamespace;
   BOT_USERNAME?: string;
+  COIN_DO:any;
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
@@ -121,7 +120,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   const userId = String(from.id);
   const userName = String(from.first_name ?? from.username ?? "你");
   const safeUserName = escapeHtml(userName);
-  const kv = env.COIN_KV;
+  const kv = createDOAdapter(env, env.COIN_DO, "coins");
   const sub = (args[0] || "").toLowerCase();
 
   // — 查询余额（默认无子命令）
