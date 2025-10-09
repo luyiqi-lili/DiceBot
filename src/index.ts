@@ -169,7 +169,7 @@ export default {
             //书签
             
             
-            case "migrate": {
+        /*    case "migrate": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleMigrate } = await import("./commands/migrate");
               await handleMigrate(parsedMessage, env);
@@ -177,6 +177,7 @@ export default {
               console.log(`index: /migrate 处理完成`);
               return new Response("OK", { status: 200 });
             }
+              */
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
