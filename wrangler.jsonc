@@ -135,7 +135,7 @@
 				"bindings": [
 					{
 						"name": "COIN_DO",
-						"class_name": "CoinDO_Prod"
+						"class_name": "CoinDO"
 					}
 				]
 			},
@@ -143,7 +143,7 @@
 				{
 					"tag": "prod",
 					"new_sqlite_classes": [
-						"CoinDO_Prod"
+						"CoinDO"
 					]
 				}
 			],
@@ -159,7 +159,7 @@
 			}
 		}
 	}
-	
+
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
