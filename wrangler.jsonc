@@ -131,6 +131,22 @@
 					"id": "8be14408cf784bf7852e2ab865fc20a2"
 				}
 			],
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "COIN_DO",
+						"class_name": "CoinDO_Prod"
+					}
+				]
+			},
+			"migrations": [
+				{
+					"tag": "prod",
+					"new_sqlite_classes": [
+						"CoinDO_Prod"
+					]
+				}
+			],
 			"vars": {
 				"BOT_USERNAME": "lili_DiceBot",
 				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh",
