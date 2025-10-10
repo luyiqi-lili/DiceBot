@@ -75,7 +75,7 @@ async function setBalance(kv: KVNamespace, id: string, bal: number): Promise<voi
 export async function addToBalance(env: EnvLike, kv: KVNamespace, id: string, delta: number, event: String): Promise<number> {
   const cur = await getBalance(kv, id);
   const next = cur + delta;
-  await SendTransLog(env, delta, id, `${event} 增加`);
+  await SendTransLog(env, delta, id, `${event} 增加 变更前 ${cur} 变更后 ${next}`);
   await setBalance(kv, id, next);
   return next;
 }
@@ -84,7 +84,7 @@ export async function addToBalance(env: EnvLike, kv: KVNamespace, id: string, de
 export async function deductFromBalance(env: EnvLike, kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
   const cur = await getBalance(kv, id);
   if (cur < amount) return false;
-  await SendTransLog(env, amount, id, `${event} 扣减`);
+  await SendTransLog(env, amount, id, `${event} 扣减  变更前 ${cur} 变更后 ${cur - amount}`);
   await setBalance(kv, id, cur - amount);
   return true;
 }
@@ -92,7 +92,7 @@ export async function deductFromBalance(env: EnvLike, kv: KVNamespace, id: strin
 /** 从账户扣款，若余额不足返回 false，否则扣款并返回 true */
 export async function deductFromBalanceAllowNegative(env: EnvLike, kv: KVNamespace, id: string, amount: number, event: String): Promise<boolean> {
   const cur = await getBalance(kv, id);
-  await SendTransLog(env, amount, id, `${event} 扣减`);
+  await SendTransLog(env, amount, id, `${event} 扣减 变更前 ${cur} 变更后 ${cur - amount}`);
   await setBalance(kv, id, cur - amount);
   return true;
 }
