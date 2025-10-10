@@ -15,10 +15,10 @@ import {
 } from "../lib/coinService";
 import { createDOAdapter } from "../lib/doAdapter";
 
- 
+
 type CoinEnv = EnvLike & {
   BOT_USERNAME?: string;
-  COIN_DO:any;
+  COIN_DO: any;
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
@@ -62,11 +62,11 @@ async function transfer(
   const fee = Math.floor(amount * rate);
 
   // 扣款
-  deductFromBalance(env,kv, fromId, amount,"转账转出");
+  await deductFromBalance(env, kv, fromId, amount, "转账转出");
   // 收款
-  addToBalance(env,kv, toId, amount - fee,"转账转入");
+  await addToBalance(env, kv, toId, amount - fee, "转账转入");
   // 手续费入艾丽莎宝库
-  await addToTreasury(env,kv, fee,"转账收税");
+  await addToTreasury(env, kv, fee, "转账收税");
 
   return {
     ok: true,
@@ -174,8 +174,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     let fee = Math.floor(gain * rate);
     fee = 0;
     const newBal = bal + gain - fee;
-    await payoutFromTreasuryAllowNegative(env,kv, gain - fee,"祈祷支出");
-    await addToBalance(env,kv, userId, gain - fee,"祈祷收入");
+    await payoutFromTreasuryAllowNegative(env, kv, gain - fee, "祈祷支出");
+    await addToBalance(env, kv, userId, gain - fee, "祈祷收入");
 
     try {
       await kv.put(prayKey, today);
@@ -244,16 +244,16 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
-    await deductFromBalance(env,kv, userId,  amount,"祈福支出");
+    await deductFromBalance(env, kv, userId, amount, "祈福支出");
 
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
     const oldRoomBal = await getBalance(kv, roomKey);
     const newRoomBal = oldRoomBal + amount;
 
-    await addToTreasury(env,kv, amount,"祈福收入");
-    
-    await addToBalance(env,kv, roomKey, amount,"祈福计数");
+    await addToTreasury(env, kv, amount, "祈福收入");
+
+    await addToBalance(env, kv, roomKey, amount, "祈福计数");
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -304,7 +304,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         return;
 
       }
-      const result = await transfer(env,kv, userId, targetID.toString(), amount);
+      const result = await transfer(env, kv, userId, targetID.toString(), amount);
       if (!result.ok) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
         return;
@@ -339,7 +339,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败，目标${repliedFrom.id} 和转账${userId} 不能相同`, parse_mode: "HTML", message_thread_id: threadId });
       return;
     }
-    const result = await transfer(env,kv, userId, String(repliedFrom.id), amount);
+    const result = await transfer(env, kv, userId, String(repliedFrom.id), amount);
     if (!result.ok) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${result.reason}`, parse_mode: "HTML", message_thread_id: threadId });
       return;
@@ -467,21 +467,21 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const oldTargetBal = await getBalance(kv, targetUid);
 
-/*
-    if (oldTargetBal < amount) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-      return;
-    }
-*/
+    /*
+        if (oldTargetBal < amount) {
+          await TgMessage.sendText(env, {
+            chat_id: chatId,
+            text: `❌ 目标余额不足，当前只有 ${oldTargetBal} 💰。`,
+            parse_mode: "HTML",
+            message_thread_id: threadId
+          });
+          return;
+        }
+    */
     // 扣除艾丽莎宝库并增加目标账户
-    await addToTreasury(env,kv, amount,"内务部税款");
+    await addToTreasury(env, kv, amount, "内务部税款");
 
-    await deductFromBalanceAllowNegative(env,kv, targetUid,  amount,"内务部税款");
+    await deductFromBalanceAllowNegative(env, kv, targetUid, amount, "内务部税款");
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -542,10 +542,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 扣除艾丽莎宝库并增加目标账户
-    await takeFromTreasury(env,kv, amount,"宝库取款");
+    await takeFromTreasury(env, kv, amount, "宝库取款");
     const oldTargetBal = await getBalance(kv, targetUid);
     const newTargetBal = oldTargetBal + amount;
-    await addToBalance(env,kv, targetUid, amount,"宝库取款");
+    await addToBalance(env, kv, targetUid, amount, "宝库取款");
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -580,7 +580,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    await addToTreasury(env,kv, amount,"虚空造币");
+    await addToTreasury(env, kv, amount, "虚空造币");
     const newTre = await getTreasury(kv);
     await TgMessage.sendText(env, {
       chat_id: chatId,
