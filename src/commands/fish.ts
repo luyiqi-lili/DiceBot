@@ -391,11 +391,11 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
 
         resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${payout} 💰渔获，最新余额 ${newOwnerBal}💰。\n`
-            + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
+ //           + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
     } else {
         // 未钓中（包括 targetValue==0 或 hook 判定失败）
         resultText += `😣 有鱼接近，但这次没有上钩。\n\n 本次花费 ${baitCost}💰鱼饵，最新余额 ${currentBal}💰 \n`
-            + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
+//            + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
     }
 
     // 防止并发/重复处理的最后检查
@@ -545,7 +545,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
     const initText =
         `${userName} 花费 ${baitCost} 💰 的鱼饵后，抛出渔线，${castDesc}\n\n` +
-        ` bestSec ${bestSec}\n` +
+ //       ` bestSec ${bestSec}\n` +
         `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
     // callback_data 使用 JSON 字符串化
