@@ -258,7 +258,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
     // 可配置的“value”范围起止；如果你希望把 1 和 13 作为参数，这里可以替换成配置变量（目前以 fishList 的实际 value 范围为准）
     const values = fishList.map(f => Number(f.value));
-    const minValueAvailable = Math.min(...values); // 例如 1（或者 0）
+    const minValueAvailable = 0; // 例如 1（或者 0）
     const maxValueAvailable = Math.max(...values); // 例如 13
 
     // 计算 score 在 100..1000 的归一化位置（0..1）
@@ -313,18 +313,22 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     }
 
     // 从候选鱼中随机选择一条
-    let chosen: any = null;
-    if (candidateFish.length > 0) {
-        const idx = Math.floor(Math.random() * candidateFish.length);
-        chosen = candidateFish[idx];
-    }
-
-    // 判定是否钓中
+    // 决定是否“上鱼”（hooked）依旧由 chosen.hookRate + baitCost * jitter 决定
+    // 但如果 isNoCatchValue 为 true（value===0），我们强制判定未上鱼
     let hooked = false;
-    if (isNoCatchValue || !chosen) {
+    let chosen: any = null;
+
+    if (isNoCatchValue) {
+        // 没有渔获（value==0），直接记录未钓中（或按你的业务需要另作显示）
         hooked = false;
     } else {
-        hooked = true;
+        // 随机从候选池中挑一条鱼作为“目标鱼”（用于判断 hookRate）
+        chosen = candidateFish[Math.floor(Math.random() * candidateFish.length)];
+
+        // 微调抓上概率：沿用原逻辑用 baitCost 做 jitter 增益
+        const jitter = 0.1 * baitCost;
+        const finalHookProb = Math.max(0, Math.min(1, (Number(chosen.hookRate) || 0) + jitter));
+        hooked = Math.random() < finalHookProb;
     }
 
 
