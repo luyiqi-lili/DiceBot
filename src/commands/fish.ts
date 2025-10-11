@@ -312,8 +312,6 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         candidateFish = fishList.filter(f => Number(f.value) === closestVal);
     }
 
-    // 决定是否“上鱼”（hooked）依旧由 chosen.hookRate + baitCost * jitter 决定
-    // 但如果 isNoCatchValue 为 true（value===0），我们强制判定未上鱼
     let hooked = false;
     let chosen: any = null;
 
@@ -321,13 +319,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         // 没有渔获（value==0），直接记录未钓中（或按你的业务需要另作显示）
         hooked = false;
     } else {
-        // 随机从候选池中挑一条鱼作为“目标鱼”（用于判断 hookRate）
-        chosen = candidateFish[Math.floor(Math.random() * candidateFish.length)];
-
-        // 微调抓上概率：沿用原逻辑用 baitCost 做 jitter 增益
-        const jitter = 0.1 * baitCost;
-        const finalHookProb = Math.max(0, Math.min(1, (Number(chosen.hookRate) || 0) + jitter));
-        hooked = Math.random() < finalHookProb;
+        hooked = true;
     }
 
     // 记录与国库操作：
