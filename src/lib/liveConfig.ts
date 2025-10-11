@@ -251,6 +251,8 @@ export const fishList = [
   { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
   { name: "🧚‍♀️湖中精灵", hookRate: 0.10, value: 13 },
   { name: "💣教堂の“小男孩”", hookRate: 0.10, value: 13 },
+  { name: "🖼️莹魔的涩图”", hookRate: 0.10, value: 13 },
+  
 ];
 
 export type LikeTextEntry = {
