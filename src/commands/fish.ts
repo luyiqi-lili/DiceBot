@@ -183,6 +183,9 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     const currentBal = await coinGetBalance(kvBackend, ownerIdStr);
     const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
 
+    const zeroCount = (fishingRecord.results || []).filter(r => r.fishValue === 0).length;
+    const guaranteePending = (zeroCount >= 10) && !Boolean((fishingRecord as any).guaranteeUsed);
+
     if (fishingRecord.results.some(r => r.messageId === messageId)) {
         await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: `该次钓鱼已处理，忽略重复点击。`, show_alert: true });
         return;
@@ -254,12 +257,51 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         return;
     }
 
-    /* ---------------- 100..1000 区间：先决定目标 value（使用泊松分布），再从 fishList 中选鱼 ---------------- */
 
     // 可配置的“value”范围起止；如果你希望把 1 和 13 作为参数，这里可以替换成配置变量（目前以 fishList 的实际 value 范围为准）
     const values = fishList.map(f => Number(f.value));
     const minValueAvailable = 0; // 例如 1（或者 0）
     const maxValueAvailable = Math.max(...values); // 例如 13
+
+    // 如果满足保底条件并且 score 落在 100..1000，则直接触发保底（只触发一次/天）
+    if (guaranteePending && score >= 100 && score <= 1000) {
+        // 选取最大 value 的鱼（如果有多条相同 value，随机挑一条）
+        const bestVal = maxValueAvailable;
+        const bestCandidates = fishList.filter(f => Number(f.value) === bestVal);
+        const chosen = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
+
+        // 给用户发奖（允许国库赤字）
+        const payout = Number(chosen.value) || 0;
+        const newOwnerBal = currentBal + payout;
+        await addToBalance(env, kvBackend, ownerIdStr, payout, "渔获（保底）");
+        await payoutFromTreasuryAllowNegative(env, kvBackend, payout, "渔获（保底）");
+
+        // 更新鱼塘当天 payout
+        const today = nowDateYMD();
+        await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
+
+        // 写入记录并标记保底已被使用（每天仅一次）
+        (fishingRecord as any).guaranteeUsed = true;
+        fishingRecord.results.push({ baitCost, hooked: true, fishValue: chosen.name, messageId });
+        fishingRecord.count += 1;
+        await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
+
+        const resultText =
+            `${clickerName} 拉杆！\n` +
+            `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${payout} 💰渔获，最新余额 ${newOwnerBal}💰。\n`
+            + showFishingRecord(fishingRecord);
+
+        await TgMessage.editMessageText(env, {
+            chat_id: chatId,
+            message_id: messageId,
+            parse_mode: "HTML",
+            text: resultText,
+            reply_markup: { inline_keyboard: [] }
+        });
+        return;
+    }
+
+    /* ---------------- 100..1000 区间：先决定目标 value（使用泊松分布），再从 fishList 中选鱼 ---------------- */
 
     // 计算 score 在 100..1000 的归一化位置（0..1）
     const norm = (score - 100) / (1000 - 100); // 0..1
@@ -321,6 +363,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     if (isNoCatchValue) {
         // 没有渔获（value==0），直接记录未钓中（或按你的业务需要另作显示）
         hooked = false;
+
     } else {
         // 随机从候选池中挑一条鱼作为“目标鱼”（用于判断 hookRate）
         chosen = candidateFish[Math.floor(Math.random() * candidateFish.length)];
