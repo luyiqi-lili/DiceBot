@@ -312,15 +312,21 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         candidateFish = fishList.filter(f => Number(f.value) === closestVal);
     }
 
-    let hooked = false;
+    // 从候选鱼中随机选择一条
     let chosen: any = null;
+    if (candidateFish.length > 0) {
+        const idx = Math.floor(Math.random() * candidateFish.length);
+        chosen = candidateFish[idx];
+    }
 
-    if (isNoCatchValue) {
-        // 没有渔获（value==0），直接记录未钓中（或按你的业务需要另作显示）
+    // 判定是否钓中
+    let hooked = false;
+    if (isNoCatchValue || !chosen) {
         hooked = false;
     } else {
         hooked = true;
     }
+
 
     // 记录与国库操作：
     // - 发起者支付的 baitCost 在发起阶段已经扣除并加入国库（handleFish 已完成 addToTreasury）
@@ -487,12 +493,12 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     // 生成抛竿描述（保留原文案）
     let castDesc: string;
     castDesc = getCastDesc(strength);
-    const bestSec = 1000/strength;
+    const bestSec = 1000 / strength;
 
 
     const initText =
         `${userName} 花费 ${baitCost} 💰 的鱼饵后，抛出渔线，${castDesc}\n\n` +
-        ` bestSec ${bestSec}\n`+
+        ` bestSec ${bestSec}\n` +
         `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
     // callback_data 使用 JSON 字符串化
