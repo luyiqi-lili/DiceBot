@@ -167,17 +167,17 @@ export default {
 
           switch (parsedMessage.command) {
             //书签
-            
-            
-        /*    case "migrate": {
-              console.log("index: 检测到 /book 命令，进入 book逻辑");
-              const { handleMigrate } = await import("./commands/migrate");
-              await handleMigrate(parsedMessage, env);
-              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
-              console.log(`index: /migrate 处理完成`);
-              return new Response("OK", { status: 200 });
-            }
-              */
+
+
+            /*    case "migrate": {
+                  console.log("index: 检测到 /book 命令，进入 book逻辑");
+                  const { handleMigrate } = await import("./commands/migrate");
+                  await handleMigrate(parsedMessage, env);
+                  await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+                  console.log(`index: /migrate 处理完成`);
+                  return new Response("OK", { status: 200 });
+                }
+                  */
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
@@ -235,6 +235,18 @@ export default {
               console.log(`index: /roll 处理完成`);
               return new Response("OK", { status: 200 });
             }
+            
+            //骰点
+            case "em":
+            case "emote": {
+              console.log("index: 检测到 /emote 命令，进入 emote逻辑");
+              const { handleEmote } = await import("./commands/emote");
+              await handleEmote(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /emote 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+
             //帮助
             case "help": {
               console.log("index: 检测到 /help 命令，进入 help逻辑");
