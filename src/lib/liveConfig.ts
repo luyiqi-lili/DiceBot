@@ -56,11 +56,11 @@ export const MAJOR_ARCANA = [
 ];
 
 export const fishList = [
-  { name: "🍾破损漂流瓶", hookRate: 0.40, value: 1 },
-  { name: "🪵浮木", hookRate: 0.40, value: 1 },
-  { name: "👢没用的靴子", hookRate: 0.40, value: 1 },
-  { name: "🌿绿海草", hookRate: 0.40, value: 1 },
-  { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 1 },
+  { name: "🍾破损漂流瓶", hookRate: 0.40, value: 0 },
+  { name: "🪵浮木", hookRate: 0.40, value: 0 },
+  { name: "👢没用的靴子", hookRate: 0.40, value: 0 },
+  { name: "🌿绿海草", hookRate: 0.40, value: 0 },
+  { name: "<tg-spoiler>🩸用过的避孕套</tg-spoiler>", hookRate: 0.60, value: 0 },
   { name: "🍇海葡萄", hookRate: 0.40, value: 1 },
   { name: "🌙月牙石", hookRate: 0.40, value: 1 },
   { name: "⭐星星贝壳", hookRate: 0.40, value: 1 },
@@ -251,6 +251,8 @@ export const fishList = [
   { name: "🐱猫鱼", hookRate: 0.10, value: 13 },
   { name: "🧚‍♀️湖中精灵", hookRate: 0.10, value: 13 },
   { name: "💣教堂の“小男孩”", hookRate: 0.10, value: 13 },
+  { name: "🖼️莹魔的涩图”", hookRate: 0.10, value: 13 },
+  
 ];
 
 export type LikeTextEntry = {
