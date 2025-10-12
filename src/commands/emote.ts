@@ -46,7 +46,22 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     content = parsed.text.replace(/^\s*\/?\w+(@\w+)?\s*/i, "").trim();
   }
 
-  content = content || "(没有内容)";
+  // 如果用户没有输入任何内容，提示并结束
+  if (!content || content.trim().length === 0) {
+    const hint = `错误：请在 /em 后添加动作描述。例如：<code>/em 开心地跳了起来</code>`;
+    try {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: hint,
+        parse_mode: "HTML",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+    } catch (e) {
+      console.error("[emote] 发送空内容提示失败", e);
+    }
+    return;
+  }
 
   // 检查 %t 占位符使用情况
   const containsTargetPlaceholder = content.includes("%t");
@@ -71,7 +86,7 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   // 如果存在 targetRaw，则替换 %t 为目标名称
   let finalContent = content;
   if (targetRaw) {
-    // 多次出现 %t 都替换
+    // 多次出现 %t 都替换（两边留空格以防粘连）
     finalContent = finalContent.split("%t").join(` ${targetRaw} `);
   }
 
