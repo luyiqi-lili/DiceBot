@@ -72,7 +72,7 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   let finalContent = content;
   if (targetRaw) {
     // 多次出现 %t 都替换
-    finalContent = finalContent.split("%t").join(targetRaw);
+    finalContent = finalContent.split("%t").join(` ${targetRaw} `);
   }
 
   // 组装输出文本： "[Actor] [finalContent]"
