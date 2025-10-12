@@ -238,6 +238,7 @@ export default {
             
             //骰点
             case "em":
+            case "me":
             case "emote": {
               console.log("index: 检测到 /emote 命令，进入 emote逻辑");
               const { handleEmote } = await import("./commands/emote");
