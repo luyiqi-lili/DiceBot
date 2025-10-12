@@ -93,7 +93,7 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   // 组装输出文本： "[Actor] [finalContent]"
   const safeActor = escapeHtml(actor);
   const safeContent = escapeHtml(finalContent);
-  const out = `<code> ${safeActor} ${safeContent} </code>`;
+  const out = `<code> ${safeActor}${safeContent} </code>`;
 
   try {
     await TgMessage.sendText(env, {
