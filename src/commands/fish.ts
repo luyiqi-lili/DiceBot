@@ -2,7 +2,6 @@ import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { CoinEnv, getBalance as coinGetBalance, addToBalance, addToTreasury, payoutFromTreasuryAllowNegative, deductFromBalance } from "../lib/coinService";
 import { fishList, getCastDesc } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
-import { createDOAdapter } from "../lib/doAdapter";
 
 
 const maxRecode = 20;
@@ -13,6 +12,8 @@ const maxRecode = 20;
  */
 export type FishEnv = CoinEnv & {
     FISHING_RECORD_KV: KVNamespace;
+    COIN_DO: DurableObjectNamespace;
+
 };
 
 
@@ -144,8 +145,8 @@ function showFishingRecord(record: FishingRecord): string {
  * 预期结构： { type: "fish", ownerId: number, strength: number, baitCost: number, startTs?: number }
  */
 export async function handleFishCallback(callbackQuery: any, callbackData: any, env: FishEnv) {
-    const kvBackend = createDOAdapter(env, env.COIN_DO, "coins");
     // 解析 callbackData（可能是字符串）
+ 
     let dataObj: any = callbackData;
     if (typeof dataObj === "string") {
         try {
@@ -180,7 +181,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
     // 读取余额与记录
     const ownerIdStr = String(ownerId);
-    const currentBal = await coinGetBalance(kvBackend, ownerIdStr);
+    const currentBal = await coinGetBalance( env.COIN_DO, ownerIdStr);
     const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
 
     const zeroCount = (fishingRecord.results || []).filter(r => r.fishValue === 0).length;
@@ -273,8 +274,8 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         // 给用户发奖（允许国库赤字）
         const payout = Number(chosen.value) || 0;
         const newOwnerBal = currentBal + payout;
-        await addToBalance(env, kvBackend, ownerIdStr, payout, "渔获（保底）");
-        await payoutFromTreasuryAllowNegative(env, kvBackend, payout, "渔获（保底）");
+        await addToBalance(env,  env.COIN_DO, ownerIdStr, payout, "渔获（保底）");
+        await payoutFromTreasuryAllowNegative(env,  env.COIN_DO, payout, "渔获（保底）");
 
         // 更新鱼塘当天 payout
         const today = nowDateYMD();
@@ -383,19 +384,19 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     if (hooked && chosen) {
         const payout = Number(chosen.value) || 0;
         const newOwnerBal = currentBal + payout;
-        await addToBalance(env, kvBackend, ownerIdStr, payout, "渔获");
-        const newTre = await payoutFromTreasuryAllowNegative(env, kvBackend, payout, "渔获");
+        await addToBalance(env,  env.COIN_DO, ownerIdStr, payout, "渔获");
+        const newTre = await payoutFromTreasuryAllowNegative(env,  env.COIN_DO, payout, "渔获");
 
         // 更新鱼塘当日 payout
         const today = nowDateYMD();
         await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
 
         resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${payout} 💰渔获，最新余额 ${newOwnerBal}💰。\n`
- //           + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
+        //           + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
     } else {
         // 未钓中（包括 targetValue==0 或 hook 判定失败）
         resultText += `😣 有鱼接近，但这次没有上钩。\n\n 本次花费 ${baitCost}💰鱼饵，最新余额 ${currentBal}💰 \n`
-//            + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
+        //            + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
     }
 
     // 防止并发/重复处理的最后检查
@@ -425,7 +426,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
  * parsedMessage: ParsedUpdate（由 TgMessage.parseUpdate 返回）
  */
 export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
-    const kvBackend = createDOAdapter(env, env.COIN_DO, "coins");
+    const kvBackend =  env.COIN_DO
     // 如果是 callback_query，转给 callback handler
     if (parsedMessage.type === "callback_query" && parsedMessage.callbackQuery) {
         // parsedMessage.callbackData 可能已被 parseCallbackData 转成 object；也可能是字符串
@@ -545,7 +546,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
     const initText =
         `${userName} 花费 ${baitCost} 💰 的鱼饵后，抛出渔线，${castDesc}\n\n` +
- //       ` bestSec ${bestSec}\n` +
+        //       ` bestSec ${bestSec}\n` +
         `点击下方的「🎣 拉杆」以收紧鱼线，迎接命运的回响\n（仅 ${userName} 本人可操作）。`;
 
     // callback_data 使用 JSON 字符串化

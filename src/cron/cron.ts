@@ -7,52 +7,19 @@
 */
 
 import TgMessage, { EnvLike } from "../lib/tgMessage";
-import { getTreasury, TREASURY_KEY } from "../lib/coinService";
-import { createDOAdapter } from "../lib/doAdapter";
-
+import { getTreasury, TREASURY_KEY,sumAllUserBalances } from "../lib/coinService";
+ 
 // 扩展 env 类型
 type CronEnv = EnvLike & {
    BOT_USERNAME?: string;
-   COIN_DO:any
+   COIN_DO:DurableObjectNamespace
 };
 
 // 简单 logger
 function log(...args: any[]) {
   console.log("🔔 [cron/coinCheck]", ...args);
 }
-
-// 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键）
-async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
-  let total = 0;
-  let cursor: string | undefined = undefined;
-  try {
-    do {
-      const opts: any = cursor ? { cursor } : {};
-      // list 返回 { keys: [{ name, ... }], cursor }
-      const res = await (kv as any).list(opts);
-      cursor = res.cursor;
-      for (const k of (res.keys || [])) {
-        const name: string = k.name;
-        if (name === TREASURY_KEY) continue;
-        if (name.includes("||")) continue;
-        if (/^\d+$/.test(name)) {
-          try {
-            const vRaw = await kv.get(name);
-            const v = Number(vRaw || 0);
-            if (!Number.isNaN(v)) total += v;
-          } catch (e) {
-            log("读取余额失败 key=", name, e);
-          }
-        }
-      }
-    } while (cursor);
-  } catch (e) {
-    log("遍历 KV 失败", e);
-    throw e;
-  }
-  return total;
-}
-
+ 
 /**
  * 执行一次 coin check，并把结果发送到指定 chat/thread
  * 默认目标：chat_id = -1002848481881, message_thread_id = 66
@@ -60,13 +27,12 @@ async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
 export async function runCoinCheck(env: CronEnv, opts?: { chat_id?: number; message_thread_id?: number }) {
   const chatId = opts?.chat_id ?? -1002848481881;
   const threadId = opts?.message_thread_id ?? 8346;
-  const kv = createDOAdapter(env, env.COIN_DO, "coins");
-
+ 
   log("开始执行 coin check", { chatId, threadId });
 
   try {
-    const treasuryBal = await getTreasury(kv);
-    const totalUserBal = await sumAllUserBalances(kv);
+    const treasuryBal = await getTreasury( env.COIN_DO);
+    const totalUserBal = await sumAllUserBalances(env.COIN_DO);
 
     const text =
       `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
