@@ -2,9 +2,7 @@
 /**
  * createDOAdapter - 返回一个“KV-like”对象，内部通过 Durable Object Stub 的 fetch 与 DO 通信。
  *
- * 用法示例：
- *   const kvLike = createDOAdapter(env, env.COIN_DO, "coins"); // env.COIN_DO 为 DO namespace binding
- *   await getBalance(kvLike, id); // 不需要改 coinService 代码
+ * 新增：atomicAdd / atomicDeduct / atomicDeductAllowNegative / transfer
  */
 export function createDOAdapter(env: any, doNamespace: DurableObjectNamespace, name = "coins") {
   if (!doNamespace) throw new Error("Durable Object namespace binding required");
@@ -21,8 +19,6 @@ export function createDOAdapter(env: any, doNamespace: DurableObjectNamespace, n
       const res = await stub.fetch(url, { method: "GET" });
       if (!res.ok) return null;
       const text = await res.text();
-      // KVNamespace.get 返回 null 而不是 '', 但你的现有代码把 raw ? parseInt(raw) 处理了；
-      // 我这里返回 '' -> 当 raw falsy 则 coinService 的 getBalance 仍会判定为 0。
       return text === "" ? null : text;
     },
 
@@ -46,6 +42,55 @@ export function createDOAdapter(env: any, doNamespace: DurableObjectNamespace, n
       if (!res.ok) return { keys: [], cursor: "" };
       const json = await res.json();
       return json;
-    }
-  } as unknown as KVNamespace; // 强制断言为 KVNamespace 以方便现有代码传入
+    },
+
+    /* ------------------ 原子操作接口 ------------------ */
+    // atomicAdd: 在 DO 内对 key 原子 +delta，返回 { balance: number }
+    async atomicAdd(key: string, delta: number, event?: string): Promise<{ balance: number }> {
+      const url = `${base}/atomic`;
+      const res = await stub.fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ op: "add", key, delta, event }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("atomicAdd failed");
+      return await res.json();
+    },
+
+    // atomicDeduct: 在 DO 内尝试原子扣款（检查余额），返回 { ok: boolean, balance: number, reason?: string }
+    async atomicDeduct(key: string, amount: number, event?: string): Promise<{ ok: boolean; balance: number; reason?: string }> {
+      const url = `${base}/atomic`;
+      const res = await stub.fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ op: "deduct", key, amount, event }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("atomicDeduct failed");
+      return await res.json();
+    },
+
+    // atomicDeductAllowNegative: 在 DO 内扣款（允许负数），返回 { balance: number }
+    async atomicDeductAllowNegative(key: string, amount: number, event?: string): Promise<{ balance: number }> {
+      const url = `${base}/atomic`;
+      const res = await stub.fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ op: "deductAllowNegative", key, amount, event }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("atomicDeductAllowNegative failed");
+      return await res.json();
+    },
+
+    // transfer: 在 DO 内执行原子转账（含手续费入宝库），返回 { ok, fee, fromNew, toNew }
+    async transfer(from: string, to: string, amount: number): Promise<{ ok: boolean; fee?: number; fromNew?: number; toNew?: number; reason?: string }> {
+      const url = `${base}/transfer`;
+      const res = await stub.fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ from, to, amount }),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("transfer failed");
+      return await res.json();
+    },
+  } as unknown as any; // 保持兼容旧代码（原来强制为 KVNamespace）
 }

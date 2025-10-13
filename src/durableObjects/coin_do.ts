@@ -17,6 +17,16 @@ export class CoinDO {
     await this.state.storage.put("__MAP__", map);
   }
 
+  // fee rate logic（与外层保持一致）
+  private calcTransferFeeRate(targetBal: number): number {
+    if (targetBal < 100) return 0;
+    if (targetBal < 300) return 0.1;
+    if (targetBal < 500) return 0.3;
+    if (targetBal < 700) return 0.5;
+    if (targetBal < 900) return 0.7;
+    return 0.9;
+  }
+
   async fetch(req: Request) {
     const url = new URL(req.url);
     const path = url.pathname;
@@ -57,6 +67,96 @@ export class CoinDO {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    /* ------------------ 原子操作接口 ------------------ */
+    if (path === "/atomic" && req.method === "POST") {
+      const body = await req.text();
+      let data: any = {};
+      try { data = JSON.parse(body); } catch (e) { /* ignore */ }
+      const op = data.op;
+      const map = await this.readMap();
+
+      if (op === "add") {
+        const key: string = String(data.key ?? "");
+        const delta: number = Number(data.delta ?? 0);
+        if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400 });
+        const cur = parseInt(map[key] ?? "0", 10) || 0;
+        const next = cur + delta;
+        map[key] = String(next);
+        await this.writeMap(map);
+        return new Response(JSON.stringify({ balance: next }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      if (op === "deduct") {
+        const key: string = String(data.key ?? "");
+        const amount: number = Number(data.amount ?? 0);
+        if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400 });
+        const cur = parseInt(map[key] ?? "0", 10) || 0;
+        if (cur < amount) {
+          return new Response(JSON.stringify({ ok: false, balance: cur, reason: "insufficient" }), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
+        const next = cur - amount;
+        map[key] = String(next);
+        await this.writeMap(map);
+        return new Response(JSON.stringify({ ok: true, balance: next }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      if (op === "deductAllowNegative") {
+        const key: string = String(data.key ?? "");
+        const amount: number = Number(data.amount ?? 0);
+        if (!key) return new Response(JSON.stringify({ error: "missing key" }), { status: 400 });
+        const cur = parseInt(map[key] ?? "0", 10) || 0;
+        const next = cur - amount;
+        map[key] = String(next);
+        await this.writeMap(map);
+        return new Response(JSON.stringify({ balance: next }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ error: "unknown op" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    // transfer: 在 DO 内执行原子转账（含手续费入宝库）
+    if (path === "/transfer" && req.method === "POST") {
+      const body = await req.text();
+      let data: any = {};
+      try { data = JSON.parse(body); } catch (e) { /* ignore */ }
+      const from: string = String(data.from ?? "");
+      const to: string = String(data.to ?? "");
+      const amount: number = Number(data.amount ?? 0);
+
+      if (!from || !to || isNaN(amount) || amount <= 0) {
+        return new Response(JSON.stringify({ ok: false, reason: "invalid params" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const map = await this.readMap();
+      const fromCur = parseInt(map[from] ?? "0", 10) || 0;
+      if (fromCur < amount) {
+        return new Response(JSON.stringify({ ok: false, reason: "insufficient", fromBalance: fromCur }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      const toCur = parseInt(map[to] ?? "0", 10) || 0;
+
+      // 费用计算（与外层保持一致）
+      const rate = this.calcTransferFeeRate(toCur);
+      const fee = Math.floor(amount * rate);
+
+      // 执行变更（全部写回 map）
+      map[from] = String(fromCur - amount);
+      map[to] = String(toCur + (amount - fee));
+
+      // 手续费写入宝库 __treasury__
+      const treKey = "__treasury__";
+      const treCur = parseInt(map[treKey] ?? "0", 10) || 0;
+      map[treKey] = String(treCur + fee);
+
+      await this.writeMap(map);
+
+      return new Response(JSON.stringify({
+        ok: true,
+        fee,
+        fromNew: Number(map[from]),
+        toNew: Number(map[to])
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     // fallback: not found
