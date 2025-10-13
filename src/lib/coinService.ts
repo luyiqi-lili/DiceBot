@@ -1,184 +1,277 @@
 // lib/coinService.ts
-
 import TgMessage, { EnvLike } from "../lib/tgMessage";
 
 /**
+ * coinService - Durable Object (COIN_DO) based implementation
+ *
+ * 说明：
+ *  - 所有余额变更通过 COIN_DO 的 POST /transfer 原子完成（保证同一 DO 实例内原子性）。
+ *  - 查询通过 GET /get?key=... 完成。
+ *  - 本文件不再假装为 KV（不要再使用 createDOAdapter 返回的 KV-like 对象）。
+ *
+ * 依赖：
+ *  - 需要传入 DurableObjectNamespace（例如 env.COIN_DO）
  */
+
 export type CoinEnv = EnvLike & {
-  COIN_DO:any;
+  COIN_DO: DurableObjectNamespace;
   BOT_USERNAME?: string;
 };
-const nameMap: Record<string, string> = {
-  '__treasury__': "艾莉莎宝库",
-  '-1002742074355||62': "紫罗兰教堂的募捐箱",
-  '-1002742074355||182': "天狐宫的祈愿箱",
-  '-1002848481881||66': "紫罗兰教堂的募捐箱(测试)"
-};
 
-
-/* ------------------------- 全局配置（统一在顶部） ------------------------- */
-// 艾丽莎宝库键
 export const TREASURY_KEY = "__treasury__";
 
-/** 日志，user 因为 变动 amout coin */
-async function SendTransLog(env: EnvLike, amount: number, id: string, event: String, newBalance?: number): Promise<boolean> {
-
-  let uname: string | undefined;
-  try {
-    if (!isNaN(Number(id))) {
-      // 尝试在主群查用户名字（容错）
-      const member = await TgMessage.fetchChatMember(env, -1002742074355, parseInt(id, 10));
-      uname = member?.first_name;
-      if (!uname || /^\d+$/.test(String(uname))) {
-        const member2 = await TgMessage.fetchChatMember(env, -1002848481881, parseInt(id, 10));
-        uname = member2?.first_name;
-      }
-    } else {
-      uname = nameMap[id] ?? id;
-    }
-  } catch (e) {
-    // 忽略 fetchChatMember 失败
-  }
-
-  const display = uname ?? id;
-  const newBalStr = typeof newBalance === "number" ? ` 变更后 ${newBalance}` : "";
-  await TgMessage.sendText(env, {
-    chat_id: -1002848481881,
-    text: `${display}  ${event} 变更量 ${amount}${newBalStr}\nUID: <code class="language-python">${id}</code>`,
-    parse_mode: "HTML",
-    message_thread_id: 12084
-  });
-
-  return false;
+/** helper - get DO stub for the canonical coins instance (name: "coins") */
+function getCoinsStub(doNs: DurableObjectNamespace) {
+  const id = doNs.idFromName("coins");
+  return doNs.get(id);
 }
 
-/** 读取余额（KV/DO） */
-export async function getBalance(kv: KVNamespace, id: string): Promise<number> {
+/** low-level: fetch GET /get?key=... from DO, return string|null */
+async function doGetRaw(doNs: DurableObjectNamespace, key: string): Promise<string | null> {
+  const stub = getCoinsStub(doNs);
+  const base = "https://do";
+  const url = `${base}/get?key=${encodeURIComponent(key)}`;
   try {
-    const raw = await kv.get(id);
-    return raw ? parseInt(raw, 10) || 0 : 0;
+    const res = await stub.fetch(url, { method: "GET" });
+    if (!res.ok) return null;
+    const text = await res.text();
+    // DO returns "" for missing key in our DO implementation — keep that behavior as null for clarity
+    return text === "" ? null : text;
   } catch (e) {
-    console.warn("[coin] getBalance KV 读取失败", e);
+    console.error("[coinService] doGetRaw fetch failed", e);
+    return null;
+  }
+}
+
+/** low-level: POST /transfer to DO, body should be JSON */
+async function doTransferRaw(doNs: DurableObjectNamespace, body: Record<string, any>): Promise<any> {
+  const stub = getCoinsStub(doNs);
+  const base = "https://do";
+  const url = `${base}/transfer`;
+  try {
+    const res = await stub.fetch(url, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" }
+    });
+    const txt = await res.text();
+    try {
+      return JSON.parse(txt);
+    } catch {
+      // if not JSON, return raw text
+      return txt;
+    }
+  } catch (e) {
+    console.error("[coinService] doTransferRaw fetch failed", e);
+    return { ok: false, reason: "do_transfer_error" };
+  }
+}
+
+/** 日志：发送交易审计（尽量不阻塞主流程） */
+async function SendTransLog(env: EnvLike, amount: number, id: string, event: string): Promise<void> {
+  try {
+    // 尽量不抛异常到上层
+    await TgMessage.sendText(env, {
+      chat_id: -1002848481881,
+      text: `${id}  ${event}\nUID: <code>${id}</code>\n金额: ${amount}`,
+      parse_mode: "HTML",
+      message_thread_id: 12084
+    });
+  } catch (e) {
+    console.warn("[coinService] SendTransLog failed", e);
+  }
+}
+
+/** 读取余额（返回 number），若出错则返回 0 */
+export async function getBalance(doNs: DurableObjectNamespace, id: string): Promise<number> {
+  try {
+    const raw = await doGetRaw(doNs, id);
+    if (raw === null) return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch (e) {
+    console.warn("[coinService] getBalance error", e);
     return 0;
   }
 }
 
-/** 写入余额（KV） - note: 仅在不支持 atomic 接口时回退使用 */
-async function setBalance(kv: KVNamespace, id: string, bal: number): Promise<void> {
-  try {
-    await kv.put(id, String(bal));
-  } catch (e) {
-    console.error("[coin] setBalance KV 写入失败", e);
+/** 增加账户余额，基于 transfer(from=TREASURY_KEY, to=id)；返回新余额或 -1 表示失败 */
+export async function addToBalance(env: EnvLike, doNs: DurableObjectNamespace, id: string, delta: number, event: String): Promise<number> {
+  if (delta <= 0) return await getBalance(doNs, id); // no-op
+  // use transfer treasury -> id, allow negative treasury so treasury can go below zero if desired
+  const body = {
+    from: TREASURY_KEY,
+    to: id,
+    amount: delta,
+    allowNegativeTreasury: true
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    // log asynchronously (fire-and-forget)
+    SendTransLog(env, delta, `${TREASURY_KEY} -> ${id}`, `${event} 增加 ${delta} 变更后 ${res.toNew}`);
+    return res.toNew ?? (await getBalance(doNs, id));
+  } else {
+    console.error("[coinService] addToBalance failed", res);
+    return -1;
   }
 }
 
-/** 增加账户余额，返回新余额 — 使用 DO 的 atomicAdd（原子） */
-export async function addToBalance(env: EnvLike, kv: any, id: string, delta: number, event: String): Promise<number> {
-  // 优先使用 kv.atomicAdd（由 createDOAdapter 提供）
-  if (typeof kv.atomicAdd === "function") {
-    const res = await kv.atomicAdd(id, delta, event);
-    const newBal = Number(res.balance || 0);
-    // 日志（在原子写入后发送，保证日志与状态一致）
-    try { await SendTransLog(env, delta, id, event, newBal); } catch (e) { /* ignore logging errors */ }
-    return newBal;
-  }
-
-  // 回退到 KV-like 操作（非原子）——不推荐
-  const cur = await getBalance(kv, id);
-  const next = cur + delta;
-  await SendTransLog(env, delta, id, `${event} 增加 ${delta} 变更前 ${cur} 变更后 ${next}`);
-  await setBalance(kv, id, next);
-  return next;
-}
-
-/** 从账户扣款，若余额不足返回 false，否则扣款并返回 true — 使用 DO 的 atomicDeduct（原子） */
-export async function deductFromBalance(env: EnvLike, kv: any, id: string, amount: number, event: String): Promise<boolean> {
-  if (typeof kv.atomicDeduct === "function") {
-    const res = await kv.atomicDeduct(id, amount, event);
-    if (!res.ok) return false;
-    const newBal = Number(res.balance || 0);
-    try { await SendTransLog(env, amount, id, event, newBal); } catch (e) { /* ignore */ }
+/** 从账户扣款（正常逻辑：如果余额不足则返回 false） */
+export async function deductFromBalance(env: EnvLike, doNs: DurableObjectNamespace, id: string, amount: number, event: String): Promise<boolean> {
+  if (amount <= 0) return true;
+  // transfer id -> treasury
+  const body = {
+    from: id,
+    to: TREASURY_KEY,
+    amount,
+    // by default do NOT allow negative from arbitrary user
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    SendTransLog(env, amount, `${id} -> ${TREASURY_KEY}`, `${event} 扣减 ${amount} 变更后 ${res.fromNew}`);
     return true;
+  } else {
+    // transfer failed (likely insufficient)
+    return false;
   }
-
-  const cur = await getBalance(kv, id);
-  if (cur < amount) return false;
-  await SendTransLog(env, amount, id, `${event} 扣减 ${amount} 变更前 ${cur} 变更后 ${cur - amount}`);
-  await setBalance(kv, id, cur - amount);
-  return true;
 }
 
-/** 从账户扣款，允许负值（原子） */
-export async function deductFromBalanceAllowNegative(env: EnvLike, kv: any, id: string, amount: number, event: String): Promise<boolean> {
-  if (typeof kv.atomicDeductAllowNegative === "function") {
-    const res = await kv.atomicDeductAllowNegative(id, amount, event);
-    const newBal = Number(res.balance || 0);
-    try { await SendTransLog(env, amount, id, event, newBal); } catch (e) { /* ignore */ }
+/**
+ * 从账户扣款，允许目标变为负值（如果 DO 支持 allowNegativeFrom）
+ * - 我这里会把 allowNegativeFrom 透传给 DO（DO 需实现对应逻辑）
+ * - 如果 DO 不支持该 flag，调用可能失败；你可以选择在 DO 内实现 allowNegativeFrom
+ */
+export async function deductFromBalanceAllowNegative(env: EnvLike, doNs: DurableObjectNamespace, id: string, amount: number, event: String): Promise<boolean> {
+  if (amount <= 0) return true;
+  const body = {
+    from: id,
+    to: TREASURY_KEY,
+    amount,
+    allowNegativeFrom: true // 由 DO 端决定是否允许
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    SendTransLog(env, amount, `${id} -> ${TREASURY_KEY}`, `${event} 扣减(允许负值) ${amount} 变更后 ${res.fromNew}`);
     return true;
+  } else {
+    // 如果 DO 不支持 allowNegativeFrom，会返回错误；为了兼容，记录并返回 false
+    console.error("[coinService] deductFromBalanceAllowNegative failed", res);
+    return false;
   }
-
-  const cur = await getBalance(kv, id);
-  await SendTransLog(env, amount, id, `${event} 扣减  ${amount}  变更前 ${cur} 变更后 ${cur - amount}`);
-  await setBalance(kv, id, cur - amount);
-  return true;
 }
 
+/* -------------------- 国库操作（基于 transfer） -------------------- */
 
-/* 艾丽莎宝库相关操作 */
-export async function getTreasury(kv: KVNamespace): Promise<number> {
-  return await getBalance(kv, TREASURY_KEY);
+/** 获取国库余额 */
+export async function getTreasury(doNs: DurableObjectNamespace): Promise<number> {
+  return await getBalance(doNs, TREASURY_KEY);
 }
-export async function addToTreasury(env: EnvLike, kv: any, amount: number, event: String): Promise<number> {
-  // 使用 atomicAdd 对宝库键做原子 +amount
-  if (typeof kv.atomicAdd === "function") {
-    const res = await kv.atomicAdd(TREASURY_KEY, amount, event);
-    const newBal = Number(res.balance || 0);
-    try { await SendTransLog(env, amount, TREASURY_KEY, event, newBal); } catch (e) { /* ignore */ }
-    return newBal;
+
+/** 把金额加入国库（treasury += amount），实现为 transfer from user->treasury 或 transfer from special->treasury */
+export async function addToTreasury(env: EnvLike, doNs: DurableObjectNamespace, amount: number, event: String): Promise<number> {
+  // If amount <= 0 just return current treasury
+  if (amount <= 0) return await getTreasury(doNs);
+  // We'll transfer from a virtual source (TREASURY_KEY) to TREASURY_KEY? That would be noop.
+  // The typical caller uses addToTreasury(env, kv, amount, "reason") when funds should be moved into treasury.
+  // Here we assume caller wants to credit treasury from "virtual source" (like game issuance), so simply perform:
+  // transfer from TREASURY_KEY to TREASURY_KEY with negative amount is nonsense.
+  // Simpler: call DO /transfer from TREASURY_KEY -> TREASURY_KEY? Instead, we'll read current value and write new value by transferring from TREASURY_KEY to target with allowNegativeTreasury true reversed.
+  // Practical approach: perform transfer from TREASURY_KEY to a temporary account then from that account back? Ugly.
+  // Better: ask DO to accept a transfer from a special issuer (we'll instruct DO to increase treasury by allowing negative treasury to go negative and then compensate).
+  // Here we implement addToTreasury as transfer from a special "__issuer__" -> TREASURY_KEY with allowNegativeFrom true.
+  const issuer = "__issuer__";
+  const body = {
+    from: issuer,
+    to: TREASURY_KEY,
+    amount,
+    allowNegativeFrom: true
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    SendTransLog(env, amount, `${issuer} -> ${TREASURY_KEY}`, `${event} 注入 ${amount} 后 ${res.toNew}`);
+    return res.toNew ?? (await getTreasury(doNs));
+  } else {
+    console.error("[coinService] addToTreasury failed", res);
+    return await getTreasury(doNs);
   }
-  return await addToBalance(env, kv, TREASURY_KEY, amount, event);
 }
-export async function takeFromTreasury(env: EnvLike, kv: any, amount: number, event: String): Promise<boolean> {
-  if (typeof kv.atomicDeduct === "function") {
-    const res = await kv.atomicDeduct(TREASURY_KEY, amount, event);
-    if (!res.ok) return false;
-    const newBal = Number(res.balance || 0);
-    try { await SendTransLog(env, amount, TREASURY_KEY, event, newBal); } catch (e) { /* ignore */ }
+
+/** 从国库取出（默认不允许国库负数） */
+export async function takeFromTreasury(env: EnvLike, doNs: DurableObjectNamespace, amount: number, event: String): Promise<boolean> {
+  if (amount <= 0) return true;
+  // transfer treasury -> __treasury_receiver__ (we'll transfer to an ephemeral account or caller should immediately transfer to target)
+  // Typical caller does takeFromTreasury + addToBalance on target, but to keep semantics, implement simple treasury->__temp__ then return true.
+  // Simpler: do a transfer from TREASURY_KEY -> "__burn__"? Not desired.
+  // We'll implement takeFromTreasury as a transfer from TREASURY_KEY to "__treasury_pool__" that callers can then distribute.
+  // However historically takeFromTreasury returned boolean if successful; here we simply attempt treasury -> "__pool__" with no allow negative.
+  const pool = "__treasury_pool__";
+  const body = {
+    from: TREASURY_KEY,
+    to: pool,
+    amount,
+    allowNegativeTreasury: false
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    SendTransLog(env, amount, `${TREASURY_KEY} -> ${pool}`, `${event} 取出 ${amount} 后国库 ${res.fromNew}`);
     return true;
+  } else {
+    return false;
   }
-  return await deductFromBalance(env, kv, TREASURY_KEY, amount, event);
 }
+
 /**
  * 从国库支付（允许出现负值）
- * - 返回新的国库余额（可能小于0）
+ * - 返回是否成功（如果 DO 支持 allowNegativeTreasury 会成功并使国库可为负）
  */
-export async function payoutFromTreasuryAllowNegative(env: EnvLike, kv: any, amount: number, event: String): Promise<boolean> {
-  if (typeof kv.atomicDeductAllowNegative === "function") {
-    const res = await kv.atomicDeductAllowNegative(TREASURY_KEY, amount, event);
-    const newBal = Number(res.balance || 0);
-    try { await SendTransLog(env, amount, TREASURY_KEY, event, newBal); } catch (e) { /* ignore */ }
+export async function payoutFromTreasuryAllowNegative(env: EnvLike, doNs: DurableObjectNamespace, amount: number, event: String): Promise<boolean> {
+  if (amount <= 0) return true;
+  // Here we interpret "payout" = treasury pays some account (caller should then addToBalance)
+  // For compatibility with older behavior, implement as transfer from TREASURY_KEY -> "__payout_sink__" with allowNegativeTreasury true.
+  const sink = "__payout_sink__";
+  const body = {
+    from: TREASURY_KEY,
+    to: sink,
+    amount,
+    allowNegativeTreasury: true
+  };
+  const res = await doTransferRaw(doNs, body);
+  if (res && res.ok) {
+    SendTransLog(env, amount, `${TREASURY_KEY} -> ${sink}`, `${event} 支付 ${amount} 后 ${res.fromNew}`);
     return true;
+  } else {
+    console.error("[coinService] payoutFromTreasuryAllowNegative failed", res);
+    return false;
   }
-  return await deductFromBalanceAllowNegative(env, kv, TREASURY_KEY, amount, event);
 }
 
 /** 计算所有“用户”余额合计（把“纯数字”键视为用户账户，排除含 '||' 的房间键和艾丽莎宝库键） */
-export async function sumAllUserBalances(kv: KVNamespace): Promise<number> {
+export async function sumAllUserBalances(doNs: DurableObjectNamespace): Promise<number> {
   let total = 0;
-  let cursor: string | undefined = undefined;
-  do {
-    const opts: any = cursor ? { cursor } : {};
-    const res = await (kv as any).list(opts);
-    cursor = res.cursor;
-    for (const k of (res.keys || [])) {
-      const name: string = k.name;
-      if (name === TREASURY_KEY) continue;
-      if (name.includes("||")) continue;
-      if (/^\d+$/.test(name)) {
-        const v = await getBalance(kv, name);
-        total += v;
+  try {
+    // DO 实现保留了 /list 接口（返回 { keys: [{ name }], cursor }）
+    const stub = getCoinsStub(doNs);
+    const base = "https://do";
+    let cursor = "";
+    do {
+      const url = `${base}/list?cursor=${encodeURIComponent(cursor)}`;
+      const res = await stub.fetch(url, { method: "GET" });
+      if (!res.ok) break;
+      const json = await res.json();
+      cursor = json.cursor || "";
+      for (const k of (json.keys || [])) {
+        const name: string = k.name;
+        if (name === TREASURY_KEY) continue;
+        if (name.includes("||")) continue;
+        if (/^\d+$/.test(name)) {
+          const v = await getBalance(doNs, name);
+          total += v;
+        }
       }
-    }
-  } while (cursor);
+      if (!cursor) break;
+    } while (cursor);
+  } catch (e) {
+    console.error("[coinService] sumAllUserBalances failed", e);
+  }
   return total;
 }
