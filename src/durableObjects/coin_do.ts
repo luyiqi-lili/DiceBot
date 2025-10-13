@@ -47,23 +47,7 @@ export class CoinDO {
   private setNumericBalance(map: Record<string, string>, key: string, value: number) {
     map[key] = String(value);
   }
-
-  // helper: send audit log to telegram (non-blocking)
-  private async sendTransLog(amount: number, id: string, event: string) {
-    try {
-      // 使用 TgMessage 发送审计日志，频道/thread 可按需调整
-      await TgMessage.sendText(this.env as EnvLike, {
-        chat_id: -1002848481881,
-        text: `${id}  ${event}\nUID: <code>${id}</code>\n金额: ${amount}`,
-        parse_mode: "HTML",
-        message_thread_id: 12084
-      });
-    } catch (e) {
-      // 不要让日志失败影响主流程
-      console.warn("[CoinDO] sendTransLog failed", e);
-    }
-  }
-
+ 
   // Primary atomic transfer implementation:
   // Attempts to move `amount` (positive integer) from `from` -> `to`.
   // - if amount <= 0 -> reject
@@ -103,8 +87,7 @@ export class CoinDO {
 
     // write map is done by caller (atomic at DO level because we write after modifications)
     // log asynchronously (fire-and-forget)
-    this.sendTransLog(amount, `${from} -> ${to}`, `transfer ${amount} (from ${from} to ${to})`);
-
+ 
     return { ok: true, fromNew: newFrom, toNew: newTo };
   }
 
