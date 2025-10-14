@@ -386,8 +386,10 @@ const TgMessage = {
       const res = await callTelegramApi(env, 'getChatMember', { chat_id: chatId, user_id: userId });
       if (res && res.ok && res.result && (res.result as any).user) {
         const u = (res.result as any).user;
+        // 去掉括号及其内容，包括全角括号和半角括号
+        const cleanFirstName = u.first_name.replace(/[\(（].*?[\)）]/g, '').trim();
         return {
-          first_name: `<a href="tg://user?id=${userId}"> ${u.first_name} </a>`  || `${userId}`,
+          first_name: `<a href="tg://user?id=${userId}">${cleanFirstName || userId}</a>`,
           username: (u.username as string) || ''
         };
       }
