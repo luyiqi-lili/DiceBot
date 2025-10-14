@@ -668,7 +668,7 @@ if (sub === "list") {
     // 排序取前20
     const top = Object.entries(allBalances)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 20);
+      .slice(0, 100);
 
     if (top.length === 0) {
       await TgMessage.sendText(env, {
