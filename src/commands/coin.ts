@@ -684,8 +684,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       for (const [idx, [uid, bal]] of top.entries()) {
         if (!isNaN(Number(uid))) {
           const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
-          textLines.push(`${idx + 1}.  ${member.first_name}  : ${bal} 💰`);
-        }
+          textLines.push(`${member.first_name}:${bal}💰`);
+        } 
       }
       const out = `🏆 财富榜 TOP ${top.length}\n  <blockquote expandable>` + textLines.join("\n") +` </blockquote>`;
       await TgMessage.sendText(env, {
