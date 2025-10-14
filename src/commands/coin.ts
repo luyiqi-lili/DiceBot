@@ -519,7 +519,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     // 从目标 -> 宝库（允许目标变为负值）
     const deducted = await addToTreasury(env, doNs, targetUid, amount, "内务部税款");
     // 同时把金额加入宝库（为了保持记账一致性）
- 
+
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `
@@ -578,9 +578,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接把国库 -> 目标（atomic via DO）
-    // We will use svcAddToBalance which internally makes a transfer from an issuer/treasury -> target
-    const newTargetBal = await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
- 
+    await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
+    const newTargetBal = await getTreasury(doNs)
+
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${treasuryBal - amount} 💰。`,
@@ -615,7 +615,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接注入国库（由 svcAddToTreasury 处理注入逻辑）
-    const newTre = await mintToTreasury(env, doNs, amount, "虚空造币");
+    await mintToTreasury(env, doNs, amount, "虚空造币");
+    const newTre = await getTreasury(doNs)
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
