@@ -3,21 +3,18 @@ import TgMessage, { EnvLike } from "../lib/tgMessage";
 
 /**
  * Durable Object: CoinDO
+ * - 提供原子接口：
+ *    GET  /get?key=...
+ *    POST /transfer  { from, to, amount, allowNegativeTreasury? }
+ *    POST /incr      { key, delta }    <-- 新增：原子自增（用于房间计数等）
  *
- * 目的：
- *  - 提供两个原子操作：GET /get 和 POST /transfer
- *  - 所有涉及余额变更的业务逻辑应基于这两个原子操作组合实现
- *
- * 注意：
- *  - 要求所有账户键都路由到同一个 DO 实例（例如使用 doNamespace.idFromName("coins")）。
- *  - transfer 在本 DO 实例内是原子的（读->校验->写 在单线程处理流程中顺序执行）。
+ * - 其它（/put、/list）保留为调试/迁移用，但业务逻辑应基于上面原子接口。
  */
 
 export class CoinDO {
   state: DurableObjectState;
   env: any;
 
-  // 特殊键：艾莉莎宝库
   static TREASURY_KEY = "__treasury__";
 
   constructor(state: DurableObjectState, env: any) {
@@ -25,7 +22,6 @@ export class CoinDO {
     this.env = env;
   }
 
-  // internal: read the whole map (string->string)
   private async readMap(): Promise<Record<string, string>> {
     const m = (await this.state.storage.get<Record<string, string>>("__MAP__")) || {};
     return m;
@@ -35,7 +31,6 @@ export class CoinDO {
     await this.state.storage.put("__MAP__", map);
   }
 
-  // helper: numeric balance (always return number)
   private async getNumericBalance(map: Record<string, string>, key: string): Promise<number> {
     const raw = map[key];
     if (raw === undefined || raw === null || raw === "") return 0;
@@ -43,17 +38,23 @@ export class CoinDO {
     return Number.isFinite(n) ? n : 0;
   }
 
-  // helper: set numeric balance in map
   private setNumericBalance(map: Record<string, string>, key: string, value: number) {
     map[key] = String(value);
   }
- 
-  // Primary atomic transfer implementation:
-  // Attempts to move `amount` (positive integer) from `from` -> `to`.
-  // - if amount <= 0 -> reject
-  // - normal accounts: require fromBalance >= amount
-  // - if from === TREASURY_KEY and allowNegativeTreasury === true -> allow treasury to go negative
-  // Returns { ok: boolean, reason?: string, fromNew?: number, toNew?: number }
+
+  private async sendTransLog(amount: number, id: string, event: string) {
+    try {
+      await TgMessage.sendText(this.env as EnvLike, {
+        chat_id: -1002848481881,
+        text: `${id}  ${event}\nUID: <code>${id}</code>\n金额: ${amount}`,
+        parse_mode: "HTML",
+        message_thread_id: 12084
+      });
+    } catch (e) {
+      console.warn("[CoinDO] sendTransLog failed", e);
+    }
+  }
+
   private async atomicTransfer(map: Record<string, string>, from: string, to: string, amount: number, allowNegativeTreasury = false) {
     if (!from || !to) {
       return { ok: false, reason: "missing from or to" };
@@ -65,14 +66,12 @@ export class CoinDO {
     const fromBal = await this.getNumericBalance(map, from);
     const toBal = await this.getNumericBalance(map, to);
 
-    // same-account transfer is a noop but return current balances
     if (from === to) {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
 
-    // Treasury allow negative special-case
     if (from === CoinDO.TREASURY_KEY && allowNegativeTreasury) {
-      // allow treasury to go negative
+      // allow negative for treasury
     } else {
       if (fromBal < amount) {
         return { ok: false, reason: "insufficient" };
@@ -85,30 +84,42 @@ export class CoinDO {
     this.setNumericBalance(map, from, newFrom);
     this.setNumericBalance(map, to, newTo);
 
-    // write map is done by caller (atomic at DO level because we write after modifications)
-    // log asynchronously (fire-and-forget)
- 
+    this.sendTransLog(amount, `${from} -> ${to}`, `transfer ${amount} (from ${from} to ${to})`);
+
     return { ok: true, fromNew: newFrom, toNew: newTo };
   }
 
-  // fetch handler: expose GET /get and POST /transfer
+  // 原子自增端点：POST /incr { key, delta }
+  // - delta 可以为正整数（也可以为 0 或负数，但业务层应避免负）
+  // - 返回 { ok: true, new: number } 或 { ok:false, reason }
+  private async atomicIncr(map: Record<string, string>, key: string, delta: number) {
+    if (!key) return { ok: false, reason: "missing key" };
+    if (!Number.isFinite(delta) || Math.floor(delta) !== delta) return { ok: false, reason: "invalid delta" };
+
+    const cur = await this.getNumericBalance(map, key);
+    const next = cur + delta;
+    this.setNumericBalance(map, key, next);
+
+    // 日志（房间计数也记录）
+    this.sendTransLog(delta, key, `incr ${delta} (room counter)`);
+
+    return { ok: true, new: next };
+  }
+
   async fetch(req: Request) {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    // GET /get?key=xxx
+    // GET /get?key=...
     if (path === "/get" && req.method === "GET") {
       const key = url.searchParams.get("key") || "";
       if (!key) return new Response("", { status: 200 });
-
       const map = await this.readMap();
       const v = map[key];
-      // 返回 string（保持兼容：空返回空字符串）
       return new Response(v ?? "", { status: 200 });
     }
 
     // POST /transfer
-    // body: { from: string, to: string, amount: number, allowNegativeTreasury?: boolean }
     if (path === "/transfer" && req.method === "POST") {
       let data: any = {};
       try {
@@ -125,35 +136,61 @@ export class CoinDO {
       if (!from || !to) {
         return new Response(JSON.stringify({ ok: false, reason: "missing from or to" }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
-
       if (!Number.isFinite(amount) || amount <= 0) {
         return new Response(JSON.stringify({ ok: false, reason: "invalid amount" }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
 
-      // Read-modify-write inside DO -> atomic relative to this DO instance
       const map = await this.readMap();
       const res = await this.atomicTransfer(map, from, to, amount, allowNegativeTreasury);
       if (!res.ok) {
         return new Response(JSON.stringify(res), { status: 200, headers: { "Content-Type": "application/json" } });
       }
-
-      // Persist the modified map atomically
       try {
         await this.writeMap(map);
       } catch (e) {
         console.error("[CoinDO] writeMap failed", e);
-        // If persist failed, we should revert in-memory? but since we haven't returned, it's safer to report failure.
         return new Response(JSON.stringify({ ok: false, reason: "persist failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
-
       return new Response(JSON.stringify({ ok: true, fromNew: res.fromNew, toNew: res.toNew }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // Optional: 为方便迁移/调试保留 list/put 接口（但建议业务仅使用 GET/TRANSFER）
-    if (path === "/put" && req.method === "POST") {
-      // legacy helper: { key, value }
+    // POST /incr  -> 原子自增（新增）
+    // body: { key: string, delta: number }
+    if (path === "/incr" && req.method === "POST") {
       let data: any = {};
-      try { data = await req.json(); } catch (e) { /* ignore */ }
+      try {
+        data = await req.json();
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, reason: "invalid json" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      const key = String(data.key ?? "");
+      const delta = Number(data.delta ?? 0);
+      if (!key) {
+        return new Response(JSON.stringify({ ok: false, reason: "missing key" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+      if (!Number.isFinite(delta) || Math.floor(delta) !== delta) {
+        return new Response(JSON.stringify({ ok: false, reason: "invalid delta" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+
+      const map = await this.readMap();
+      const res = await this.atomicIncr(map, key, delta);
+      if (!res.ok) {
+        return new Response(JSON.stringify(res), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      try {
+        await this.writeMap(map);
+      } catch (e) {
+        console.error("[CoinDO] writeMap(incr) failed", e);
+        return new Response(JSON.stringify({ ok: false, reason: "persist failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ ok: true, new: res.new }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    // legacy: put (保持兼容)
+    if (path === "/put" && req.method === "POST") {
+      const body = await req.text();
+      let data: { key?: string; value?: string } = {};
+      try { data = JSON.parse(body); } catch (e) { /* ignore */ }
       if (!data.key) return new Response("missing key", { status: 400 });
       const map = await this.readMap();
       map[data.key] = data.value ?? "";
@@ -161,8 +198,8 @@ export class CoinDO {
       return new Response("OK", { status: 200 });
     }
 
+    // legacy: list
     if (path === "/list" && req.method === "GET") {
-      // 简单分页实现：cursor=lastKey, limit
       const cursor = url.searchParams.get("cursor") || "";
       const limit = parseInt(url.searchParams.get("limit") || "1000", 10);
       const map = await this.readMap();
@@ -174,7 +211,10 @@ export class CoinDO {
       }
       const page = keys.slice(start, start + limit).map((k) => ({ name: k }));
       const nextCursor = (start + page.length) < keys.length ? page[page.length - 1].name : "";
-      return new Response(JSON.stringify({ keys: page, cursor: nextCursor }), { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ keys: page, cursor: nextCursor }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     return new Response("not found", { status: 404 });

@@ -1,19 +1,18 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import {escapeHtml}  from "../lib/util";
+import { escapeHtml } from "../lib/util";
 
 import {
-  CoinEnv,
-  getBalance as coinGetBalance,
-  deductFromBalance,
+  getBalance,
   addToTreasury
 } from "../lib/coinService";
- 
+
 /**
  * 环境类型：在 CoinEnv 基础上要求 AFFECTION_KV
  */
-export type RoseEnv = CoinEnv & {
+export type RoseEnv = Env & {
   AFFECTION_KV: KVNamespace;
-      COIN_DO: DurableObjectNamespace;
+  COIN_DO: DurableObjectNamespace;
+  TOKEN: string;
 
 };
 
@@ -65,7 +64,7 @@ async function writeAffectionMap(kv: KVNamespace, sourceId: number, map: Record<
    主处理函数：接收 ParsedUpdate 并使用 TgMessage 发送回复
 -----------------------------------*/
 export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Promise<void> {
-   const chatId = parsedMessage.chatId!;
+  const chatId = parsedMessage.chatId!;
   const threadId = parsedMessage.threadId;
   const from = parsedMessage.from!;
   const fromId = Number(from.id);
@@ -122,10 +121,10 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     // 非免费时间：尝试支付 30 💰（扣钱并将款项记入国库）
     const amount = 30;
-    const ok = await deductFromBalance(env,env.COIN_DO, String(fromId), amount,"送花消费");
+    const ok = await addToTreasury(env, env.COIN_DO, String(fromId), amount, "送花消费");
     if (!ok) {
       // 查询余额并提示
-      const bal = await coinGetBalance(env.COIN_DO, String(fromId));
+      const bal = await getBalance(env.COIN_DO, String(fromId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${fromName} 今天已经送过花了。如需额外送花需支付 ${amount} 💰，但你的余额仅有 ${bal} 💰。`,
@@ -135,16 +134,13 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       return;
     }
 
-    // 扣款成功后把钱转入国库
-    await addToTreasury(env,env.COIN_DO, amount,"送花消费");
-
     // 记录好感度变化
     score += 160;
     map[key] = { firstName: targetName, value: score };
     await writeAffectionMap(env.AFFECTION_KV, fromId, map);
 
     // 获取新的余额显示
-    const newBal = await coinGetBalance(env.COIN_DO, String(fromId));
+    const newBal = await getBalance(env.COIN_DO, String(fromId));
     const emoji = scoreToEmoji(score);
 
     await TgMessage.sendText(env, {

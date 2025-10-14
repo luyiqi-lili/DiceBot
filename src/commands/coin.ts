@@ -3,16 +3,14 @@ import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { escapeHtml } from "../lib/util";
 import { payConfigs } from "../lib/liveConfig";
 import {
-  getBalance as svcGetBalance,
-  payoutFromTreasuryAllowNegative,
-  getTreasury as svcGetTreasury,
-  addToTreasury as svcAddToTreasury,
-  takeFromTreasury as svcTakeFromTreasury,
+  getBalance,
+  getTreasury,
+  addToTreasury,
+  takeFromTreasury,
   TREASURY_KEY,
-  addToBalance as svcAddToBalance,
-  deductFromBalance as svcDeductFromBalance,
-  deductFromBalanceAllowNegative as svcDeductFromBalanceAllowNegative,
-  sumAllUserBalances as svcSumAllUserBalances
+  sumAllUserBalances,
+  addRoomCount,
+  mintToTreasury
 } from "../lib/coinService";
 
 type CoinEnv = EnvLike & {
@@ -99,10 +97,10 @@ async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: stri
   if (amount <= 0) return { ok: false, reason: "invalid amount" };
 
   // 前置余额检查
-  const senderBal = await svcGetBalance(doNs, fromId);
+  const senderBal = await getBalance(doNs, fromId);
   if (senderBal < amount) return { ok: false, reason: "insufficient" };
 
-  const targetBal = await svcGetBalance(doNs, toId);
+  const targetBal = await getBalance(doNs, toId);
   const rate = calcTransferFeeRate(targetBal);
   const fee = Math.floor(amount * rate);
 
@@ -137,8 +135,8 @@ async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: stri
   }
 
   // 获取最新余额（从 step2 返回值通常包含 but for safety we query)
-  const newFrom = await svcGetBalance(doNs, fromId);
-  const newTo = await svcGetBalance(doNs, toId);
+  const newFrom = await getBalance(doNs, fromId);
+  const newTo = await getBalance(doNs, toId);
 
   return { ok: true, fee, fromNew: newFrom, toNew: newTo };
 }
@@ -172,7 +170,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   // — 查询余额（默认无子命令）
   if (!sub) {
-    const bal = await svcGetBalance(doNs, userId);
+    const bal = await getBalance(doNs, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `${safeUserName}，你目前有 ${bal} 💰。`,
@@ -215,7 +213,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     // 祈祷：从国库支付（允许国库为负）到用户账户
-    const payoutSuccess = await payoutFromTreasuryAllowNegative(env, doNs, gain, "祈祷支出");
+    const payoutSuccess = await takeFromTreasury(env, doNs, userId, gain, "祈祷");
+
     if (!payoutSuccess) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -226,7 +225,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
     // 将“国库支付”部分转为用户余额（把国库 -> user）
-    const addRes = await svcAddToBalance(env, doNs, userId, gain, "祈祷收入");
     // 标记今天已祈祷（直接调用 DO /put）
     try {
       const stub = getCoinsStub(doNs);
@@ -237,7 +235,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
     } catch (e) { /* ignore */ }
 
-    const newBal = addRes;
+    const newBal = await getBalance(doNs, userId);;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
@@ -268,7 +266,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
-      const roomBal = await svcGetBalance(doNs, roomKey);
+      const roomBal = await getBalance(doNs, roomKey);
       const place = cfg.placeName || `房间 ${threadId}`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -289,7 +287,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const senderBal = await svcGetBalance(doNs, userId);
+    const senderBal = await getBalance(doNs, userId);
     if (senderBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -301,7 +299,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 扣除用户 -> 宝库
-    const deducted = await svcDeductFromBalance(env, doNs, userId, amount, "祈福支出");
+    const deducted = await addToTreasury(env, doNs, userId, amount, "祈福支出");
     if (!deducted) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -314,7 +312,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
     // 把这笔钱计入房间余额（从宝库转房间）
-    const moved = await svcAddToBalance(env, doNs, roomKey, amount, "祈福计数");
+    const moved = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -438,7 +436,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const repliedFrom = parsedMessage.message?.reply_to_message?.from;
     if (repliedFrom && parsedMessage.isReply) {
       const targetId = String(repliedFrom.id);
-      const bal = await svcGetBalance(doNs, targetId);
+      const bal = await getBalance(doNs, targetId);
       const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? targetId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -451,8 +449,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 否则返回艾丽莎宝库与所有用户合计
     try {
-      const treasuryBal = await svcGetTreasury(doNs);
-      const totalUserBal = await svcSumAllUserBalances(doNs);
+      const treasuryBal = await getTreasury(doNs);
+      const totalUserBal = await sumAllUserBalances(doNs);
 
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
@@ -519,10 +517,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 从目标 -> 宝库（允许目标变为负值）
-    const deducted = await svcDeductFromBalanceAllowNegative(env, doNs, targetUid, amount, "内务部税款");
+    const deducted = await addToTreasury(env, doNs, targetUid, amount, "内务部税款");
     // 同时把金额加入宝库（为了保持记账一致性）
-    await svcAddToTreasury(env, doNs, amount, "内务部税款");
-
+ 
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `
@@ -569,7 +566,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
     }
 
-    const treasuryBal = await svcGetTreasury(doNs);
+    const treasuryBal = await getTreasury(doNs);
     if (treasuryBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -582,10 +579,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 直接把国库 -> 目标（atomic via DO）
     // We will use svcAddToBalance which internally makes a transfer from an issuer/treasury -> target
-    const newTargetBal = await svcAddToBalance(env, doNs, targetUid, amount, "宝库取款");
-    // Deduct treasury by doing takeFromTreasury (keeps bookkeeping consistent)
-    await svcTakeFromTreasury(env, doNs, amount, "宝库取款");
-
+    const newTargetBal = await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
+ 
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${treasuryBal - amount} 💰。`,
@@ -620,7 +615,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接注入国库（由 svcAddToTreasury 处理注入逻辑）
-    const newTre = await svcAddToTreasury(env, doNs, amount, "虚空造币");
+    const newTre = await mintToTreasury(env, doNs, amount, "虚空造币");
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,

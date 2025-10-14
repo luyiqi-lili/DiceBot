@@ -7,12 +7,13 @@
 */
 
 import TgMessage, { EnvLike } from "../lib/tgMessage";
-import { getTreasury, TREASURY_KEY,sumAllUserBalances } from "../lib/coinService";
+import { getTreasury,sumAllUserBalances } from "../lib/coinService";
  
 // 扩展 env 类型
 type CronEnv = EnvLike & {
    BOT_USERNAME?: string;
    COIN_DO:DurableObjectNamespace
+   TOKEN: string;
 };
 
 // 简单 logger
