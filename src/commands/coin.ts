@@ -312,7 +312,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
     // 把这笔钱计入房间余额（从宝库转房间）
-    const moved = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
+      await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
+    const moved = await getBalance(env, doNs, roomKey)
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
