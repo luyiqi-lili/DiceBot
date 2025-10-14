@@ -26,14 +26,16 @@ const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
 const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
 
 /** 费率计算 */
+
+/** ease-in-out 曲线：100 -> 0.1, 900 -> 0.5，端点导数为0 */
 function calcTransferFeeRate(targetBal: number): number {
   if (targetBal < 100) return 0;
-  if (targetBal < 300) return 0.1;
-  if (targetBal < 500) return 0.3;
-  if (targetBal < 700) return 0.5;
-  if (targetBal < 900) return 0.7;
-  return 0.9;
+  if (targetBal >= 900) return 0.5;
+  const t = (targetBal - 100) / (900 - 100); // 0..1
+  const ease = 3 * t * t - 2 * t * t * t; // cubic ease-in-out
+  return 0.1 + ease * (0.5 - 0.1);
 }
+
 
 /* ------------------------- DO 低级封装（仅用于祈祷记录） ------------------------- */
 
@@ -191,7 +193,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 修复：使用专门的祈祷记录存储，而不是余额
     const prayKey = `coin_pray:${userId}`;
-    const today = new Date().toISOString().split("T")[0].replace(/-/g, ""); // 格式: 20251014
+    const today = new Date().toISOString().split("T")[0];
+
     const lastPrayDate = await doGetRaw(doNs, prayKey);
 
     if (lastPrayDate === today) {
@@ -306,7 +309,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     //const roomIncr = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
 
     const roomBalAfter = roomBalBefore + amount;
-    await doPutRaw(doNs,roomKey,String(roomBalAfter))
+    await doPutRaw(doNs, roomKey, String(roomBalAfter))
 
 
     const place = cfg.placeName || `房间 ${threadId}`;
@@ -610,9 +613,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接注入国库
-    
+
     const oldTre = await getTreasury(doNs);
-    await doPutRaw(doNs,TREASURY_KEY,String(amount+oldTre))
+    await doPutRaw(doNs, TREASURY_KEY, String(amount + oldTre))
     const newTre = await getTreasury(doNs);
     await TgMessage.sendText(env, {
       chat_id: chatId,
