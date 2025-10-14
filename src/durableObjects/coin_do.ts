@@ -2,13 +2,13 @@
 import TgMessage, { EnvLike } from "../lib/tgMessage";
 
 /**
- * Durable Object: CoinDO
- * - 提供原子接口：
+ * Durable Object: CoinDO (修正版)
+ * - 原子接口：
  *    GET  /get?key=...
  *    POST /transfer  { from, to, amount, allowNegativeTreasury? }
  *    POST /incr      { key, delta }    <-- 原子自增（用于房间计数等）
  *
- * - 其它（/put、/list）保留为调试/迁移用，但业务逻辑应基于上面原子接口。
+ * - 改进：日志更友好（分别解析 from/to 名称），避免把 "from->to" 作为单个 id 去解析。
  */
 
 export class CoinDO {
@@ -17,8 +17,6 @@ export class CoinDO {
 
   static TREASURY_KEY = "__treasury__";
 
-  // 可显示化的一些名称映射（房间/特殊键）
-  // 如果需要可以在这里扩充或把映射放到 env
   private nameMap: Record<string, string> = {
     '__treasury__': "艾莉莎宝库",
     '-1002742074355||62': "紫罗兰教堂的募捐箱",
@@ -52,49 +50,80 @@ export class CoinDO {
   }
 
   /**
-   * 尝试把 key 解析为更可读的名字（优先：纯数字 -> fetchChatMember；其次 nameMap；最后原始 key）
-   * 注意：fetchChatMember 需要一个 chatId 作为上下文；这里沿用你项目里常用的管理群 -1002742074355。
-   * 若需要其它逻辑（或把 chatId 作为 env 配置），可以再调整。
+   * 解析 key -> 人类可读名称
+   * - 若 key 全是数字，尝试用 fetchChatMember 在管理群里查名（非必须，失败回退）
+   * - 否则尝试 nameMap
+   * - 最后回退到原始 key
+   *
+   * 注意：chatIdForLookup 可改为 env 配置，我当前沿用 -1002742074355；如需改我可以把它改成 this.env.COIN_NAME_LOOKUP_CHAT 或类似。
    */
   private async resolveDisplayName(key: string): Promise<string> {
-    // exact numeric user id
+    if (!key) return key;
+    // numeric user id
     if (/^\d+$/.test(key)) {
       try {
-        // 尝试在一个已知群里查 member 名（注意这个群 id 可按需调整到你常用的群）
         const numericId = parseInt(key, 10);
-        const chatIdForLookup = -1002742074355; // 这里沿用原项目中常见的群 id，如需改请替换
+        const chatIdForLookup = -1002742074355;
         const member = await TgMessage.fetchChatMember(this.env as EnvLike, chatIdForLookup, numericId);
-        const name = member?.first_name || member?.username || (`用户${key}`);
-        // 若返回的名字仍然像数字（极小概率），回退到 key
+        const name = member?.first_name || member?.username;
         if (name && !/^\d+$/.test(String(name))) return String(name);
       } catch (e) {
-        // 忽略 fetch 错误（可能该 userid 不在群内或接口权限问题）
+        // 忽略，继续下方回退逻辑
       }
     }
 
-    // 非数字或 fetch 失败 -> 检查 nameMap
+    // nameMap
     if (this.nameMap[key]) return this.nameMap[key];
 
-    // 最后回退到原始 key
     return key;
   }
 
   /**
-   * 发送审计日志（非阻塞）：把 human-friendly id/name 与事件写入管理频道
-   * amount 表示此次变动的主要数值（例如 incr 的 delta，或 transfer 的 amount）
+   * 新：结构化转账日志（分别解析 from/to 名称）
    */
-  private async sendTransLog(amount: number, idKey: string, event: string) {
+  private async sendTransLogTransfer(
+    fromKey: string,
+    toKey: string,
+    amount: number,
+    preFrom: number,
+    preTo: number,
+    newFrom: number,
+    newTo: number
+  ) {
     try {
-      const disp = await this.resolveDisplayName(idKey);
+      const fromName = await this.resolveDisplayName(fromKey);
+      const toName = await this.resolveDisplayName(toKey);
+      const text =
+        `${fromName} (${fromKey}) -> ${toName} (${toKey})\n` +
+        `transfer amount=${amount}\n` +
+        `before: ${fromName}=${preFrom}, ${toName}=${preTo}\n` +
+        `after:  ${fromName}=${newFrom}, ${toName}=${newTo}`;
       await TgMessage.sendText(this.env as EnvLike, {
         chat_id: -1002848481881,
-        text: `${disp} (${idKey})\n${event}\n变动量: ${amount}`,
+        text,
         parse_mode: "HTML",
         message_thread_id: 12084
       });
     } catch (e) {
-      // 日志失败不应中断主流程
-      console.warn("[CoinDO] sendTransLog failed", e);
+      console.warn("[CoinDO] sendTransLogTransfer failed", e);
+    }
+  }
+
+  /**
+   * 新：单键 incr 日志（显示 before/delta/after）
+   */
+  private async sendTransLogIncr(key: string, delta: number, before: number, after: number) {
+    try {
+      const name = await this.resolveDisplayName(key);
+      const text = `${name} (${key})\n` + `incr (before=${before} delta=${delta} after=${after})`;
+      await TgMessage.sendText(this.env as EnvLike, {
+        chat_id: -1002848481881,
+        text,
+        parse_mode: "HTML",
+        message_thread_id: 12084
+      });
+    } catch (e) {
+      console.warn("[CoinDO] sendTransLogIncr failed", e);
     }
   }
 
@@ -113,6 +142,13 @@ export class CoinDO {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
 
+    if (from === CoinDO.TREASURY_KEY && allowNegativeTreasury) {
+      // allow negative for treasury
+    } else {
+      if (fromBal < amount) {
+        return { ok: false, reason: "insufficient" };
+      }
+    }
 
     const newFrom = fromBal - amount;
     const newTo = toBal + amount;
@@ -120,15 +156,12 @@ export class CoinDO {
     this.setNumericBalance(map, from, newFrom);
     this.setNumericBalance(map, to, newTo);
 
-    // 记录日志（fire-and-forget）
-    this.sendTransLog(amount, `${from}->${to}`, `transfer: ${from} (${fromBal}) -> ${to} (${toBal}), amount=${amount}, result: ${newFrom} -> ${newTo}`);
+    // 使用结构化日志
+    this.sendTransLogTransfer(from, to, amount, fromBal, toBal, newFrom, newTo);
 
     return { ok: true, fromNew: newFrom, toNew: newTo };
   }
 
-  // 原子自增端点：POST /incr { key, delta }
-  // - delta 可以为正整数（也可以为 0 或负数，但业务层应避免负）
-  // - 返回 { ok: true, new: number } 或 { ok:false, reason }
   private async atomicIncr(map: Record<string, string>, key: string, delta: number) {
     if (!key) return { ok: false, reason: "missing key" };
     if (!Number.isFinite(delta) || Math.floor(delta) !== delta) return { ok: false, reason: "invalid delta" };
@@ -137,8 +170,8 @@ export class CoinDO {
     const next = cur + delta;
     this.setNumericBalance(map, key, next);
 
-    // 日志（房间计数也记录），把增前/增量/增后值都写清楚
-    this.sendTransLog(delta, key, `incr (before=${cur} delta=${delta} after=${next})`);
+    // 使用更清晰日志
+    this.sendTransLogIncr(key, delta, cur, next);
 
     return { ok: true, new: next };
   }
@@ -191,8 +224,7 @@ export class CoinDO {
       return new Response(JSON.stringify({ ok: true, fromNew: res.fromNew, toNew: res.toNew }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // POST /incr  -> 原子自增（新增）
-    // body: { key: string, delta: number }
+    // POST /incr  -> 原子自增
     if (path === "/incr" && req.method === "POST") {
       let data: any = {};
       try {
@@ -223,7 +255,7 @@ export class CoinDO {
       return new Response(JSON.stringify({ ok: true, new: res.new }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // legacy: put (保持兼容)
+    // legacy: put
     if (path === "/put" && req.method === "POST") {
       const body = await req.text();
       let data: { key?: string; value?: string } = {};
