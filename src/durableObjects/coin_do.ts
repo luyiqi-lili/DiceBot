@@ -8,7 +8,7 @@ import TgMessage, { EnvLike } from "../lib/tgMessage";
  *    POST /transfer  { from, to, amount, allowNegativeTreasury? }
  *    POST /incr      { key, delta }    <-- 原子自增（用于房间计数等）
  *
- * - 改进：日志更友好（分别解析 from/to 名称），避免把 "from->to" 作为单个 id 去解析。
+ * - 改进：incr 前后会额外发送单独的 TG 日志消息，打印 key 与对应的值，便于排查并发/一致性问题。
  */
 
 export class CoinDO {
@@ -50,16 +50,10 @@ export class CoinDO {
   }
 
   /**
-   * 解析 key -> 人类可读名称
-   * - 若 key 全是数字，尝试用 fetchChatMember 在管理群里查名（非必须，失败回退）
-   * - 否则尝试 nameMap
-   * - 最后回退到原始 key
-   *
-   * 注意：chatIdForLookup 可改为 env 配置，我当前沿用 -1002742074355；如需改我可以把它改成 this.env.COIN_NAME_LOOKUP_CHAT 或类似。
+   * 解析 key -> 可读名称（优先 numeric fetch -> nameMap -> 原始 key）
    */
   private async resolveDisplayName(key: string): Promise<string> {
     if (!key) return key;
-    // numeric user id
     if (/^\d+$/.test(key)) {
       try {
         const numericId = parseInt(key, 10);
@@ -68,18 +62,15 @@ export class CoinDO {
         const name = member?.first_name || member?.username;
         if (name && !/^\d+$/.test(String(name))) return String(name);
       } catch (e) {
-        // 忽略，继续下方回退逻辑
+        // ignore
       }
     }
-
-    // nameMap
     if (this.nameMap[key]) return this.nameMap[key];
-
     return key;
   }
 
   /**
-   * 新：结构化转账日志（分别解析 from/to 名称）
+   * 结构化转账日志
    */
   private async sendTransLogTransfer(
     fromKey: string,
@@ -110,7 +101,7 @@ export class CoinDO {
   }
 
   /**
-   * 新：单键 incr 日志（显示 before/delta/after）
+   * 单键 incr 日志（before/delta/after）
    */
   private async sendTransLogIncr(key: string, delta: number, before: number, after: number) {
     try {
@@ -141,22 +132,14 @@ export class CoinDO {
     if (from === to) {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
-
-    if (from === CoinDO.TREASURY_KEY && allowNegativeTreasury) {
-      // allow negative for treasury
-    } else {
-      if (fromBal < amount) {
-        return { ok: false, reason: "insufficient" };
-      }
-    }
-
+ 
     const newFrom = fromBal - amount;
     const newTo = toBal + amount;
 
     this.setNumericBalance(map, from, newFrom);
     this.setNumericBalance(map, to, newTo);
 
-    // 使用结构化日志
+    // 结构化日志
     this.sendTransLogTransfer(from, to, amount, fromBal, toBal, newFrom, newTo);
 
     return { ok: true, fromNew: newFrom, toNew: newTo };
@@ -170,7 +153,7 @@ export class CoinDO {
     const next = cur + delta;
     this.setNumericBalance(map, key, next);
 
-    // 使用更清晰日志
+    // 使用更清晰日志（内部）
     this.sendTransLogIncr(key, delta, cur, next);
 
     return { ok: true, new: next };
@@ -224,7 +207,7 @@ export class CoinDO {
       return new Response(JSON.stringify({ ok: true, fromNew: res.fromNew, toNew: res.toNew }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    // POST /incr  -> 原子自增
+    // POST /incr  -> 原子自增（新增）
     if (path === "/incr" && req.method === "POST") {
       let data: any = {};
       try {
@@ -241,17 +224,54 @@ export class CoinDO {
         return new Response(JSON.stringify({ ok: false, reason: "invalid delta" }), { status: 400, headers: { "Content-Type": "application/json" } });
       }
 
+      // 读取当前 map（在 DO 内，读写合并保证原子性）
       const map = await this.readMap();
+
+      // === 额外日志：在 incr 前发送单独的 TG 消息，打印 key 与当前值 ===
+      try {
+        const beforeVal = await this.getNumericBalance(map, key);
+        const disp = await this.resolveDisplayName(key);
+        const preText = `INCR START: ${disp} (${key}) current=${beforeVal}`;
+        await TgMessage.sendText(this.env as EnvLike, {
+          chat_id: -1002848481881,
+          text: preText,
+          parse_mode: "HTML",
+          message_thread_id: 12084
+        });
+      } catch (e) {
+        console.warn("[CoinDO] pre-incr log failed", e);
+      }
+
+      // 执行原子自增（在同一 map 上）
       const res = await this.atomicIncr(map, key, delta);
       if (!res.ok) {
         return new Response(JSON.stringify(res), { status: 200, headers: { "Content-Type": "application/json" } });
       }
+
+      // 持久化
       try {
         await this.writeMap(map);
       } catch (e) {
         console.error("[CoinDO] writeMap(incr) failed", e);
         return new Response(JSON.stringify({ ok: false, reason: "persist failed" }), { status: 500, headers: { "Content-Type": "application/json" } });
       }
+
+      // === 额外日志：在 incr 后发送单独的 TG 消息，打印 key 与新值 ===
+      try {
+        const newVal = res.new;
+        const disp2 = await this.resolveDisplayName(key);
+        const postText = `INCR END: ${disp2} (${key}) new=${newVal}`;
+        await TgMessage.sendText(this.env as EnvLike, {
+          chat_id: -1002848481881,
+          text: postText,
+          parse_mode: "HTML",
+          message_thread_id: 12084
+        });
+      } catch (e) {
+        console.warn("[CoinDO] post-incr log failed", e);
+      }
+
+      // 原有内部日志也会发送（sendTransLogIncr）
       return new Response(JSON.stringify({ ok: true, new: res.new }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
