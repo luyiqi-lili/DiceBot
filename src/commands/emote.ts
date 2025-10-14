@@ -1,6 +1,6 @@
 // commands/emote.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import { escapeHtml, deleteMarkup } from "../lib/util";
+import { deleteMarkup } from "../lib/util";
 
 /**
  * /em 命令处理器
@@ -31,11 +31,8 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   let targetRaw: string | null = null;
   if (parsed.isReply && parsed.replyToMessage && parsed.replyToMessage.from) {
     const tgt = parsed.replyToMessage.from;
-    targetRaw =
-      (tgt.first_name as string) ||
-      (tgt.username ? `@${tgt.username}` : "") ||
-      `ID${tgt.id}`;
-  }
+     targetRaw = (await TgMessage.fetchChatMember(env, chatId, tgt.id)).first_name;
+   }
 
   // 提取命令后的文本：优先使用 args（parseCommandFromText 已填充）
   let content = "";
