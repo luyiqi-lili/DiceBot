@@ -10,7 +10,8 @@ import {
   TREASURY_KEY,
   sumAllUserBalances,
   addRoomCount,
-  mintToTreasury
+  mintToTreasury,
+  transfer
 } from "../lib/coinService";
 
 type CoinEnv = EnvLike & {
@@ -36,51 +37,7 @@ function calcTransferFeeRate(targetBal: number): number {
   return 0.9;
 }
 
-/* ------------------------- DO 低级封装（直接调用 DO stub） ------------------------- */
-
-function getCoinsStub(doNs: DurableObjectNamespace) {
-  const id = doNs.idFromName("coins");
-  return doNs.get(id);
-}
-
-async function doGetRaw(doNs: DurableObjectNamespace, key: string): Promise<string | null> {
-  const stub = getCoinsStub(doNs);
-  const base = "https://do";
-  const url = `${base}/get?key=${encodeURIComponent(key)}`;
-  try {
-    const res = await stub.fetch(url, { method: "GET" });
-    if (!res.ok) return null;
-    const text = await res.text();
-    return text === "" ? null : text;
-  } catch (e) {
-    console.error("[coin] doGetRaw failed", e);
-    return null;
-  }
-}
-
-async function doTransferRaw(doNs: DurableObjectNamespace, body: Record<string, any>): Promise<any> {
-  const stub = getCoinsStub(doNs);
-  const base = "https://do";
-  const url = `${base}/transfer`;
-  try {
-    const res = await stub.fetch(url, {
-      method: "POST",
-      body: JSON.stringify(body),
-      headers: { "Content-Type": "application/json" }
-    });
-    const txt = await res.text();
-    try {
-      return JSON.parse(txt);
-    } catch {
-      return txt;
-    }
-  } catch (e) {
-    console.error("[coin] doTransferRaw failed", e);
-    return { ok: false, reason: "do_transfer_error" };
-  }
-}
-
-/* ------------------------- 高级封装：在命令层用 DO 的 get/transfer 实现业务 ------------------------- */
+/* ------------------------- 使用 coinService 的高级封装 ------------------------- */
 
 /**
  * atomicTransferUserToUser
@@ -106,42 +63,40 @@ async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: stri
 
   // if no fee -> single atomic transfer (from -> to amount)
   if (fee === 0) {
-    // call DO directly: transfer from->to amount
-    const res = await doTransferRaw(doNs, { from: fromId, to: toId, amount });
-    if (!res || !res.ok) return { ok: false, reason: res?.reason || "transfer_failed" };
+    const res = await transfer(env, doNs, fromId, toId, amount);
+    if (!res.ok) return { ok: false, reason: res.reason || "transfer_failed" };
     return { ok: true, fee: 0, fromNew: res.fromNew, toNew: res.toNew };
   }
 
   // fee > 0: sequence: 1) from->treasury fee ; 2) from->to (amount - fee)
-  // We already checked senderBal >= amount, so step1 & step2 should both succeed normally.
-  // Step1:
-  const step1 = await doTransferRaw(doNs, { from: fromId, to: TREASURY_KEY, amount: fee });
-  if (!step1 || !step1.ok) {
-    return { ok: false, reason: step1?.reason || "charge_fee_failed" };
+  // Step1: 支付手续费到国库
+  const step1 = await transfer(env, doNs, fromId, TREASURY_KEY, fee);
+  if (!step1.ok) {
+    return { ok: false, reason: step1.reason || "charge_fee_failed" };
   }
 
-  // Step2:
+  // Step2: 转账给接收者
   const transferAmount = amount - fee;
-  const step2 = await doTransferRaw(doNs, { from: fromId, to: toId, amount: transferAmount });
-  if (!step2 || !step2.ok) {
-    // 极端回滚尝试：把已扣的 fee 从宝库退回给发送者（尽量恢复状态）
+  const step2 = await transfer(env, doNs, fromId, toId, transferAmount);
+  if (!step2.ok) {
+    // 极端回滚尝试：把已扣的 fee 从宝库退回给发送者
     try {
-      await doTransferRaw(doNs, { from: TREASURY_KEY, to: fromId, amount: fee, allowNegativeTreasury: true });
+      await transfer(env, doNs, TREASURY_KEY, fromId, fee, true);
       console.warn("[coin] transfer step2 failed, rollback fee attempted");
     } catch (e) {
       console.error("[coin] rollback failed", e);
     }
-    return { ok: false, reason: step2?.reason || "transfer_recipient_failed" };
+    return { ok: false, reason: step2.reason || "transfer_recipient_failed" };
   }
 
-  // 获取最新余额（从 step2 返回值通常包含 but for safety we query)
+  // 获取最新余额
   const newFrom = await getBalance(doNs, fromId);
   const newTo = await getBalance(doNs, toId);
 
   return { ok: true, fee, fromNew: newFrom, toNew: newTo };
 }
 
-/* ------------------------- 原有命令处理（使用上面导出函数） ------------------------- */
+/* ------------------------- 命令处理 ------------------------- */
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -195,10 +150,13 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
+    // 使用 coinService 的 getBalance 来检查祈祷记录
     const prayKey = `coin_pray:${userId}`;
-    const last = await doGetRaw(doNs, prayKey);
-    const today = new Date().toISOString().split("T")[0];
-    if (last === today) {
+    const last = await getBalance(doNs, prayKey); // 注意：这里假设祈祷记录是数字格式的日期
+    const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
+    const todayNum = parseInt(today, 10);
+
+    if (last === todayNum) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `🙏 ${safeUserName}，你今天已经祈祷过了，明天再来吧！`,
@@ -213,9 +171,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     // 祈祷：从国库支付（允许国库为负）到用户账户
-    const payoutSuccess = await takeFromTreasury(env, env.COIN_DO, userId, gain, "祈祷");
+    const payoutSuccess = await takeFromTreasury(env, doNs, userId, gain, "祈祷", true);
 
-    if (!payoutSuccess) {
+    if (!payoutSuccess.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${safeUserName}，祈祷失败：国库支付出错。`,
@@ -224,18 +182,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
-    // 将“国库支付”部分转为用户余额（把国库 -> user）
-    // 标记今天已祈祷（直接调用 DO /put）
-    try {
-      const stub = getCoinsStub(env.COIN_DO);
-      await stub.fetch("https://do/put", {
-        method: "POST",
-        body: JSON.stringify({ key: prayKey, value: today }),
-        headers: { "Content-Type": "application/json" }
-      });
-    } catch (e) { /* ignore */ }
 
-    const newBal = await getBalance(env.COIN_DO, userId);;
+    // 标记今天已祈祷（使用 addRoomCount 来记录，因为它可以处理任意键的增量）
+    await addRoomCount(env, doNs, prayKey, todayNum, "祈祷记录");
+
+    const newBal = await getBalance(doNs, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
@@ -299,8 +250,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 扣除用户 -> 宝库
-    const deducted = await addToTreasury(env, env.COIN_DO, userId, amount, "祈福支出");
-    if (!deducted) {
+    const deducted = await addToTreasury(env, doNs, userId, amount, "祈福支出");
+    if (!deducted.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${safeUserName}，投币失败（扣款失败）。`,
@@ -311,9 +262,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
-    // 把这笔钱计入房间余额（从宝库转房间）
-    await addRoomCount(env, env.COIN_DO, roomKey, amount, "祈福计数");
-    const moved = await getBalance(env.COIN_DO, roomKey)
+    // 把这笔钱计入房间余额
+    await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
+    const roomBal = await getBalance(doNs, roomKey);
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -321,7 +272,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       .replace(/\$\{userName\}/g, escapeHtml(userName))
       .replace(/\$\{place\}/g, escapeHtml(place))
       .replace(/\$\{amount\}/g, String(amount))
-      .replace(/\$\{total\}/g, String(moved))
+      .replace(/\$\{total\}/g, String(roomBal))
       .replace(/\$\{threadId\}/g, String(threadId));
 
     await TgMessage.sendText(env, {
@@ -346,7 +297,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    //如果传了UID
+    // 如果传了UID
     const targetID = parseInt(args[2] || "", 10);
     if (!isNaN(targetID)) {
       const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
@@ -456,7 +407,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
         `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-        ` 📊 总计（宝库  + 房间）：${treasuryBal + totalUserBal} 💰。`;
+        ` 📊 总计（宝库 + 用户）：${treasuryBal + totalUserBal} 💰。`;
 
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -519,7 +470,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 从目标 -> 宝库（允许目标变为负值）
     const deducted = await addToTreasury(env, doNs, targetUid, amount, "内务部税款");
-    // 同时把金额加入宝库（为了保持记账一致性）
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -558,7 +508,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 目标：如果是回复某人则转给被回复的人， 否则给调用者
+    // 目标：如果是回复某人则转给被回复的人，否则给调用者
     let targetUid = userId;
     let targetLabel = escapeHtml(userName);
     if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
@@ -578,13 +528,14 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 直接把国库 -> 目标（atomic via DO）
+    // 直接把国库 -> 目标
     await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
-    const newTargetBal = await getBalance(doNs, targetUid)
+    const newTargetBal = await getBalance(doNs, targetUid);
+    const newTreasuryBal = await getTreasury(doNs);
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${treasuryBal - amount} 💰。`,
+      text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${newTreasuryBal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -615,9 +566,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 直接注入国库（由 svcAddToTreasury 处理注入逻辑）
-    await mintToTreasury(env, env.COIN_DO, amount, "虚空造币");
-    const newTre = await getTreasury(env.COIN_DO)
+    // 直接注入国库
+    await mintToTreasury(env, doNs, amount, "虚空造币");
+    const newTre = await getTreasury(doNs);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
@@ -626,84 +577,85 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     });
     return;
   }
-  // /coin list — 列出余额前 20
-// /coin list — 列出余额前 20
-if (sub === "list") {
-  const callerNum = Number(userId);
-  if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
-      parse_mode: "HTML",
-      message_thread_id: threadId
-    });
-    return;
-  }
 
-  try {
-    const stub = getCoinsStub(doNs);
-    let allBalances: Record<string, number> = {};
-    let cursor = "";
-
-    // 分页读取 DO 内所有 key
-    while (true) {
-      const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
-      const data = await res.json();
-      const keys: { name: string }[] = data.keys || [];
-      cursor = data.cursor || "";
-
-      // 遍历 keys，逐个查询余额
-      for (const { name } of keys) {
-        if (name.startsWith("coin_pray:")) continue; // 跳过临时祈祷记录
-        const val = await doGetRaw(doNs, name);
-        if (!val) continue;
-        const num = parseInt(val, 10);
-        if (isNaN(num)) continue;
-        allBalances[name] = num;
-      }
-
-      if (!cursor) break;
-    }
-
-    // 排序取前20
-    const top = Object.entries(allBalances)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 100);
-
-    if (top.length === 0) {
+  // /coin list — 列出余额前 100
+  if (sub === "list") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `📭 暂无余额记录。`,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
     }
 
-    const textLines = top.map(
-      ([uid, bal], idx) => `${idx + 1}. <code>${escapeHtml(uid)}</code> — ${bal} 💰`
-    );
+    try {
+      // 由于 coinService 没有提供列出所有键的功能，我们暂时保留直接 DO 调用
+      // 或者可以扩展 coinService 来提供这个功能
+      const id = doNs.idFromName("coins");
+      const stub = doNs.get(id);
+      
+      let allBalances: Record<string, number> = {};
+      let cursor = "";
 
-    const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: out,
-      parse_mode: "HTML",
-      message_thread_id: threadId
-    });
-    return;
-  } catch (e) {
-    console.error("[coin] /coin list error", e);
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: `❌ 查询失败：无法列出余额，请稍后重试。`,
-      parse_mode: "HTML",
-      message_thread_id: threadId
-    });
-    return;
+      // 分页读取 DO 内所有 key
+      while (true) {
+        const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
+        const data = await res.json();
+        const keys: { name: string }[] = data.keys || [];
+        cursor = data.cursor || "";
+
+        // 遍历 keys，使用 coinService 的 getBalance 查询余额
+        for (const { name } of keys) {
+          if (name.startsWith("coin_pray:")) continue; // 跳过临时祈祷记录
+          const bal = await getBalance(doNs, name);
+          if (bal === 0) continue; // 跳过0余额
+          allBalances[name] = bal;
+        }
+
+        if (!cursor) break;
+      }
+
+      // 排序取前100
+      const top = Object.entries(allBalances)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 100);
+
+      if (top.length === 0) {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: `📭 暂无余额记录。`,
+          parse_mode: "HTML",
+          message_thread_id: threadId
+        });
+        return;
+      }
+
+      const textLines = top.map(
+        ([uid, bal], idx) => `${idx + 1}. <code>${escapeHtml(uid)}</code> — ${bal} 💰`
+      );
+
+      const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: out,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    } catch (e) {
+      console.error("[coin] /coin list error", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 查询失败：无法列出余额，请稍后重试。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
   }
-}
-
 
   // 未知子命令
   await TgMessage.sendText(env, {
