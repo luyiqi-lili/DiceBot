@@ -6,7 +6,7 @@ import TgMessage, { EnvLike } from "../lib/tgMessage";
  * - 提供原子接口：
  *    GET  /get?key=...
  *    POST /transfer  { from, to, amount, allowNegativeTreasury? }
- *    POST /incr      { key, delta }    <-- 新增：原子自增（用于房间计数等）
+ *    POST /incr      { key, delta }    <-- 原子自增（用于房间计数等）
  *
  * - 其它（/put、/list）保留为调试/迁移用，但业务逻辑应基于上面原子接口。
  */
@@ -16,6 +16,15 @@ export class CoinDO {
   env: any;
 
   static TREASURY_KEY = "__treasury__";
+
+  // 可显示化的一些名称映射（房间/特殊键）
+  // 如果需要可以在这里扩充或把映射放到 env
+  private nameMap: Record<string, string> = {
+    '__treasury__': "艾莉莎宝库",
+    '-1002742074355||62': "紫罗兰教堂的募捐箱",
+    '-1002742074355||182': "天狐宫的祈愿箱",
+    '-1002848481881||66': "紫罗兰教堂的募捐箱(测试)"
+  };
 
   constructor(state: DurableObjectState, env: any) {
     this.state = state;
@@ -42,15 +51,49 @@ export class CoinDO {
     map[key] = String(value);
   }
 
-  private async sendTransLog(amount: number, id: string, event: string) {
+  /**
+   * 尝试把 key 解析为更可读的名字（优先：纯数字 -> fetchChatMember；其次 nameMap；最后原始 key）
+   * 注意：fetchChatMember 需要一个 chatId 作为上下文；这里沿用你项目里常用的管理群 -1002742074355。
+   * 若需要其它逻辑（或把 chatId 作为 env 配置），可以再调整。
+   */
+  private async resolveDisplayName(key: string): Promise<string> {
+    // exact numeric user id
+    if (/^\d+$/.test(key)) {
+      try {
+        // 尝试在一个已知群里查 member 名（注意这个群 id 可按需调整到你常用的群）
+        const numericId = parseInt(key, 10);
+        const chatIdForLookup = -1002742074355; // 这里沿用原项目中常见的群 id，如需改请替换
+        const member = await TgMessage.fetchChatMember(this.env as EnvLike, chatIdForLookup, numericId);
+        const name = member?.first_name || member?.username || (`用户${key}`);
+        // 若返回的名字仍然像数字（极小概率），回退到 key
+        if (name && !/^\d+$/.test(String(name))) return String(name);
+      } catch (e) {
+        // 忽略 fetch 错误（可能该 userid 不在群内或接口权限问题）
+      }
+    }
+
+    // 非数字或 fetch 失败 -> 检查 nameMap
+    if (this.nameMap[key]) return this.nameMap[key];
+
+    // 最后回退到原始 key
+    return key;
+  }
+
+  /**
+   * 发送审计日志（非阻塞）：把 human-friendly id/name 与事件写入管理频道
+   * amount 表示此次变动的主要数值（例如 incr 的 delta，或 transfer 的 amount）
+   */
+  private async sendTransLog(amount: number, idKey: string, event: string) {
     try {
+      const disp = await this.resolveDisplayName(idKey);
       await TgMessage.sendText(this.env as EnvLike, {
         chat_id: -1002848481881,
-        text: `${id}  ${event}\nUID: <code>${id}</code>\n金额: ${amount}`,
+        text: `${disp} (${idKey})\n${event}\n变动量: ${amount}`,
         parse_mode: "HTML",
         message_thread_id: 12084
       });
     } catch (e) {
+      // 日志失败不应中断主流程
       console.warn("[CoinDO] sendTransLog failed", e);
     }
   }
@@ -69,7 +112,7 @@ export class CoinDO {
     if (from === to) {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
- 
+
 
     const newFrom = fromBal - amount;
     const newTo = toBal + amount;
@@ -77,7 +120,8 @@ export class CoinDO {
     this.setNumericBalance(map, from, newFrom);
     this.setNumericBalance(map, to, newTo);
 
-    this.sendTransLog(amount, `${from} -> ${to}`, `transfer ${amount} (from ${from} to ${to})`);
+    // 记录日志（fire-and-forget）
+    this.sendTransLog(amount, `${from}->${to}`, `transfer: ${from} (${fromBal}) -> ${to} (${toBal}), amount=${amount}, result: ${newFrom} -> ${newTo}`);
 
     return { ok: true, fromNew: newFrom, toNew: newTo };
   }
@@ -93,8 +137,8 @@ export class CoinDO {
     const next = cur + delta;
     this.setNumericBalance(map, key, next);
 
-    // 日志（房间计数也记录）
-    this.sendTransLog(delta, key, `incr ${cur} ${delta} ${next}(room counter)`);
+    // 日志（房间计数也记录），把增前/增量/增后值都写清楚
+    this.sendTransLog(delta, key, `incr (before=${cur} delta=${delta} after=${next})`);
 
     return { ok: true, new: next };
   }
