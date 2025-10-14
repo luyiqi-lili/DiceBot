@@ -312,8 +312,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
     // 把这笔钱计入房间余额（从宝库转房间）
-      await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
-    const moved = await getBalance(env, doNs, roomKey)
+    await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
+    const moved = await getBalance(  doNs, roomKey)
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -580,7 +580,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 直接把国库 -> 目标（atomic via DO）
     await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
-    const newTargetBal = await getBalance(doNs,targetUid)
+    const newTargetBal = await getBalance(doNs, targetUid)
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
