@@ -627,70 +627,82 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
   // /coin list — 列出余额前 20
-  if (sub === "list") {
-    const callerNum = Number(userId);
-    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+// /coin list — 列出余额前 20
+if (sub === "list") {
+  const callerNum = Number(userId);
+  if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  }
+
+  try {
+    const stub = getCoinsStub(doNs);
+    let allBalances: Record<string, number> = {};
+    let cursor = "";
+
+    // 分页读取 DO 内所有 key
+    while (true) {
+      const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
+      const data = await res.json();
+      const keys: { name: string }[] = data.keys || [];
+      cursor = data.cursor || "";
+
+      // 遍历 keys，逐个查询余额
+      for (const { name } of keys) {
+        if (name.startsWith("coin_pray:")) continue; // 跳过临时祈祷记录
+        const val = await doGetRaw(doNs, name);
+        if (!val) continue;
+        const num = parseInt(val, 10);
+        if (isNaN(num)) continue;
+        allBalances[name] = num;
+      }
+
+      if (!cursor) break;
+    }
+
+    // 排序取前20
+    const top = Object.entries(allBalances)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20);
+
+    if (top.length === 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
+        text: `📭 暂无余额记录。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
     }
 
-    try {
-      // 通过 DO 的 /list 接口获取所有键值
-      const stub = getCoinsStub(doNs);
-      const res = await stub.fetch("https://do/list", { method: "GET" });
-      const list = (await res.json()) as Record<string, number>;
+    const textLines = top.map(
+      ([uid, bal], idx) => `${idx + 1}. <code>${escapeHtml(uid)}</code> — ${bal} 💰`
+    );
 
-      // 排序并取前20
-      const entries = Object.entries(list)
-        .filter(([k]) => !k.startsWith("coin_pray:")) // 过滤掉临时键
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 20);
-
-      if (entries.length === 0) {
-        await TgMessage.sendText(env, {
-          chat_id: chatId,
-          text: `📭 当前没有可显示的账户。`,
-          parse_mode: "HTML",
-          message_thread_id: threadId
-        });
-        return;
-      }
-
-      // 格式化输出
-      const lines = entries.map(([key, val], idx) => {
-        let name = key;
-        if (key === "__treasury__") name = "艾丽莎宝库";
-        else if (key.includes("||")) name = `房间余额 ${key}`;
-        else if (/^\d+$/.test(key)) name = `用户 ${key}`;
-        return `${idx + 1}. ${escapeHtml(name)} — <b>${val}</b> 💰`;
-      });
-
-      const text =
-        `🏆 <b>财富榜 TOP ${entries.length}</b>\n` +
-        lines.join("\n");
-
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-    } catch (e) {
-      console.error("[coin] /coin list 出错", e);
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `❌ 查询失败，可能是 DO 未实现 /list 或数据量过大。`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-    }
+    const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: out,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+    return;
+  } catch (e) {
+    console.error("[coin] /coin list error", e);
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `❌ 查询失败：无法列出余额，请稍后重试。`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
     return;
   }
+}
 
 
   // 未知子命令
