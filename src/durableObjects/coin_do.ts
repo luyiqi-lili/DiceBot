@@ -69,14 +69,7 @@ export class CoinDO {
     if (from === to) {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
-
-    if (from === CoinDO.TREASURY_KEY && allowNegativeTreasury) {
-      // allow negative for treasury
-    } else {
-      if (fromBal < amount) {
-        return { ok: false, reason: "insufficient" };
-      }
-    }
+ 
 
     const newFrom = fromBal - amount;
     const newTo = toBal + amount;
