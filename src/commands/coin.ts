@@ -1,6 +1,6 @@
 // commands/coin.ts
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-import { escapeHtml } from "../lib/util";
+import { deleteMarkup, escapeHtml } from "../lib/util";
 import { payConfigs } from "../lib/liveConfig";
 import {
   getBalance,
@@ -674,6 +674,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           chat_id: chatId,
           text: `📭 暂无余额记录。`,
           parse_mode: "HTML",
+          reply_markup: deleteMarkup,
           message_thread_id: threadId
         });
         return;
@@ -681,16 +682,17 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
       const textLines = [];
       for (const [idx, [uid, bal]] of top.entries()) {
-        if (!isNaN(Number(uid))){
-        const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
-        textLines.push(`${idx + 1}.  ${member.first_name}  : ${bal} 💰`);
+        if (!isNaN(Number(uid))) {
+          const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
+          textLines.push(`${idx + 1}.  ${member.first_name}  : ${bal} 💰`);
         }
       }
-      const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
+      const out = `🏆 财富榜 TOP ${top.length}\n  <blockquote expandable>` + textLines.join("\n") +` </blockquote>`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: out,
         parse_mode: "HTML",
+        reply_markup: deleteMarkup,
         message_thread_id: threadId
       });
       return;
@@ -700,6 +702,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         chat_id: chatId,
         text: `❌ 查询失败：无法列出余额，请稍后重试。`,
         parse_mode: "HTML",
+        reply_markup: deleteMarkup,
         message_thread_id: threadId
       });
       return;
@@ -718,6 +721,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       `<code>/coin take 100</code> （管理员从艾丽莎宝库取款）\n` +
       `<code>/coin create 1000</code> （管理员向艾丽莎宝库注入）`,
     parse_mode: "HTML",
+    reply_markup: deleteMarkup,
     message_thread_id: threadId
   });
   return;
