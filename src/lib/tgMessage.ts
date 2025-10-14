@@ -387,7 +387,7 @@ const TgMessage = {
       if (res && res.ok && res.result && (res.result as any).user) {
         const u = (res.result as any).user;
         return {
-          first_name: u.first_name || `${userId}`,
+          first_name: `<a tg://user?id=${userId}> ${u.first_name} </a>`  || `${userId}`,
           username: (u.username as string) || ''
         };
       }
