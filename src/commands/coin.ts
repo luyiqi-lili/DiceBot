@@ -9,8 +9,6 @@ import {
   takeFromTreasury,
   TREASURY_KEY,
   sumAllUserBalances,
-  addRoomCount,
-  mintToTreasury,
   transfer
 } from "../lib/coinService";
 
@@ -305,20 +303,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 把这笔钱计入房间余额
-    const roomIncr = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
-    if (!roomIncr.ok) {
-      // 如果房间计数失败，尝试回滚
-      await transfer(env, doNs, TREASURY_KEY, userId, amount, true);
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `❌ ${safeUserName}，投币失败（房间计数失败）。`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-      return;
-    }
+    //const roomIncr = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
 
-    const roomBalAfter = roomIncr.new || roomBalBefore + amount;
+    const roomBalAfter = roomBalBefore + amount;
+    await doPutRaw(doNs,roomKey,String(roomBalAfter))
+
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -621,7 +610,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接注入国库
-    await mintToTreasury(env, doNs, amount, "虚空造币");
+    
+    const oldTre = await getTreasury(doNs);
+    await doPutRaw(doNs,TREASURY_KEY,String(amount+oldTre))
     const newTre = await getTreasury(doNs);
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -648,7 +639,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     try {
       const id = doNs.idFromName("coins");
       const stub = doNs.get(id);
-      
+
       let allBalances: Record<string, number> = {};
       let cursor = "";
 

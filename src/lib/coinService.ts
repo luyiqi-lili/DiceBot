@@ -82,7 +82,7 @@ export async function transfer(
           chat_id: -1002848481881,
           text: `⚠️ coin transfer failed: ${String(e?.message ?? e)}\nfrom=${from} to=${to} amount=${amount}`,
           parse_mode: "HTML"
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch { /* ignore */ }
     return { ok: false, reason: "internal_error" };
@@ -112,59 +112,6 @@ export async function takeFromTreasury(
   return await transfer(envOrNull, doNs, TREASURY_KEY, to, amount, allowNegativeTreasury, name);
 }
 
-/**
- * mintToTreasury
- *  - 将指定 amount 直接原子地增加到 国库 (TREASURY_KEY)
- *  - 不从任何账户扣钱（虚空造币）
- *  - 使用 DO 的 POST /incr { key: TREASURY_KEY, delta: amount }
- *
- * 返回 { ok: true, new: number } 或 { ok: false, reason }
- */
-export async function mintToTreasury(
-  envOrNull: EnvLike | null,
-  doNs: DurableObjectNamespace,
-  amount: number,
-  name = "coins"
-): Promise<{ ok: boolean; reason?: string; new?: number }> {
-  try {
-    if (!doNs) throw new Error("doNs required");
-    if (!Number.isFinite(amount) || amount <= 0 || Math.floor(amount) !== amount) {
-      return { ok: false, reason: "invalid_amount" };
-    }
-
-    const stub = getDOStub(doNs, name);
-    const url = `https://do/incr`;
-    const body = JSON.stringify({ key: TREASURY_KEY, delta: amount });
-    const res = await stub.fetch(url, {
-      method: "POST",
-      body,
-      headers: { "Content-Type": "application/json" }
-    });
-
-    const json = await res.json().catch(async () => {
-      const txt = await res.text().catch(() => "");
-      return { ok: false, reason: `invalid response: ${txt}` };
-    });
-
-    if (!json || typeof json.ok === "undefined") {
-      return { ok: false, reason: "invalid_response" };
-    }
-
-    return json as { ok: boolean; reason?: string; new?: number };
-  } catch (e: any) {
-    console.error("[coinService] mintToTreasury failed", e);
-    try {
-      if (envOrNull) {
-        TgMessage.sendText(envOrNull, {
-          chat_id: -1002848481881,
-          text: `⚠️ coin mintToTreasury failed: ${String(e?.message ?? e)}\namount=${amount}`,
-          parse_mode: "HTML"
-        }).catch(() => {});
-      }
-    } catch { /* ignore */ }
-    return { ok: false, reason: "internal_error" };
-  }
-}
 
 export async function getTreasury(doNs: DurableObjectNamespace, name = "coins"): Promise<number> {
   return await getBalance(doNs, TREASURY_KEY, name);
@@ -207,66 +154,13 @@ export async function sumAllUserBalances(doNs: DurableObjectNamespace, name = "c
   }
   return total;
 }
-
-/**
- * addRoomCount
- *  - 原子地为房间/计数键增加 delta（可以是正数）
- *  - roomKey 示例: `${chatId}||${threadId}`
- *  - 不会从任何账户扣钱（只是计数）
- *  - 依赖 DO 的 POST /incr 接口（必须存在）
- *
- * 返回 { ok: true, new: number } 或 { ok: false, reason }
- */
-export async function addRoomCount(
-  envOrNull: EnvLike | null,
-  doNs: DurableObjectNamespace,
-  roomKey: string,
-  delta: number,
-  name = "coins"
-): Promise<{ ok: boolean; reason?: string; new?: number }> {
-  try {
-    if (!doNs) throw new Error("doNs required");
-    const stub = getDOStub(doNs, name);
-    const url = `https://do/incr`;
-    const body = JSON.stringify({ key: roomKey, delta });
-    const res = await stub.fetch(url, {
-      method: "POST",
-      body,
-      headers: { "Content-Type": "application/json" }
-    });
-
-    const json = await res.json().catch(async () => {
-      const txt = await res.text().catch(() => "");
-      return { ok: false, reason: `invalid response: ${txt}` };
-    });
-
-    if (!json || typeof json.ok === "undefined") {
-      return { ok: false, reason: "invalid_response" };
-    }
-    return json as { ok: boolean; reason?: string; new?: number };
-  } catch (e: any) {
-    console.error("[coinService] addRoomCount failed", e);
-    try {
-      if (envOrNull) {
-        TgMessage.sendText(envOrNull, {
-          chat_id: -1002848481881,
-          text: `⚠️ coin addRoomCount failed: ${String(e?.message ?? e)}\nroom=${roomKey} delta=${delta}`,
-          parse_mode: "HTML"
-        }).catch(() => {});
-      }
-    } catch { /* ignore */ }
-    return { ok: false, reason: "internal_error" };
-  }
-}
-
+ 
 export default {
   TREASURY_KEY,
   getBalance,
   transfer,
   addToTreasury,
   takeFromTreasury,
-  mintToTreasury,
-  getTreasury,
+   getTreasury,
   sumAllUserBalances,
-  addRoomCount
-};
+ };
