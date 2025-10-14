@@ -679,10 +679,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         return;
       }
 
-      const textLines = top.map(
-        ([uid, bal], idx) => `${idx + 1}. <code>${TgMessage.fetchChatMember(env,chatId,Number(uid))}</code> — ${bal} 💰`
-      );
-
+      const textLines = [];
+      for (const [idx, [uid, bal]] of top.entries()) {
+        const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
+        textLines.push(`${idx + 1}. <code>${member.first_name}</code> — ${bal} 💰`);
+      }
       const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
       await TgMessage.sendText(env, {
         chat_id: chatId,
