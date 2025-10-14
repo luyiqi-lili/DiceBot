@@ -626,6 +626,72 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     });
     return;
   }
+  // /coin list — 列出余额前 20
+  if (sub === "list") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    try {
+      // 通过 DO 的 /list 接口获取所有键值
+      const stub = getCoinsStub(doNs);
+      const res = await stub.fetch("https://do/list", { method: "GET" });
+      const list = (await res.json()) as Record<string, number>;
+
+      // 排序并取前20
+      const entries = Object.entries(list)
+        .filter(([k]) => !k.startsWith("coin_pray:")) // 过滤掉临时键
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20);
+
+      if (entries.length === 0) {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: `📭 当前没有可显示的账户。`,
+          parse_mode: "HTML",
+          message_thread_id: threadId
+        });
+        return;
+      }
+
+      // 格式化输出
+      const lines = entries.map(([key, val], idx) => {
+        let name = key;
+        if (key === "__treasury__") name = "艾丽莎宝库";
+        else if (key.includes("||")) name = `房间余额 ${key}`;
+        else if (/^\d+$/.test(key)) name = `用户 ${key}`;
+        return `${idx + 1}. ${escapeHtml(name)} — <b>${val}</b> 💰`;
+      });
+
+      const text =
+        `🏆 <b>财富榜 TOP ${entries.length}</b>\n` +
+        lines.join("\n");
+
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+    } catch (e) {
+      console.error("[coin] /coin list 出错", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 查询失败，可能是 DO 未实现 /list 或数据量过大。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+    }
+    return;
+  }
+
 
   // 未知子命令
   await TgMessage.sendText(env, {
