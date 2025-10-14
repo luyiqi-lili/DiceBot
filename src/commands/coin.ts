@@ -213,7 +213,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     // 祈祷：从国库支付（允许国库为负）到用户账户
-    const payoutSuccess = await takeFromTreasury(env, doNs, userId, gain, "祈祷");
+    const payoutSuccess = await takeFromTreasury(env, env.COIN_DO, userId, gain, "祈祷");
 
     if (!payoutSuccess) {
       await TgMessage.sendText(env, {
@@ -227,7 +227,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     // 将“国库支付”部分转为用户余额（把国库 -> user）
     // 标记今天已祈祷（直接调用 DO /put）
     try {
-      const stub = getCoinsStub(doNs);
+      const stub = getCoinsStub(env.COIN_DO);
       await stub.fetch("https://do/put", {
         method: "POST",
         body: JSON.stringify({ key: prayKey, value: today }),
@@ -235,7 +235,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
     } catch (e) { /* ignore */ }
 
-    const newBal = await getBalance(doNs, userId);;
+    const newBal = await getBalance(env.COIN_DO, userId);;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
@@ -299,7 +299,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 扣除用户 -> 宝库
-    const deducted = await addToTreasury(env, doNs, userId, amount, "祈福支出");
+    const deducted = await addToTreasury(env, env.COIN_DO, userId, amount, "祈福支出");
     if (!deducted) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -312,8 +312,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
     // 把这笔钱计入房间余额（从宝库转房间）
-    await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
-    const moved = await getBalance(doNs, roomKey)
+    await addRoomCount(env, env.COIN_DO, roomKey, amount, "祈福计数");
+    const moved = await getBalance(env.COIN_DO, roomKey)
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -616,8 +616,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接注入国库（由 svcAddToTreasury 处理注入逻辑）
-    await mintToTreasury(env, doNs, amount, "虚空造币");
-    const newTre = await getTreasury(doNs)
+    await mintToTreasury(env, env.COIN_DO, amount, "虚空造币");
+    const newTre = await getTreasury(env.COIN_DO)
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
