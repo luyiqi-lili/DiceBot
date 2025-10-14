@@ -37,6 +37,47 @@ function calcTransferFeeRate(targetBal: number): number {
   return 0.9;
 }
 
+/* ------------------------- DO 低级封装（仅用于祈祷记录） ------------------------- */
+
+function getCoinsStub(doNs: DurableObjectNamespace) {
+  const id = doNs.idFromName("coins");
+  return doNs.get(id);
+}
+
+// 仅用于祈祷记录的读写（不涉及货币操作）
+async function doGetRaw(doNs: DurableObjectNamespace, key: string): Promise<string | null> {
+  const stub = getCoinsStub(doNs);
+  const base = "https://do";
+  const url = `${base}/get?key=${encodeURIComponent(key)}`;
+  try {
+    const res = await stub.fetch(url, { method: "GET" });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text === "" ? null : text;
+  } catch (e) {
+    console.error("[coin] doGetRaw failed", e);
+    return null;
+  }
+}
+
+// 仅用于祈祷记录的写入
+async function doPutRaw(doNs: DurableObjectNamespace, key: string, value: string): Promise<boolean> {
+  const stub = getCoinsStub(doNs);
+  const base = "https://do";
+  const url = `${base}/put`;
+  try {
+    const res = await stub.fetch(url, {
+      method: "POST",
+      body: JSON.stringify({ key, value }),
+      headers: { "Content-Type": "application/json" }
+    });
+    return res.ok;
+  } catch (e) {
+    console.error("[coin] doPutRaw failed", e);
+    return false;
+  }
+}
+
 /* ------------------------- 使用 coinService 的高级封装 ------------------------- */
 
 /**
@@ -150,13 +191,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 使用 coinService 的 getBalance 来检查祈祷记录
+    // 修复：使用专门的祈祷记录存储，而不是余额
     const prayKey = `coin_pray:${userId}`;
-    const last = await getBalance(doNs, prayKey); // 注意：这里假设祈祷记录是数字格式的日期
-    const today = new Date().toISOString().split("T")[0].replace(/-/g, "");
-    const todayNum = parseInt(today, 10);
+    const today = new Date().toISOString().split("T")[0].replace(/-/g, ""); // 格式: 20251014
+    const lastPrayDate = await doGetRaw(doNs, prayKey);
 
-    if (last === todayNum) {
+    if (lastPrayDate === today) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `🙏 ${safeUserName}，你今天已经祈祷过了，明天再来吧！`,
@@ -183,8 +223,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 标记今天已祈祷（使用 addRoomCount 来记录，因为它可以处理任意键的增量）
-    await addRoomCount(env, doNs, prayKey, todayNum, "祈祷记录");
+    // 标记今天已祈祷（使用专门的存储，不是余额）
+    await doPutRaw(doNs, prayKey, today);
 
     const newBal = await getBalance(doNs, userId);
     await TgMessage.sendText(env, {
@@ -249,6 +289,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
+    const roomKey = `${chatId}||${threadId ?? 0}`;
+    const roomBalBefore = await getBalance(doNs, roomKey);
+
     // 扣除用户 -> 宝库
     const deducted = await addToTreasury(env, doNs, userId, amount, "祈福支出");
     if (!deducted.ok) {
@@ -261,10 +304,21 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const roomKey = `${chatId}||${threadId ?? 0}`;
     // 把这笔钱计入房间余额
-    await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
-    const roomBal = await getBalance(doNs, roomKey);
+    const roomIncr = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
+    if (!roomIncr.ok) {
+      // 如果房间计数失败，尝试回滚
+      await transfer(env, doNs, TREASURY_KEY, userId, amount, true);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${safeUserName}，投币失败（房间计数失败）。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    const roomBalAfter = roomIncr.new || roomBalBefore + amount;
 
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
@@ -272,7 +326,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       .replace(/\$\{userName\}/g, escapeHtml(userName))
       .replace(/\$\{place\}/g, escapeHtml(place))
       .replace(/\$\{amount\}/g, String(amount))
-      .replace(/\$\{total\}/g, String(roomBal))
+      .replace(/\$\{total\}/g, String(roomBalAfter))
       .replace(/\$\{threadId\}/g, String(threadId));
 
     await TgMessage.sendText(env, {
@@ -284,7 +338,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // send (转账)
+  // send (转账) - 保持不变
   if (sub === "send") {
     const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount) || amount <= 0) {
@@ -297,7 +351,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 如果传了UID
+    //如果传了UID
     const targetID = parseInt(args[2] || "", 10);
     if (!isNaN(targetID)) {
       const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
@@ -371,7 +425,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   /* ------------------------- 管理命令：check / take / create / remove ------------------------- */
 
-  // /coin check
+  // /coin check - 保持不变
   if (sub === "check") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -428,7 +482,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
   }
 
-  // /coin remove <amount> — 扣除某人的coin（仅 ADMIN_UIDS_REMOVE）
+  // /coin remove - 保持不变
   if (sub === "remove") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_REMOVE.includes(callerNum)) {
@@ -484,7 +538,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin take <amount> — 从艾丽莎宝库取款：不带回复则给自己，回复某人则给被回复的人（仅 ADMIN_UIDS_TAKE）
+  // /coin take - 保持不变
   if (sub === "take") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
@@ -542,7 +596,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin create <amount>
+  // /coin create - 保持不变
   if (sub === "create") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
@@ -578,7 +632,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin list — 列出余额前 100
+  // /coin list - 保持不变
   if (sub === "list") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -592,8 +646,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     try {
-      // 由于 coinService 没有提供列出所有键的功能，我们暂时保留直接 DO 调用
-      // 或者可以扩展 coinService 来提供这个功能
       const id = doNs.idFromName("coins");
       const stub = doNs.get(id);
       
