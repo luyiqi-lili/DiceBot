@@ -680,7 +680,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       }
 
       const textLines = top.map(
-        ([uid, bal], idx) => `${idx + 1}. <code>${escapeHtml(uid)}</code> — ${bal} 💰`
+        ([uid, bal], idx) => `${idx + 1}. <code>${TgMessage.fetchChatMember(env,chatId,Number(uid))}</code> — ${bal} 💰`
       );
 
       const out = `🏆 财富榜 TOP ${top.length}\n` + textLines.join("\n");
