@@ -579,7 +579,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 直接把国库 -> 目标（atomic via DO）
     await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
-    const newTargetBal = await getTreasury(doNs)
+    const newTargetBal = await getBalance(doNs,targetUid)
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
