@@ -94,7 +94,7 @@ export class CoinDO {
     this.setNumericBalance(map, key, next);
 
     // 日志（房间计数也记录）
-    this.sendTransLog(delta, key, `incr ${delta} (room counter)`);
+    this.sendTransLog(delta, key, `incr ${cur} ${delta} ${next}(room counter)`);
 
     return { ok: true, new: next };
   }
