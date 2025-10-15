@@ -110,7 +110,6 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     text: out,
     parse_mode: "HTML",
     message_thread_id: threadId,
-    reply_markup: deleteMarkup
   };
   if (replyToMessageId !== undefined) {
     sendParams.reply_to_message_id = replyToMessageId;
