@@ -706,7 +706,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           textLines.push(`${member.first_name}:${bal}💰`);
         }
       }
-      const out = `🏆 财富榜 TOP ${top.length}\n  <blockquote expandable>` + textLines.join("\n") + ` </blockquote>`;
+      const out = `🏆 财富榜\n  <blockquote expandable>` + textLines.join("\n") + ` </blockquote>`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: out,
