@@ -101,7 +101,7 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   }
 
   // 组装输出文本： "<em> Actor action </em>"
-  const out = `<em> ${actor} ${finalContent} </em>`;
+  const out = `<em>  ${actor}${finalContent} </em>`;
 
   // 发送时如果用户原始消息是回复某条消息，bot 的消息也应 reply_to 那条消息
   const sendParams: any = {
