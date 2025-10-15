@@ -27,13 +27,13 @@ const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896
 
 /** 费率计算 */
 
-/** ease-in-out 曲线：100 -> 0.1, 900 -> 0.5，端点导数为0 */
+/** ease-in-out 300 -> 0.1, 3000 -> 0.3，端点导数为0 */
 function calcTransferFeeRate(targetBal: number): number {
-  if (targetBal < 100) return 0;
-  if (targetBal >= 900) return 0.5;
-  const t = (targetBal - 100) / (900 - 100); // 0..1
+  if (targetBal < 300) return 0;
+  if (targetBal >= 3000) return 0.5;
+  const t = (targetBal - 300) / (3000 - 300); // 0..1
   const ease = 3 * t * t - 2 * t * t * t; // cubic ease-in-out
-  return 0.1 + ease * (0.5 - 0.1);
+  return 0.1 + ease * (0.3 - 0.1);
 }
 
 
@@ -159,17 +159,35 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.slice() : [];
   const userId = String(from.id);
-  const userName = String(from.first_name ?? from.username ?? "你");
-  const safeUserName = escapeHtml(userName);
   const doNs = env.COIN_DO;
   const sub = (args[0] || "").toLowerCase();
+
+  // helper: 获取指定 userId 在本 chat 的 first_name（优先使用 fetchChatMember）
+  async function resolveFirstName(uid: string | number): Promise<string> {
+    try {
+      const mid = Number(uid);
+      const member = await TgMessage.fetchChatMember(env, chatId, mid);
+      return String(member.first_name ?? member.username ?? mid);
+    } catch (e) {
+      // fallback: 尝试直接用消息中的 from 字段或 uid 本身
+      try {
+        if (typeof uid === "string" && !isNaN(Number(uid))) return uid;
+        return String(uid);
+      } catch {
+        return String(uid);
+      }
+    }
+  }
+
+  // 获取调用者名字（不进行 escapeHtml）
+  const userName = await resolveFirstName(userId);
 
   // — 查询余额（默认无子命令）
   if (!sub) {
     const bal = await getBalance(doNs, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `${safeUserName}，你目前有 ${bal} 💰。`,
+      text: `${userName}，你目前有 ${bal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -200,7 +218,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (lastPrayDate === today) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `🙏 ${safeUserName}，你今天已经祈祷过了，明天再来吧！`,
+        text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -217,7 +235,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!payoutSuccess.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，祈祷失败：国库支付出错。`,
+        text: `❌ ${userName}，祈祷失败：国库支付出错。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -230,7 +248,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const newBal = await getBalance(doNs, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${safeUserName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      text: `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -248,7 +266,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!cfg || cfg.enabled === false) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，此房间暂不支持投币 (pay)。`,
+        text: `❌ ${userName}，此房间暂不支持投币 (pay)。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -272,7 +290,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (isNaN(amount) || amount <= 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请指定正确的投币数量，例如：<code>/coin pay 1</code>。`,
+        text: `❌ ${userName}，请指定正确的投币数量，例如：<code>/coin pay 1</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -283,7 +301,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (senderBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你的余额不足，当前只有 ${senderBal} 💰。`,
+        text: `❌ ${userName}，你的余额不足，当前只有 ${senderBal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -298,7 +316,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!deducted.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，投币失败（扣款失败）。`,
+        text: `❌ ${userName}，投币失败（扣款失败）。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -315,7 +333,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const place = cfg.placeName || `房间 ${threadId}`;
     const template = cfg.successMessage || "${userName} 往${place}投入 ${amount} 💰。${place}现在有 ${total} 💰。";
     const textOut = template
-      .replace(/\$\{userName\}/g, escapeHtml(userName))
+      .replace(/\$\{userName\}/g, userName)
       .replace(/\$\{place\}/g, escapeHtml(place))
       .replace(/\$\{amount\}/g, String(amount))
       .replace(/\$\{total\}/g, String(roomBalAfter))
@@ -336,7 +354,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (isNaN(amount) || amount <= 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请指定正确的转账数量，例如：<code>/coin send 50</code>。`,
+        text: `❌ ${userName}，请指定正确的转账数量，例如：<code>/coin send 50</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -347,7 +365,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const targetID = parseInt(args[2] || "", 10);
     if (!isNaN(targetID)) {
       const userInfo = await TgMessage.fetchChatMember(env, chatId, targetID);
-      const targetName = userInfo.first_name;
+      const targetName = String(userInfo.first_name ?? userInfo.username ?? targetID);
       if ((targetName === `用户${targetID}`)) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${targetID} 查询用户失败`, parse_mode: "HTML", message_thread_id: threadId });
         return;
@@ -367,7 +385,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text:
-          `💸 ${escapeHtml(userName)} 向 ${escapeHtml(String(userInfo.first_name ?? userInfo.username ?? targetID))} 转账 ${amount} 💰。\n` +
+          `💸 ${userName} 向 ${String(userInfo.first_name ?? userInfo.username ?? targetID)} 转账 ${amount} 💰。\n` +
           `📊 原有余额更新完毕，手续费 ${res.fee ?? 0} 💰（已入艾丽莎宝库）。\n` +
           `✅ 转账后 新余额：${res.toNew} 💰；\n` +
           `🪙 你的新余额：${res.fromNew} 💰。`,
@@ -382,7 +400,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!repliedFrom || !parsedMessage.isReply) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
+        text: `❌ ${userName}，请在对方的消息下回复并使用 <code>/coin send ${amount}</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -394,18 +412,19 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
+    const targetFirstName = await resolveFirstName(String(repliedFrom.id));
     const res = await atomicTransferUserToUser(env, userId, String(repliedFrom.id), amount);
     if (!res.ok) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${res.reason || "未知原因"}`, parse_mode: "HTML", message_thread_id: threadId });
       return;
     }
 
-    const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? "TA"));
+    const targetName = String(targetFirstName ?? "TA");
     const feePercent = res.fee && amount ? Math.round((res.fee / amount) * 100) : 0;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text:
-        `💸 ${escapeHtml(userName)} 向 ${targetName} 转账 ${amount} 💰。\n` +
+        `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
         `📊 手续费 ${res.fee ?? 0} 💰（已入艾丽莎宝库）。\n` +
         `✅ 转账后 ${targetName} 新余额：${res.toNew} 💰；\n` +
         `🪙 你的新余额：${res.fromNew} 💰。`,
@@ -423,7 +442,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin check。`,
+        text: `❌ ${userName}，你没有权限使用 /coin check。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -435,7 +454,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (repliedFrom && parsedMessage.isReply) {
       const targetId = String(repliedFrom.id);
       const bal = await getBalance(doNs, targetId);
-      const targetName = escapeHtml(String(repliedFrom.first_name ?? repliedFrom.username ?? targetId));
+      const targetName = await resolveFirstName(targetId);
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `👤 ${targetName} 的余额：${bal} 💰。`,
@@ -480,7 +499,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!ADMIN_UIDS_REMOVE.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin remove。`,
+        text: `❌ ${userName}，你没有权限使用 /coin remove。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -491,7 +510,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (isNaN(amount) || amount <= 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin remove 100</code>。`,
+        text: `❌ ${userName}，请指定正确的取款数量，例如：<code>/coin remove 100</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -503,7 +522,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
       targetUid = String(r.id);
-      targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
+      targetLabel = await resolveFirstName(targetUid);
     } else {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -536,7 +555,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin take。`,
+        text: `❌ ${userName}，你没有权限使用 /coin take。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -547,7 +566,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (isNaN(amount) || amount <= 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
+        text: `❌ ${userName}，请指定正确的取款数量，例如：<code>/coin take 100</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -556,11 +575,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 目标：如果是回复某人则转给被回复的人，否则给调用者
     let targetUid = userId;
-    let targetLabel = escapeHtml(userName);
+    let targetLabel = userName;
     if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
       targetUid = String(r.id);
-      targetLabel = escapeHtml(String(r.first_name ?? r.username ?? targetUid));
+      targetLabel = await resolveFirstName(targetUid);
     }
 
     const treasuryBal = await getTreasury(doNs);
@@ -581,7 +600,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ ${safeUserName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${newTreasuryBal} 💰。`,
+      text: `✅ ${userName} 已从艾丽莎宝库取出 ${amount} 💰，并转入账户 ${targetLabel}（新余额 ${newTargetBal} 💰）。艾丽莎宝库剩余 ${newTreasuryBal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -594,7 +613,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin create。`,
+        text: `❌ ${userName}，你没有权限使用 /coin create。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -605,7 +624,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (isNaN(amount) || amount <= 0) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`,
+        text: `❌ ${userName}，请指定正确的注入数量，例如：<code>/coin create 1000</code>。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -619,7 +638,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const newTre = await getTreasury(doNs);
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${safeUserName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
+      text: `✨ ${userName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
@@ -632,7 +651,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${safeUserName}，你没有权限使用 /coin list。`,
+        text: `❌ ${userName}，你没有权限使用 /coin list。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -685,9 +704,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         if (!isNaN(Number(uid))) {
           const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
           textLines.push(`${member.first_name}:${bal}💰`);
-        } 
+        }
       }
-      const out = `🏆 财富榜 TOP ${top.length}\n  <blockquote expandable>` + textLines.join("\n") +` </blockquote>`;
+      const out = `🏆 财富榜 TOP ${top.length}\n  <blockquote expandable>` + textLines.join("\n") + ` </blockquote>`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: out,
