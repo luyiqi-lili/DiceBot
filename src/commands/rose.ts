@@ -83,7 +83,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
   const target = parsedMessage.replyToMessage.from;
   const targetId = Number(target.id);
-  const targetName = escapeHtml(String(target.first_name ?? target.username ?? "该用户"));
+  const targetName = TgMessage.fetchChatMember(env,chatId,target.id)
 
   // 解析是否为 send 操作（parsedMessage.args 由 TgMessage.parseCommandFromText 填充）
   const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.map((s) => String(s).toLowerCase()) : [];
