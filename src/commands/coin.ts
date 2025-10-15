@@ -686,7 +686,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       // 排序取前100
       const top = Object.entries(allBalances)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 100);
+        .slice(0, 200);
 
       if (top.length === 0) {
         await TgMessage.sendText(env, {
