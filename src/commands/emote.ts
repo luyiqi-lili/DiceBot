@@ -27,12 +27,26 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     `ID${from.id}`;
   const actor = actorRaw.trim();
 
-  // 如果是回复则尝试获取目标用户信息
+  // 如果是回复则尝试获取目标用户信息（用于 %t 替换）
   let targetRaw: string | null = null;
+  let replyToMessageId: number | undefined = undefined;
   if (parsed.isReply && parsed.replyToMessage && parsed.replyToMessage.from) {
     const tgt = parsed.replyToMessage.from;
-     targetRaw = (await TgMessage.fetchChatMember(env, chatId, tgt.id)).first_name;
-   }
+    // 记录要回复的 message_id（使 bot 的消息回复同一条被回复消息）
+    replyToMessageId = parsed.replyToMessage.message_id;
+    try {
+      const member = await TgMessage.fetchChatMember(env, chatId, tgt.id);
+      // 优先用 first_name，再 username，再回落到 ID
+      targetRaw = (member?.first_name as string) || (member?.username ? `@${member.username}` : (`ID${tgt.id}`));
+    } catch (e) {
+      // fetch 失败则回退到回复消息里原始 from 字段（可靠）
+      try {
+        targetRaw = (tgt.first_name as string) || (tgt.username ? `@${tgt.username}` : (`ID${tgt.id}`));
+      } catch {
+        targetRaw = `ID${tgt.id}`;
+      }
+    }
+  }
 
   // 提取命令后的文本：优先使用 args（parseCommandFromText 已填充）
   let content = "";
@@ -87,25 +101,35 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     finalContent = finalContent.split("%t").join(` ${targetRaw} `);
   }
 
-  // 组装输出文本： "[Actor] [finalContent]"
-  const out = `<em> ${actor}${finalContent} </em>`;
+  // 组装输出文本： "<em> Actor action </em>"
+  const out = `<em> ${actor} ${finalContent} </em>`;
+
+  // 发送时如果用户原始消息是回复某条消息，bot 的消息也应 reply_to 那条消息
+  const sendParams: any = {
+    chat_id: chatId,
+    text: out,
+    parse_mode: "HTML",
+    message_thread_id: threadId,
+    reply_markup: deleteMarkup
+  };
+  if (replyToMessageId !== undefined) {
+    sendParams.reply_to_message_id = replyToMessageId;
+  }
 
   try {
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: out,
-      parse_mode: "HTML",
-      message_thread_id: threadId,
-    });
+    await TgMessage.sendText(env, sendParams);
   } catch (err) {
     console.error("[emote] 发送 emote 失败，尝试低级接口回退", err);
+    // 回退发送也带上 reply_to_message_id（若有）
     try {
-      await TgMessage.send(env, "sendMessage", {
+      const fallbackParams: any = {
         chat_id: chatId,
         text: out,
         parse_mode: "HTML",
         message_thread_id: threadId
-      });
+      };
+      if (replyToMessageId !== undefined) fallbackParams.reply_to_message_id = replyToMessageId;
+      await TgMessage.send(env, "sendMessage", fallbackParams);
     } catch (e) {
       console.error("[emote] 回退发送也失败", e);
     }
