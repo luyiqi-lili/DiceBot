@@ -4,22 +4,20 @@ import { MAJOR_ARCANA } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
 
 // 从 coin 模块复用 KV 操作函数
-import { getBalance, deductFromBalance, addToTreasury } from "../lib/coinService";
-import { createDOAdapter } from "../lib/doAdapter";
-
+import { getBalance, addToTreasury } from "../lib/coinService";
+ 
 type Env = {
     TOKEN: string;
     BOT_USERNAME?: string;
     GOOGLE_API_KEYS?: string[];
-    COIN_DO: any
+    COIN_DO: DurableObjectNamespace;
 };
 
 
 export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> {
     console.log("🔮 [handleFate] invoked, parsed.command:", parsed.command, "textPreview:", parsed.textPreview);
 
-    const kvBackend = createDOAdapter(env, env.COIN_DO, "coins");
-    const msg = parsed.message;
+     const msg = parsed.message;
     if (!msg) {
         console.log("🔮 [handleFate] parsed.message 缺失，忽略");
         return;
@@ -137,7 +135,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
 
         // 解析成功后尝试从用户扣费并把钱转入国库
         try {
-            const deducted = await deductFromBalance(env, kvBackend, String(fromId), 5, "占卜费");
+            const deducted = await addToTreasury(env, env.COIN_DO, String(fromId), 5, "占卜费");
             if (!deducted) {
                 const failText = `❌ 扣费失败（余额不足或系统错误），解析已生成但未能扣款。请先充值后重试。`;
                 if (processingMsgId) {
@@ -148,11 +146,9 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
                 return;
             }
 
-            // 将这笔钱加入国库（艾丽莎宝库）
-            await addToTreasury(env, kvBackend, 5, "占卜费");
 
             // 获取新余额用于提示
-            const newBal = await getBalance(kvBackend, String(fromId));
+            const newBal = await getBalance(env.COIN_DO, String(fromId));
 
             const cardList = cap
                 .split("\n")

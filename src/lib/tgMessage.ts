@@ -314,15 +314,30 @@ const TgMessage = {
   },
 
   /**
-   * 发送文本消息的便捷函数
-   * opts: { chat_id, text, parse_mode, reply_markup, message_thread_id }
+   * 发送文本消息的便捷函数（更宽松的参数，支持 reply_to_message_id 等）
+   * opts: { chat_id, text, parse_mode, reply_markup, message_thread_id, reply_to_message_id, disable_web_page_preview }
    */
-  async sendText(env: EnvLike, opts: { chat_id: number; text: string; parse_mode?: string; reply_markup?: any; message_thread_id?: number }) {
+  async sendText(
+    env: EnvLike,
+    opts: {
+      chat_id: number;
+      text: string;
+      parse_mode?: string;
+      reply_markup?: any;
+      message_thread_id?: number;
+      reply_to_message_id?: number;
+      disable_web_page_preview?: boolean;
+    }
+  ) {
     const body: any = { chat_id: opts.chat_id, text: opts.text };
+
     if (opts.parse_mode) body.parse_mode = opts.parse_mode;
     if (opts.reply_markup) body.reply_markup = opts.reply_markup;
-    if (opts.message_thread_id) body.message_thread_id = opts.message_thread_id;
-    return await TgMessage.send(env, 'sendMessage', body);
+    if (typeof opts.message_thread_id !== "undefined") body.message_thread_id = opts.message_thread_id;
+    if (typeof opts.reply_to_message_id !== "undefined") body.reply_to_message_id = opts.reply_to_message_id;
+    if (typeof opts.disable_web_page_preview !== "undefined") body.disable_web_page_preview = opts.disable_web_page_preview;
+
+    return await TgMessage.send(env, "sendMessage", body);
   },
 
   /**
@@ -386,8 +401,10 @@ const TgMessage = {
       const res = await callTelegramApi(env, 'getChatMember', { chat_id: chatId, user_id: userId });
       if (res && res.ok && res.result && (res.result as any).user) {
         const u = (res.result as any).user;
+        // 去掉括号及其内容，包括全角括号和半角括号
+        const cleanFirstName = u.first_name.replace(/[\(（].*?[\)）]/g, '').trim();
         return {
-          first_name: u.first_name || `${userId}`,
+          first_name: `<a href="tg://user?id=${userId}">${cleanFirstName || userId}</a>`,
           username: (u.username as string) || ''
         };
       }
