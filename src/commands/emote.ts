@@ -97,7 +97,6 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   // 如果存在 targetRaw，则替换 %t 为目标名称
   let finalContent = content;
   if (targetRaw) {
-    // 多次出现 %t 都替换（两边留空格以防粘连）
     finalContent = finalContent.split("%t").join(`${targetRaw}`);
   }
 
