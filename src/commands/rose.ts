@@ -70,6 +70,112 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   const fromId = Number(from.id);
   const fromName = escapeHtml(String(from.first_name ?? from.username ?? "你"));
 
+  // 解析是否为 send/check 操作（parsedMessage.args 由 TgMessage.parseCommandFromText 填充）
+  const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.map((s) => String(s).toLowerCase()) : [];
+  const isSend = args.includes("send");
+  const isCheck = args.includes("check");
+
+  // 如果是 check 命令：统计所有人对目标用户的好感度（回复某人则查该人；直接发送则查自己）
+  if (isCheck) {
+    // 目标用户支持两种方式：回复某人，或直接发送（则查询对自己的好感度）
+    let targetId: number;
+    let targetName: string;
+
+    if (parsedMessage.isReply && parsedMessage.replyToMessage && parsedMessage.replyToMessage.from) {
+      targetId = Number(parsedMessage.replyToMessage.from.id);
+      try {
+        targetName = (await TgMessage.fetchChatMember(env, chatId, parsedMessage.replyToMessage.from.id)).first_name;
+      } catch {
+        targetName = escapeHtml(String(parsedMessage.replyToMessage.from.first_name ?? parsedMessage.replyToMessage.from.username ?? String(targetId)));
+      }
+    } else {
+      targetId = fromId;
+      targetName = fromName;
+    }
+
+    const targetKey = String(targetId);
+
+    // 列出所有 affection:* 键并查找包含 targetKey 的来源
+    let cursor: string | undefined = undefined;
+    const rows: Array<{ sourceId: number; sourceName: string; value: number }> = [];
+
+    do {
+      // KV list 可能返回 keys 字段
+      const list = await env.AFFECTION_KV.list({ prefix: "affection:", cursor });
+      const keys = (list.keys ?? []) as Array<{ name: string }>;
+
+      for (const k of keys) {
+        // k.name 格式: affection:<sourceId>
+        const parts = k.name.split(":");
+        if (parts.length < 2) continue;
+        const sourceId = Number(parts[1]);
+        if (Number.isNaN(sourceId)) continue;
+
+        const raw = await env.AFFECTION_KV.get(k.name);
+        if (!raw) continue;
+        let map: Record<string, { firstName: string; value: number }>;
+        try {
+          map = JSON.parse(raw) as Record<string, { firstName: string; value: number }>;
+        } catch {
+          continue;
+        }
+
+        const rec = map[targetKey];
+        if (!rec) continue; // 该 source 对 target 没有记录
+
+        // 获取来源用户展示名（尝试从 chat member 获取，失败则用占位）
+        let sourceName = `用户${sourceId}`;
+        try {
+          const member = await TgMessage.fetchChatMember(env, chatId, Number(sourceId));
+          sourceName = member.first_name ?? sourceName;
+        } catch {
+          // 忽略 fetch 错误，保持占位名
+        }
+
+        // 排除目标自己对自己的记录（如果需要保留可移除此判断）
+        if (sourceId === targetId) continue;
+
+        rows.push({ sourceId, sourceName: (String(sourceName)), value: Number(rec.value || 0) });
+      }
+
+      cursor = (list as any).cursor;
+    } while (cursor);
+
+    // 按数值倒序排序
+    rows.sort((a, b) => b.value - a.value);
+
+    if (rows.length === 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `${targetName} 暂无来自他人的好感记录。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 构造回复文本（限制行数以防过长）
+    const maxLines = 50;
+    const lines: string[] = [];
+    for (let i = 0; i < Math.min(rows.length, maxLines); i++) {
+      const r = rows[i];
+      const emoji = scoreToEmoji(r.value);
+      lines.push(`${i + 1}. ${r.sourceName} — ${emoji || String(r.value)}`);
+    }
+
+    let text = `${targetName} 的好感度排行榜（按数值倒序，共 ${rows.length} 条）：\n` + lines.join("\n");
+    if (rows.length > maxLines) text += `\n... 仅显示前 ${maxLines} 条`;
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+
+    return;
+  }
+
   // 必须是对某条消息的回复（由 TgMessage.parseUpdate 解析），并且被回复消息要有 from
   if (!parsedMessage.isReply || !parsedMessage.replyToMessage || !parsedMessage.replyToMessage.from) {
     await TgMessage.sendText(env, {
@@ -84,10 +190,6 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   const target = parsedMessage.replyToMessage.from;
   const targetId = Number(target.id);
   const targetName = (await TgMessage.fetchChatMember(env,chatId,target.id)).first_name
-
-  // 解析是否为 send 操作（parsedMessage.args 由 TgMessage.parseCommandFromText 填充）
-  const args = Array.isArray(parsedMessage.args) ? parsedMessage.args.map((s) => String(s).toLowerCase()) : [];
-  const isSend = args.includes("send");
 
   // 读取当前好感地图（本地操作）
   const map = await readAffectionMap(env.AFFECTION_KV, fromId);
