@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { escapeHtml } from "../lib/util";
+import { deleteMarkup, escapeHtml } from "../lib/util";
 
 import {
   getBalance,
@@ -149,7 +149,9 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
         chat_id: chatId,
         text: `${targetName} 暂无来自他人的好感记录。`,
         parse_mode: "HTML",
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+
       });
       return;
     }
@@ -163,15 +165,17 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       lines.push(`${i + 1}. ${r.sourceName} — ${emoji || String(r.value)}`);
     }
 
-    let text = `${targetName} 的好感度排行榜（按数值倒序，共 ${rows.length} 条）：<blockquote expandable>` + lines.join("\n");
+    let text = `${targetName} 的好感度排行榜：<blockquote expandable>` + lines.join("\n");
     if (rows.length > maxLines) text += `\n... 仅显示前 ${maxLines} 条`;
-    text +='</blockquote>'
+    text += '</blockquote>'
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text,
       parse_mode: "HTML",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+
     });
 
     return;
@@ -183,14 +187,16 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       chat_id: chatId,
       text: `请在目标用户的消息上回复并使用 /rose 查询或 /rose send 送花（例如：在某人消息上回复并发送 <code>/rose send</code>）。`,
       parse_mode: "HTML",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+
     });
     return;
   }
 
   const target = parsedMessage.replyToMessage.from;
   const targetId = Number(target.id);
-  const targetName = (await TgMessage.fetchChatMember(env,chatId,target.id)).first_name
+  const targetName = (await TgMessage.fetchChatMember(env, chatId, target.id)).first_name
 
   // 读取当前好感地图（本地操作）
   const map = await readAffectionMap(env.AFFECTION_KV, fromId);
@@ -232,7 +238,9 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
         chat_id: chatId,
         text: `❌ ${fromName} 今天已经送过花了。如需额外送花需支付 ${amount} 💰，但你的余额仅有 ${bal} 💰。`,
         parse_mode: "HTML",
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+
       });
       return;
     }
@@ -264,7 +272,9 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       chat_id: chatId,
       text: `${fromName} 对 ${targetName} 的好感度不够高，快多互动吧！`,
       parse_mode: "HTML",
-      message_thread_id: threadId
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+
     });
     return;
   }
@@ -274,7 +284,9 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     chat_id: chatId,
     text: `${fromName} 对 ${targetName} 的好感度为 ${emoji}`,
     parse_mode: "HTML",
-    message_thread_id: threadId
+    message_thread_id: threadId,
+    reply_markup: deleteMarkup
+
   });
 }
 
