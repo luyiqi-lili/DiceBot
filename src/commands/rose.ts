@@ -165,7 +165,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     let text = `${targetName} 的好感度排行榜（按数值倒序，共 ${rows.length} 条）：<blockquote expandable>` + lines.join("\n");
     if (rows.length > maxLines) text += `\n... 仅显示前 ${maxLines} 条`;
-    text +='</expandable>'
+    text +='</blockquote>'
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
