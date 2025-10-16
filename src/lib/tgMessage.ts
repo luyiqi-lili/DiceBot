@@ -117,58 +117,83 @@ function parseCommandFromText(text: string, botUsername?: string) {
   log('分割字符', tokens);
   if (tokens.length === 0) return { isCommand: false };
 
-
   const first = tokens[0];
 
+  // 辅助：把像 "coin_check_more" -> { command: "coin", suffix: "check_more" }
+  const splitUnderscore = (namePart: string) => {
+    const idx = namePart.indexOf('_');
+    if (idx === -1) return { cmd: namePart, suffix: '' };
+    const cmd = namePart.slice(0, idx);
+    const suffix = namePart.slice(idx + 1);
+    return { cmd, suffix };
+  };
 
-  // 1. 以斜线开头的常规命令，例如 "/roll"、"/roll@Bot"、"/rd10"、"/r2d10"
+  // 1. 以斜线开头的常规命令，例如 "/roll"、"/roll@Bot"、"/rd10"、"/r2d10"、"/coin_check"
   if (first.startsWith('/')) {
     // 去掉起始的 '/'
     // 并且移除尾随的 @username 部分（如果存在）
     const withoutSlash = first.slice(1);
-    const [namePart] = withoutSlash.split('@'); // e.g. 'rd10' 或 'r2d10' 或 'roll'
-
+    const [namePart] = withoutSlash.split('@'); // e.g. 'rd10' 或 'r2d10' 或 'roll' 或 'coin_check'
 
     if (!namePart) return { isCommand: false };
 
-
-    // 如果是以 "r" 开头且第二个字符是数字或字母 'd'（比如 rd10 / r2d10），视为快捷的 /r 命令
-    // 这样不会把 /roll 当做 /r（因为第二个字符是 'o'，不匹配）
+    // 优先处理 /r2d10 /rd10 这种快捷写法 —— 仍然保留原行为
     if (/^r(?:\d|d)/i.test(namePart)) {
-      // namePart = 'rd10' | 'r2d10' | 'r123' ...
       const suffix = namePart.slice(1); // 'd10' | '2d10' | '123'
-      const args = [] as string[];
+      const args: string[] = [];
       if (suffix) args.push(suffix);
-      // 其余 tokens 也应该被当成参数
       args.push(...tokens.slice(1));
       return { isCommand: true, command: 'r', args };
     }
 
+    // 支持用下划线把命令名和第一个参数连写的形式：/coin_check -> command: 'coin', args: ['check', ...]
+    const { cmd, suffix } = splitUnderscore(namePart);
+    if (suffix) {
+      const args = [] as string[];
+      args.push(suffix);
+      args.push(...tokens.slice(1));
+      return { isCommand: true, command: cmd, args };
+    }
 
     // 普通的 '/cmd' 或 '/cmd@Bot' 处理（拆 @）
     const [nameOnly] = namePart.split('@');
     return { isCommand: true, command: nameOnly, args: tokens.slice(1) };
   }
 
-
-  // 2. 形如 "@BotUsername cmd ..." 的情况
+  // 2. 形如 "@BotUsername cmd ..." 的情况（或者 "@BotUsername coin_check ..."）
   if (botUsername && first.toLowerCase() === `@${botUsername.toLowerCase()}`) {
     const second = tokens[1] || '';
     if (!second) return { isCommand: false };
+
     if (second.startsWith('/')) {
       const [name] = second.slice(1).split('@');
-      return { isCommand: true, command: name, args: tokens.slice(2) };
+      // 这里也支持 /coin_check 这种情况
+      const { cmd, suffix } = splitUnderscore(name);
+      const args: string[] = [];
+      if (suffix) args.push(suffix);
+      args.push(...tokens.slice(2));
+      return { isCommand: true, command: cmd, args };
     }
+
+    // second 本身可能是 coin_check（不带斜线）
+    if (second.includes('_')) {
+      const idx = second.indexOf('_');
+      const cmd = second.slice(0, idx);
+      const suffix = second.slice(idx + 1);
+      const args = [] as string[];
+      if (suffix) args.push(suffix);
+      args.push(...tokens.slice(2));
+      return { isCommand: true, command: cmd, args };
+    }
+
     return { isCommand: true, command: second, args: tokens.slice(2) };
   }
 
-
-  // 3. 兼容以 "/r" 或其他常规命令直接出现（不带 bot username）
+  // 3. 兼容以 "/r" 或其他常规命令直接出现（不带 bot username） — 已在上面处理过，但保留兜底
   if (first.startsWith('/')) {
     const [name] = first.slice(1).split('@');
     return { isCommand: true, command: name, args: tokens.slice(1) };
   }
-
 
   return { isCommand: false };
 }
