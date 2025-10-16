@@ -230,6 +230,19 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     // 非免费时间：尝试支付 30 💰（扣钱并将款项记入国库）
     const amount = 30;
+    const bal = await getBalance(env.COIN_DO, String(fromId));
+    if (bal < 30) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${fromName} 今天已经送过花了。如需额外送花需支付 ${amount} 💰，但你的余额仅有 ${bal} 💰。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+
+      });
+      return;
+
+    }
     const ok = await addToTreasury(env, env.COIN_DO, String(fromId), amount, "送花消费");
     if (!ok) {
       // 查询余额并提示
