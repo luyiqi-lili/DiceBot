@@ -522,7 +522,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     targetUid = parseInt(args[2] || "", 10);
     if (!isNaN(targetUid)) {
       const userInfo = await TgMessage.fetchChatMember(env, chatId, targetUid);
-      let targetLabel = String(userInfo.first_name ?? userInfo.username ?? targetUid);
+      targetLabel = userInfo.first_name;
 
     } else if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
