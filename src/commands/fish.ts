@@ -1,7 +1,7 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import {   getBalance as coinGetBalance,   addToTreasury, takeFromTreasury } from "../lib/coinService";
 import { fishList, getCastDesc } from "../lib/liveConfig";
-import { escapeHtml } from "../lib/util";
+import { escapeHtml, stripHtml } from "../lib/util";
 
 
 const maxRecode = 20;
@@ -125,7 +125,8 @@ function showFishingRecord(record: FishingRecord): string {
         rev.forEach((r, idx) => {
             resultText += `<b>第${todayCount - idx}次:</b> 花费 ${r.baitCost}💰, `;
             if (r.hooked) {
-                resultText += `钓到 ${r.fishValue}`;
+                const cleanFishTest=stripHtml(String(r.fishValue));
+                resultText += `钓到  ${cleanFishTest}`;
             } else {
                 resultText += `未钓到鱼`;
             }

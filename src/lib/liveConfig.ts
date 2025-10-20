@@ -207,7 +207,7 @@ export const fishList = [
 
   { name: "<a href=\"tg://user?id=8445100282\" >🫙纸星瓶</a>", hookRate: 0.23, value: 6 },
 
-  { name: "<a href=\"tg://user?id=8445100282\" >🍀幸運葉子</a>", hookRate: 0.20, value: 7 },
+  { name: "<a href=\"tg://user?id=6788664480\" >🍀幸運葉子</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐬彩虹海豚</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=8445100282\" >🌊风暴海鲈</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=8445100282\" >🌹玫瑰海胆</a>", hookRate: 0.20, value: 7 },
@@ -251,7 +251,7 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🐱猫鱼</a>", hookRate: 0.10, value: 13 },
   { name: "<a href=\"tg://user?id=8445100282\" >🧚‍♀️湖中精灵</a>", hookRate: 0.10, value: 13 },
   { name: "<a href=\"tg://user?id=8445100282\" >💣教堂の“小男孩”</a>", hookRate: 0.10, value: 13 },
-  { name: "<a href=\"tg://user?id=8445100282\" >🖼️莹魔的涩图”</a>", hookRate: 0.10, value: 13 },
+  { name: "<a href=\"tg://user?id=7674905488\" >🖼️莹魔的涩图”</a>", hookRate: 0.10, value: 13 },
 
 ];
 
