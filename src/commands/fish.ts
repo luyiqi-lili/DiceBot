@@ -163,7 +163,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     const chatId = callbackQuery.message?.chat?.id;
     const messageId = callbackQuery.message?.message_id;
     const clickerId = callbackQuery.from?.id;
-    const clickerName = escapeHtml(String(callbackQuery.from?.first_name ?? callbackQuery.from?.username ?? "你"));
+    const clickerName= (await TgMessage.fetchChatMember(env,chatId,clickerId)).first_name;
 
     // 只有发起者本人可以拉杆
     if (clickerId !== ownerId) {
