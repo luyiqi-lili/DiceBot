@@ -251,7 +251,7 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🐱猫鱼</a>", hookRate: 0.10, value: 13 },
   { name: "<a href=\"tg://user?id=8445100282\" >🧚‍♀️湖中精灵</a>", hookRate: 0.10, value: 13 },
   { name: "<a href=\"tg://user?id=8445100282\" >💣教堂の“小男孩”</a>", hookRate: 0.10, value: 13 },
-  { name: "<a href=\"tg://user?id=7674905488\" >🖼️莹魔的涩图”</a>", hookRate: 0.10, value: 13 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🖼️莹魔的涩图”</a>", hookRate: 0.10, value: 13 },
 
 ];
 
