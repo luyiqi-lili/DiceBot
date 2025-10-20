@@ -143,7 +143,7 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🍗章鱼哥的腿</a>", hookRate: 0.35, value: 2 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐈🐟“猫</a>", hookRate: 0.35, value: 2 },
   { name: "<a href=\"tg://user?id=8445100282\" >🔭破损望远镜</a>", hookRate: 0.35, value: 2 },
-
+  { name: "<a href=\"tg://user?id=8445100282\" >🤖安卓鱼</a>", hookRate: 0.35, value: 2 },
 
   { name: "<a href=\"tg://user?id=8445100282\" >🧶猫鱼的猫毛</a>", hookRate: 0.30, value: 3 },
   { name: "<a href=\"tg://user?id=8445100282\" >🥮三黄QQ弹弹香芋抹茶糯叽叽月饼</a>", hookRate: 0.30, value: 3 },
@@ -203,9 +203,11 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🥭可爱的芒果</a>", hookRate: 0.25, value: 5 },
   { name: "<a href=\"tg://user?id=8445100282\" >🎞️远星的胶片</a>", hookRate: 0.25, value: 5 },
   { name: "<a href=\"tg://user?id=8445100282\" >🌔圆月模型</a>", hookRate: 0.25, value: 5 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🎃南瓜灯</a>", hookRate: 0.25, value: 5 },
 
 
   { name: "<a href=\"tg://user?id=8445100282\" >🫙纸星瓶</a>", hookRate: 0.23, value: 6 },
+  { name: "<a href=\"tg://user?id=8445100282\" >💤睡觉鱼</a>", hookRate: 0.23, value: 6 },
 
   { name: "<a href=\"tg://user?id=6788664480\" >🍀幸運葉子</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐬彩虹海豚</a>", hookRate: 0.20, value: 7 },
