@@ -651,7 +651,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin list - 保持不变
+  // /coin list  
   if (sub === "list") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -669,6 +669,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const stub = doNs.get(id);
 
       let allBalances: Record<string, number> = {};
+      let prayRecords: Record<string, string> = {}; // 新增：存储祈祷记录
       let cursor = "";
 
       // 分页读取 DO 内所有 key
@@ -678,9 +679,19 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         const keys: { name: string }[] = data.keys || [];
         cursor = data.cursor || "";
 
-        // 遍历 keys，使用 coinService 的 getBalance 查询余额
+        // 遍历 keys，分别处理余额和祈祷记录
         for (const { name } of keys) {
-          if (name.startsWith("coin_pray:")) continue; // 跳过临时祈祷记录
+          if (name.startsWith("coin_pray:")) {
+            // 处理祈祷记录
+            const prayUserId = name.replace("coin_pray:", "");
+            const prayDate = await doGetRaw(doNs, name);
+            if (prayDate) {
+              prayRecords[prayUserId] = prayDate;
+            }
+            continue;
+          }
+
+          // 处理余额
           const bal = await getBalance(doNs, name);
           if (bal === 0) continue; // 跳过0余额
           allBalances[name] = bal;
@@ -689,7 +700,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         if (!cursor) break;
       }
 
-      // 排序取前100
+      // 排序取前200
       const top = Object.entries(allBalances)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 200);
@@ -708,11 +719,21 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const textLines = [];
       for (const [idx, [uid, bal]] of top.entries()) {
         if (!isNaN(Number(uid))) {
-          const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
-          textLines.push(`${member.first_name}  ${uid}  :${bal}💰`);
+          try {
+            const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
+            const prayDate = prayRecords[uid]; // 获取该用户的最后祈祷时间
+            const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
+            textLines.push(`${member.first_name}  ${uid}  :${bal}💰${prayInfo}`);
+          } catch (e) {
+            // 如果获取用户信息失败，只显示UID
+            const prayDate = prayRecords[uid];
+            const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
+            textLines.push(`用户${uid}  :${bal}💰${prayInfo}`);
+          }
         }
       }
-      const out = `🏆 财富榜\n  <blockquote expandable>` + textLines.join("\n") + ` </blockquote>`;
+
+      const out = `🏆 财富榜\n<blockquote expandable>` + textLines.join("\n") + `</blockquote>`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: out,
@@ -733,7 +754,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
   }
-
   // 未知子命令
   await TgMessage.sendText(env, {
     chat_id: chatId,
