@@ -651,7 +651,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin list  
+  // /coin list - 修改为分页发送
   if (sub === "list") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -669,7 +669,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       const stub = doNs.get(id);
 
       let allBalances: Record<string, number> = {};
-      let prayRecords: Record<string, string> = {}; // 新增：存储祈祷记录
+      let prayRecords: Record<string, string> = {};
       let cursor = "";
 
       // 分页读取 DO 内所有 key
@@ -716,31 +716,49 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         return;
       }
 
-      const textLines = [];
-      for (const [idx, [uid, bal]] of top.entries()) {
-        if (!isNaN(Number(uid))) {
-          try {
-            const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
-            const prayDate = prayRecords[uid]; // 获取该用户的最后祈祷时间
-            const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
-            textLines.push(`${member.first_name}  ${uid}  :${bal}💰${prayInfo}`);
-          } catch (e) {
-            // 如果获取用户信息失败，只显示UID
-            const prayDate = prayRecords[uid];
-            const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
-            textLines.push(`用户${uid}  :${bal}💰${prayInfo}`);
+      // 分页处理：每页显示30个用户
+      const pageSize = 50;
+      const totalPages = Math.ceil(top.length / pageSize);
+
+      for (let page = 0; page < totalPages; page++) {
+        const startIdx = page * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, top.length);
+        const pageData = top.slice(startIdx, endIdx);
+
+        const textLines = [];
+        for (const [idx, [uid, bal]] of pageData.entries()) {
+          const globalIdx = startIdx + idx + 1; // 全局排名
+          if (!isNaN(Number(uid))) {
+            try {
+              const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
+              const prayDate = prayRecords[uid];
+              const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
+              textLines.push(`${globalIdx}. ${member.first_name} ${uid} :${bal}💰${prayInfo}`);
+            } catch (e) {
+              // 如果获取用户信息失败，只显示UID
+              const prayDate = prayRecords[uid];
+              const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
+              textLines.push(`${globalIdx}. 用户${uid} :${bal}💰${prayInfo}`);
+            }
           }
         }
-      }
 
-      const out = `🏆 财富榜\n<blockquote expandable>` + textLines.join("\n") + `</blockquote>`;
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: out,
-        parse_mode: "HTML",
-        reply_markup: deleteMarkup,
-        message_thread_id: threadId
-      });
+        const pageInfo = totalPages > 1 ? `（第 ${page + 1}/${totalPages} 页）` : '';
+        const out = `🏆 财富榜${pageInfo}\n<blockquote expandable>` + textLines.join("\n") + `</blockquote>`;
+
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: out,
+          parse_mode: "HTML",
+          reply_markup: deleteMarkup,
+          message_thread_id: threadId
+        });
+
+        // 如果不是最后一页，等待一下避免发送过快
+        if (page < totalPages - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
       return;
     } catch (e) {
       console.error("[coin] /coin list error", e);
