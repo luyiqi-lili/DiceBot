@@ -387,7 +387,7 @@ export const payConfigs: PayConfig[] = [
   {
     chatId: -1002742074355,
     threadIds: [182],
-    placename: "天狐宫的祈愿箱",
+    placeName: "天狐宫的祈愿箱",
     enabled: true,
     successMessage:
       "${userName}将 ${amount} 💰投入${place}." +
@@ -399,7 +399,7 @@ export const payConfigs: PayConfig[] = [
   {
     chatId: -1002742074355,
     threadIds: [62],
-    placename: "紫罗兰教堂的募捐箱",
+    placeName: "紫罗兰教堂的募捐箱",
     enabled: true,
     successMessage:
       "${userName}已将 ${amount} 💰投入${place}." +
@@ -411,7 +411,7 @@ export const payConfigs: PayConfig[] = [
   {
     chatId: -1002848481881,
     threadIds: [66],
-    placename: "紫罗兰教堂的募捐箱",
+    placeName: "紫罗兰教堂的募捐箱",
     enabled: true,
     successMessage:
       "${userName}已将 ${amount} 💰投入${place}." +
