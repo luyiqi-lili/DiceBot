@@ -6,7 +6,7 @@ import { escapeHtml } from "../lib/util";
  * Duel 重构版
  * - 通过回复消息确认决斗对象
  * - 接受决斗后才进行双方掷点
- * - 图片、文本和按钮在同一个消息中
+ * - 在单条消息中包含图片、文本和按钮
  */
 
 type ShortCb = {
@@ -115,23 +115,18 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
   const cb: ShortCb = { type: "duel", act: "accept", uid: targetId };
 
   try {
-    // 发送带图片、文本和按钮的完整消息
-    await TgMessage.sendMediaGroup(env, {
+    // 使用 sendPhoto 发送包含图片、文本和按钮的单条消息
+    await TgMessage.sendPhoto(env, {
       chat_id,
-      media: [
-        {
-          type: "photo",
-          media: DUEL_IMAGE_ID,
-          caption: captionText,
-          parse_mode: "HTML"
-        }
-      ],
-      message_thread_id: thread_id,
+      photo: DUEL_IMAGE_ID,
+      caption: captionText,
+      parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
           [{ text: "⚔️ 接受决斗", callback_data: JSON.stringify(cb) }]
         ]
-      }
+      },
+      message_thread_id: thread_id
     });
 
   } catch (e) {
@@ -182,35 +177,32 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
 
   const callerFirst = cq.from?.first_name || "决斗者";
 
-  // 从消息中解析发起者和赌注信息
+  // 从消息 caption 中解析发起者和赌注信息
   const caption = msg.caption || "";
   const initiatorMatch = caption.match(/🗡️ <b>(.+?)<\/b> 向/);
-  const targetMatch = caption.match(/向 <b>(.+?)<\/b> 发起决斗/);
-  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)\n\n/);
+  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)\n/);
 
   const initiatorName = initiatorMatch ? initiatorMatch[1] : "发起者";
-  const targetName = targetMatch ? targetMatch[1] : callerFirst;
   const stake = stakeMatch ? stakeMatch[1] : "未知赌注";
 
   // 双方掷点
   const pointA = Math.floor(Math.random() * 100) + 1; // 发起者点数
   const pointB = Math.floor(Math.random() * 100) + 1; // 接受者点数
 
-  const winner = pointB > pointA ? targetName : initiatorName;
-  const winnerPoints = pointB > pointA ? pointB : pointA;
+  const winner = pointB > pointA ? callerFirst : initiatorName;
+  const winnerPoints = Math.max(pointA, pointB);
 
   const resultText =
     `⚔️ <b>决斗结果</b> ⚔️\n\n` +
-    `🗡️ <b>${escapeHtml(initiatorName)}</b> 向 <b>${escapeHtml(targetName)}</b> 发起决斗\n` +
-    `💰 <b>赌注：</b>${escapeHtml(stake)}\n\n` +
     `🎲 <b>${escapeHtml(initiatorName)}</b> 掷出了 <b>${pointA}</b> 点\n` +
-    `🎲 <b>${escapeHtml(targetName)}</b> 掷出了 <b>${pointB}</b> 点\n\n` +
+    `🎲 <b>${escapeHtml(callerFirst)}</b> 掷出了 <b>${pointB}</b> 点\n\n` +
     `🏆 <b>胜利者：${escapeHtml(winner)}</b> (${winnerPoints}点)\n\n` +
-    `💰 <b>请兑现赌注！</b>`;
+    `💰 <b>赌注：${escapeHtml(stake)}</b>\n\n` +
+    `🎉 <b>请兑现赌注！</b>`;
 
   try {
-    // 编辑原消息显示结果（保持同一张图片）
-    await TgMessage.send(env, 'editMessageCaption', {
+    // 编辑原消息显示结果（保持图片，更新文本和按钮）
+    await TgMessage.editMessageCaption(env, {
       chat_id,
       message_id,
       caption: resultText,
@@ -223,7 +215,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
     });
 
     await TgMessage.answerCallbackQuery(env, cq.id, {
-      text: "决斗已完成！",
+      text: "决斗完成！",
       show_alert: false
     });
 

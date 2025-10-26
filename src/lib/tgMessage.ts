@@ -409,12 +409,65 @@ const TgMessage = {
     return await TgMessage.send(env, 'sendChatAction', { chat_id, action });
   },
 
-
-
-
   // 构造一个常用的 inline keyboard 快速函数
   buildInlineKeyboard(buttons: Array<Array<{ text: string; callback_data?: string; url?: string; switch_inline_query?: string }>>) {
     return { inline_keyboard: buttons };
+  },
+
+
+  /**
+   * 发送图片消息（支持 caption 和 inline keyboard）
+   * opts: { chat_id, photo, caption, parse_mode, reply_markup, message_thread_id, reply_to_message_id }
+   */
+  async sendPhoto(
+    env: EnvLike,
+    opts: {
+      chat_id: number;
+      photo: string;
+      caption?: string;
+      parse_mode?: string;
+      reply_markup?: any;
+      message_thread_id?: number;
+      reply_to_message_id?: number;
+    }
+  ) {
+    const body: any = {
+      chat_id: opts.chat_id,
+      photo: opts.photo
+    };
+
+    if (opts.caption) body.caption = opts.caption;
+    if (opts.parse_mode) body.parse_mode = opts.parse_mode;
+    if (opts.reply_markup) body.reply_markup = opts.reply_markup;
+    if (typeof opts.message_thread_id !== "undefined") body.message_thread_id = opts.message_thread_id;
+    if (typeof opts.reply_to_message_id !== "undefined") body.reply_to_message_id = opts.reply_to_message_id;
+
+    return await TgMessage.send(env, "sendPhoto", body);
+  },
+  // 在 TgMessage 对象中添加以下方法：
+
+  /**
+   * 编辑消息的 caption（适用于图片、视频等媒体消息）
+   * opts 可包含 chat_id/message_id 或 inline_message_id
+   */
+  async editMessageCaption(
+    env: EnvLike,
+    opts: {
+      caption: string;
+      chat_id?: number;
+      message_id?: number;
+      inline_message_id?: string;
+      parse_mode?: string;
+      reply_markup?: any
+    }
+  ) {
+    const body: any = { caption: opts.caption };
+    if (opts.chat_id) body.chat_id = opts.chat_id;
+    if (opts.message_id) body.message_id = opts.message_id;
+    if (opts.inline_message_id) body.inline_message_id = opts.inline_message_id;
+    if (opts.parse_mode) body.parse_mode = opts.parse_mode;
+    if (opts.reply_markup) body.reply_markup = opts.reply_markup;
+    return await TgMessage.send(env, 'editMessageCaption', body);
   },
   /**
  * 获取 chat 中某个 user 的信息（first_name, username）
