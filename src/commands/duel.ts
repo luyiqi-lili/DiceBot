@@ -6,7 +6,7 @@ import { escapeHtml } from "../lib/util";
  * Duel 重构版
  * - 通过回复消息确认决斗对象
  * - 接受决斗后才进行双方掷点
- * - 图片和文本在同一个消息中
+ * - 图片、文本和按钮在同一个消息中
  */
 
 type ShortCb = {
@@ -104,8 +104,8 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     return;
   }
 
-  // 构建决斗邀请消息文本
-  const initText =
+  // 构建决斗邀请消息
+  const captionText =
     `⚔️ <b>决斗邀请</b> ⚔️\n\n` +
     `🗡️ <b>${escapeHtml(initiatorFirst)}</b> 向 <b>${escapeHtml(targetDisplay)}</b> 发起决斗！\n` +
     `💰 <b>赌注：</b>${escapeHtml(stake)}\n\n` +
@@ -115,31 +115,23 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
   const cb: ShortCb = { type: "duel", act: "accept", uid: targetId };
 
   try {
-    // 发送带图片和文本的单一消息
+    // 发送带图片、文本和按钮的完整消息
     await TgMessage.sendMediaGroup(env, {
       chat_id,
       media: [
         {
           type: "photo",
           media: DUEL_IMAGE_ID,
-          caption: initText,
+          caption: captionText,
           parse_mode: "HTML"
         }
       ],
-      message_thread_id: thread_id
-    });
-
-    // 发送决斗按钮消息（紧跟在图片消息后面）
-    await TgMessage.sendText(env, {
-      chat_id,
-      text: `🗡️ ${escapeHtml(targetDisplay)}，你被挑战了！点击下方按钮接受决斗：`,
-      parse_mode: "HTML",
+      message_thread_id: thread_id,
       reply_markup: {
         inline_keyboard: [
           [{ text: "⚔️ 接受决斗", callback_data: JSON.stringify(cb) }]
         ]
-      },
-      message_thread_id: thread_id
+      }
     });
 
   } catch (e) {
@@ -147,7 +139,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     // 如果发送图片失败，回退到纯文本
     await TgMessage.sendText(env, {
       chat_id,
-      text: initText + `\n\n🗡️ ${escapeHtml(targetDisplay)}，点击按钮接受决斗：`,
+      text: captionText + `\n\n🗡️ ${escapeHtml(targetDisplay)}，点击按钮接受决斗：`,
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
@@ -190,31 +182,39 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
 
   const callerFirst = cq.from?.first_name || "决斗者";
 
-  // 从按钮消息的文本中解析被挑战者名字
-  const targetNameMatch = msg.text?.match(/🗡️ (.+?)，你被挑战了/);
-  const targetName = targetNameMatch ? targetNameMatch[1] : callerFirst;
+  // 从消息中解析发起者和赌注信息
+  const caption = msg.caption || "";
+  const initiatorMatch = caption.match(/🗡️ <b>(.+?)<\/b> 向/);
+  const targetMatch = caption.match(/向 <b>(.+?)<\/b> 发起决斗/);
+  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)\n\n/);
+
+  const initiatorName = initiatorMatch ? initiatorMatch[1] : "发起者";
+  const targetName = targetMatch ? targetMatch[1] : callerFirst;
+  const stake = stakeMatch ? stakeMatch[1] : "未知赌注";
 
   // 双方掷点
   const pointA = Math.floor(Math.random() * 100) + 1; // 发起者点数
   const pointB = Math.floor(Math.random() * 100) + 1; // 接受者点数
 
-  const winner = pointB > pointA ? targetName : "发起者";
+  const winner = pointB > pointA ? targetName : initiatorName;
   const winnerPoints = pointB > pointA ? pointB : pointA;
 
   const resultText =
     `⚔️ <b>决斗结果</b> ⚔️\n\n` +
-    `🎲 <b>发起者</b> 掷出了 <b>${pointA}</b> 点\n` +
+    `🗡️ <b>${escapeHtml(initiatorName)}</b> 向 <b>${escapeHtml(targetName)}</b> 发起决斗\n` +
+    `💰 <b>赌注：</b>${escapeHtml(stake)}\n\n` +
+    `🎲 <b>${escapeHtml(initiatorName)}</b> 掷出了 <b>${pointA}</b> 点\n` +
     `🎲 <b>${escapeHtml(targetName)}</b> 掷出了 <b>${pointB}</b> 点\n\n` +
     `🏆 <b>胜利者：${escapeHtml(winner)}</b> (${winnerPoints}点)\n\n` +
     `💰 <b>请兑现赌注！</b>`;
 
   try {
-    // 编辑原按钮消息显示结果
-    await TgMessage.editMessageText(env, {
+    // 编辑原消息显示结果（保持同一张图片）
+    await TgMessage.send(env, 'editMessageCaption', {
       chat_id,
       message_id,
+      caption: resultText,
       parse_mode: "HTML",
-      text: resultText,
       reply_markup: {
         inline_keyboard: [
           [{ text: "删除消息", callback_data: JSON.stringify({ type: "delete_message" }) }]
@@ -222,17 +222,9 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
       }
     });
 
-    // 发送结果图片消息（图片和文本在一起）
-    await TgMessage.sendMediaGroup(env, {
-      chat_id,
-      media: [
-        {
-          type: "photo",
-          media: DUEL_IMAGE_ID,
-          caption: `🎉 <b>${escapeHtml(winner)} 获得了胜利！</b>\n\n${resultText}`,
-          parse_mode: "HTML"
-        }
-      ]
+    await TgMessage.answerCallbackQuery(env, cq.id, {
+      text: "决斗已完成！",
+      show_alert: false
     });
 
   } catch (e) {
