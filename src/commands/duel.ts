@@ -22,7 +22,7 @@ const reply_delete = {
 };
 
 // 决斗氛围图片 ID
-const DUEL_IMAGE_ID = "AgACAgEAAyEFAASpyGJZAAJ9SWj-FJr4gS7H43QLuwYb25tuqfBSAAIuC2sbPEfwR4PzdlhNkrdiAQADAgADeAADNgQ";
+const DUEL_IMAGE_ID = "BQACAgEAAyEFAASpyGJZAAJ9jGj-J00_DwmkJ1hHyqhRQMBzlNLYAALeBAACPEfwRwScMkvQMoG-NgQ";
 
 /**
  * 处理 /duel 发起（通过回复消息确认决斗对象）
@@ -224,11 +224,6 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
       message_id,
       caption: resultText,
       parse_mode: "HTML",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "删除消息", callback_data: JSON.stringify({ type: "delete_message" }) }]
-        ]
-      }
     });
 
     await TgMessage.answerCallbackQuery(env, cq.id, {
