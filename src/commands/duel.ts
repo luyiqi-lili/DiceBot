@@ -11,11 +11,10 @@ import { escapeHtml } from "../lib/util";
  */
 
 type ShortCb = {
-  type: "duel";
-  act: "accept";
-  initiatorId: number; // 发起者用户 ID
-  targetId: number;    // 目标用户 ID
-  stake: string;       // 赌注
+  type: "duel";          // type
+  i: number;          // initiatorId
+  d: number;          // targetId
+  s: string;          // stake (截断到安全长度)
 };
 
 const reply_delete = {
@@ -113,14 +112,25 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     `💰 <b>赌注：</b>${escapeHtml(stake)}\n\n` +
     `⚠️ ${targetInfo.first_name} 请点击下方按钮接受决斗！`;
 
-  // callback_data 包含所有必要信息
+  // callback_data 包含所有必要信息，使用缩写字段名减少长度
   const cb: ShortCb = {
     type: "duel",
-    act: "accept",
-    initiatorId: initiatorId!,
-    targetId: targetId,
-    stake: stake
+    i: initiatorId!,
+    d: targetId,
+    s: stake.slice(0, 20) // 限制赌注长度，避免超过64字节限制
   };
+
+  const callbackData = JSON.stringify(cb);
+  console.log("[duel] callback_data 长度:", callbackData.length, "内容:", callbackData);
+
+  // 检查长度是否超过限制
+  if (callbackData.length > 64) {
+    console.error("[duel] callback_data 超过64字节限制:", callbackData.length);
+    // 如果还是太长，进一步缩短赌注
+    cb.s = stake.slice(0, 10);
+    const finalCallbackData = JSON.stringify(cb);
+    console.log("[duel] 调整后的 callback_data 长度:", finalCallbackData.length);
+  }
 
   try {
     // 使用 sendPhoto 发送包含图片、文本和按钮的单条消息
@@ -160,7 +170,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
 export async function handleDuelCallback(callbackQuery: any, callbackData: any, env: EnvLike) {
   const cq = callbackQuery;
   if (!callbackData || typeof callbackData !== "object") return;
-  if (callbackData.type !== "duel" || callbackData.act !== "accept") return;
+  if (callbackData.type !== "duel"  ) return;
 
   const msg = cq.message;
   if (!msg) {
@@ -172,7 +182,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
   const message_id = msg.message_id;
 
   // 验证调用者是否为被挑战者
-  const expectedTargetId = callbackData.targetId;
+  const expectedTargetId = callbackData.d; // 使用缩写字段
   const callerId = cq.from?.id;
 
   if (expectedTargetId !== callerId) {
@@ -183,10 +193,10 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
     return;
   }
 
-  // 从 callback_data 中获取所有必要信息
-  const initiatorId = callbackData.initiatorId;
-  const targetId = callbackData.targetId;
-  const stake = callbackData.stake;
+  // 从 callback_data 中获取所有必要信息（使用缩写字段）
+  const initiatorId = callbackData.i;
+  const targetId = callbackData.d;
+  const stake = callbackData.s;
 
   // 获取用户显示名称（带链接）
   const initiatorInfo = await TgMessage.fetchChatMember(env, chat_id, initiatorId);
