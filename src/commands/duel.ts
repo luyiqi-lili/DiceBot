@@ -6,7 +6,7 @@ import { escapeHtml } from "../lib/util";
  * Duel 重构版
  * - 通过回复消息确认决斗对象
  * - 接受决斗后才进行双方掷点
- * - 添加决斗氛围图片
+ * - 图片和文本在同一个消息中
  */
 
 type ShortCb = {
@@ -104,7 +104,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     return;
   }
 
-  // 构建决斗邀请消息
+  // 构建决斗邀请消息文本
   const initText =
     `⚔️ <b>决斗邀请</b> ⚔️\n\n` +
     `🗡️ <b>${escapeHtml(initiatorFirst)}</b> 向 <b>${escapeHtml(targetDisplay)}</b> 发起决斗！\n` +
@@ -115,7 +115,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
   const cb: ShortCb = { type: "duel", act: "accept", uid: targetId };
 
   try {
-    // 发送决斗氛围图片
+    // 发送带图片和文本的单一消息
     await TgMessage.sendMediaGroup(env, {
       chat_id,
       media: [
@@ -129,7 +129,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
       message_thread_id: thread_id
     });
 
-    // 发送决斗按钮消息
+    // 发送决斗按钮消息（紧跟在图片消息后面）
     await TgMessage.sendText(env, {
       chat_id,
       text: `🗡️ ${escapeHtml(targetDisplay)}，你被挑战了！点击下方按钮接受决斗：`,
@@ -209,7 +209,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
     `💰 <b>请兑现赌注！</b>`;
 
   try {
-    // 编辑原消息显示结果
+    // 编辑原按钮消息显示结果
     await TgMessage.editMessageText(env, {
       chat_id,
       message_id,
@@ -222,14 +222,14 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
       }
     });
 
-    // 发送胜利庆祝图片
+    // 发送结果图片消息（图片和文本在一起）
     await TgMessage.sendMediaGroup(env, {
       chat_id,
       media: [
         {
           type: "photo",
           media: DUEL_IMAGE_ID,
-          caption: `🎉 <b>${escapeHtml(winner)} 获得了胜利！</b>`,
+          caption: `🎉 <b>${escapeHtml(winner)} 获得了胜利！</b>\n\n${resultText}`,
           parse_mode: "HTML"
         }
       ]
