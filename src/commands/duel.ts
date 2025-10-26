@@ -179,11 +179,17 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
 
   // 从消息 caption 中解析发起者和赌注信息
   const caption = msg.caption || "";
+
+  // 改进的解析逻辑
   const initiatorMatch = caption.match(/🗡️ <b>(.+?)<\/b> 向/);
-  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)\n/);
+  // 修复赌注解析：匹配赌注行直到两个换行符之前的所有内容
+  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)(?:\n\n|$)/);
 
   const initiatorName = initiatorMatch ? initiatorMatch[1] : "发起者";
-  const stake = stakeMatch ? stakeMatch[1] : "未知赌注";
+  const stake = stakeMatch ? stakeMatch[1].trim() : "未知赌注";
+
+  console.log("[duel callback] 解析到的赌注:", stake);
+  console.log("[duel callback] 完整caption:", caption);
 
   // 双方掷点
   const pointA = Math.floor(Math.random() * 100) + 1; // 发起者点数
