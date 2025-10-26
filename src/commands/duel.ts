@@ -7,12 +7,15 @@ import { escapeHtml } from "../lib/util";
  * - 通过回复消息确认决斗对象
  * - 接受决斗后才进行双方掷点
  * - 在单条消息中包含图片、文本和按钮
+ * - 所有必要信息存储在 callback_data 中
  */
 
 type ShortCb = {
   type: "duel";
   act: "accept";
-  uid?: number; // 目标用户 ID
+  initiatorId: number; // 发起者用户 ID
+  targetId: number;    // 目标用户 ID
+  stake: string;       // 赌注
 };
 
 const reply_delete = {
@@ -21,10 +24,6 @@ const reply_delete = {
 
 // 决斗氛围图片 ID
 const DUEL_IMAGE_ID = "AgACAgEAAyEFAASpyGJZAAJ9SWj-FJr4gS7H43QLuwYb25tuqfBSAAIuC2sbPEfwR4PzdlhNkrdiAQADAgADeAADNgQ";
-
-function pickDisplayNameFromParsed(parsed: ParsedUpdate) {
-  return parsed.from?.first_name || "决斗者";
-}
 
 /**
  * 处理 /duel 发起（通过回复消息确认决斗对象）
@@ -36,8 +35,8 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
   const thread_id = parsed.threadId;
   const botName = env.BOT_USERNAME || "";
 
-  const initiatorFirst = pickDisplayNameFromParsed(parsed);
   const initiatorId = parsed.from?.id;
+  const initiatorFirst = parsed.from?.first_name || "决斗者";
   const args = parsed.args || [];
 
   // 检查是否是回复消息
@@ -65,7 +64,6 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     return;
   }
 
-  const targetDisplay = targetUser.first_name || "未知用户";
   const targetId = targetUser.id;
 
   // 检查赌注
@@ -104,15 +102,25 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     return;
   }
 
+  // 获取用户显示名称（带链接）
+  const initiatorInfo = await TgMessage.fetchChatMember(env, chat_id, initiatorId!);
+  const targetInfo = await TgMessage.fetchChatMember(env, chat_id, targetId);
+
   // 构建决斗邀请消息
   const captionText =
     `⚔️ <b>决斗邀请</b> ⚔️\n\n` +
-    `🗡️ <b>${escapeHtml(initiatorFirst)}</b> 向 <b>${escapeHtml(targetDisplay)}</b> 发起决斗！\n` +
+    `🗡️ ${initiatorInfo.first_name} 向 ${targetInfo.first_name} 发起决斗！\n` +
     `💰 <b>赌注：</b>${escapeHtml(stake)}\n\n` +
-    `⚠️ ${escapeHtml(targetDisplay)} 请点击下方按钮接受决斗！`;
+    `⚠️ ${targetInfo.first_name} 请点击下方按钮接受决斗！`;
 
-  // callback_data 包含目标用户 ID 用于验证
-  const cb: ShortCb = { type: "duel", act: "accept", uid: targetId };
+  // callback_data 包含所有必要信息
+  const cb: ShortCb = {
+    type: "duel",
+    act: "accept",
+    initiatorId: initiatorId!,
+    targetId: targetId,
+    stake: stake
+  };
 
   try {
     // 使用 sendPhoto 发送包含图片、文本和按钮的单条消息
@@ -134,7 +142,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     // 如果发送图片失败，回退到纯文本
     await TgMessage.sendText(env, {
       chat_id,
-      text: captionText + `\n\n🗡️ ${escapeHtml(targetDisplay)}，点击按钮接受决斗：`,
+      text: captionText + `\n\n🗡️ ${targetInfo.first_name}，点击按钮接受决斗：`,
       parse_mode: "HTML",
       reply_markup: {
         inline_keyboard: [
@@ -164,7 +172,7 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
   const message_id = msg.message_id;
 
   // 验证调用者是否为被挑战者
-  const expectedTargetId = callbackData.uid;
+  const expectedTargetId = callbackData.targetId;
   const callerId = cq.from?.id;
 
   if (expectedTargetId !== callerId) {
@@ -175,34 +183,27 @@ export async function handleDuelCallback(callbackQuery: any, callbackData: any, 
     return;
   }
 
-  const callerFirst = cq.from?.first_name || "决斗者";
+  // 从 callback_data 中获取所有必要信息
+  const initiatorId = callbackData.initiatorId;
+  const targetId = callbackData.targetId;
+  const stake = callbackData.stake;
 
-  // 从消息 caption 中解析发起者和赌注信息
-  const caption = msg.caption || "";
-
-  // 改进的解析逻辑
-  const initiatorMatch = caption.match(/🗡️ <b>(.+?)<\/b> 向/);
-  // 修复赌注解析：匹配赌注行直到两个换行符之前的所有内容
-  const stakeMatch = caption.match(/💰 <b>赌注：<\/b>(.+?)(?:\n\n|$)/);
-
-  const initiatorName = initiatorMatch ? initiatorMatch[1] : "发起者";
-  const stake = stakeMatch ? stakeMatch[1].trim() : "未知赌注";
-
-  console.log("[duel callback] 解析到的赌注:", stake);
-  console.log("[duel callback] 完整caption:", caption);
+  // 获取用户显示名称（带链接）
+  const initiatorInfo = await TgMessage.fetchChatMember(env, chat_id, initiatorId);
+  const targetInfo = await TgMessage.fetchChatMember(env, chat_id, targetId);
 
   // 双方掷点
   const pointA = Math.floor(Math.random() * 100) + 1; // 发起者点数
   const pointB = Math.floor(Math.random() * 100) + 1; // 接受者点数
 
-  const winner = pointB > pointA ? callerFirst : initiatorName;
+  const winner = pointB > pointA ? targetInfo.first_name : initiatorInfo.first_name;
   const winnerPoints = Math.max(pointA, pointB);
 
   const resultText =
     `⚔️ <b>决斗结果</b> ⚔️\n\n` +
-    `🎲 <b>${escapeHtml(initiatorName)}</b> 掷出了 <b>${pointA}</b> 点\n` +
-    `🎲 <b>${escapeHtml(callerFirst)}</b> 掷出了 <b>${pointB}</b> 点\n\n` +
-    `🏆 <b>胜利者：${escapeHtml(winner)}</b> (${winnerPoints}点)\n\n` +
+    `🎲 ${initiatorInfo.first_name} 掷出了 <b>${pointA}</b> 点\n` +
+    `🎲 ${targetInfo.first_name} 掷出了 <b>${pointB}</b> 点\n\n` +
+    `🏆 <b>胜利者：${winner}</b> (${winnerPoints}点)\n\n` +
     `💰 <b>赌注：${escapeHtml(stake)}</b>\n\n` +
     `🎉 <b>请兑现赌注！</b>`;
 
