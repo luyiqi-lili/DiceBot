@@ -163,7 +163,7 @@ export default {
 
           //5.3.0 首先添加用户调用计数
           console.log("main:command", parsedMessage.command);
-          await incrementUsageCount(parsedMessage, env);
+          //await incrementUsageCount(parsedMessage, env);
 
           switch (parsedMessage.command) {
             //书签
