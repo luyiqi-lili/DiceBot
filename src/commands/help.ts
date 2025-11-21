@@ -26,7 +26,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/rXdY </code>- 简写，等价于 /roll XdY  
  <code>/rh </code>- 隐藏掷骰，结果仅发送到私聊  
 
- <code>/duel @目标 赌注内容 </code>- 向某人发起一场赌注决斗！
+ <code>/duel 赌注内容 </code>- 回复某人消息发起一场赌注决斗！
 
  <code>/groll </code>- 发起一个群骰，支持多人加入 
 
@@ -69,7 +69,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/roll {选项}", switch_inline_query_current_chat: `/roll {红 白 绿}` },
-        { text: "/duel", switch_inline_query_current_chat: `/duel @对手 一杯奶茶` },
+        { text: "/duel", switch_inline_query_current_chat: `/duel 一杯奶茶` },
         { text: "/groll", switch_inline_query_current_chat: `/groll` }
       ],
       [
