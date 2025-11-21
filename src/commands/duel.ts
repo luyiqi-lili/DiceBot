@@ -22,7 +22,8 @@ const reply_delete = {
 };
 
 // 决斗氛围图片 ID
-const DUEL_IMAGE_ID = "AgACAgUAAyEFAASpyGJZAAJ9kWj-KAtoaaUdQT7xPLJKheSgF75eAAKiDWsb7gzwV0KqjLuqU6CnAQADAgADeAADNgQ";
+                       
+const DUEL_IMAGE_ID = "AgACAgUAAyEGAASpyGJZAAKPGWkf2s8ys6vx0T_eRWdMBuUqIsMjAAKiDWsb7gzwV0KqjLuqU6CnAQADAgADeAADNgQ";
 
 /**
  * 处理 /duel 发起（通过回复消息确认决斗对象）
