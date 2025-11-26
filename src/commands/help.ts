@@ -40,8 +40,6 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/news </code>- 直接使用，查看当日爆料列表 ；回复消息时使用）将该条消息爆料进小道消息系统  
  <code>/news YYYYMMDD </code>- 查看指定日期的爆料  
 
- <code>/like </code>- 查看你召唤骰娘的次数  
-
  <code>/trans &lt;语言&gt; </code>- 回复消息并翻译到指定语言（默认中文），例如 /trans 日语 
 
  <code>/rose </code>- 回复某人的消息以查看你对他的好感度   \n
@@ -79,7 +77,6 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/news", switch_inline_query_current_chat: `/news` },
-        { text: "/like", switch_inline_query_current_chat: `/like` },
         { text: "/trans", switch_inline_query_current_chat: `/trans English` }
       ],
       [
