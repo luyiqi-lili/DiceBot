@@ -31,6 +31,24 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   let targetRaw: string | null = null;
   let replyToMessageId: number | undefined = undefined;
   if (parsed.isReply && parsed.replyToMessage && parsed.replyToMessage.from) {
+
+    if (parsed.replyToMessage.from.is_bot) {
+      const errText = `哎呀，莉莉可没办法和别的机器人互动哦～请回复一位真人玩家的消息来使用此功能。`;
+      try {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: errText,
+          parse_mode: "HTML",
+          message_thread_id: threadId,
+          reply_markup: deleteMarkup // 使用已有的删除按钮
+        });
+      } catch (e) {
+        console.error("[emote] 发送‘禁止回复Bot’提示失败", e);
+      }
+      return; // 直接结束函数，不再执行后面的动作发送流程
+    }
+
+
     const tgt = parsed.replyToMessage.from;
     // 记录要回复的 message_id（使 bot 的消息回复同一条被回复消息）
     replyToMessageId = parsed.replyToMessage.message_id;
