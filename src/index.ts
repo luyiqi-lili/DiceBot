@@ -23,6 +23,8 @@ export type Env = {
   ITEM_STORE: KVNamespace
   COIN_DO: any
   COIN_KV: KVNamespace
+  LOTTERY_DO: DurableObjectNamespace  // 新增
+
 };
 export { CoinDO } from './durableObjects/coin_do';
 
@@ -132,6 +134,13 @@ export default {
               await handleGrollCallback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
+            case "lottery": {
+              console.log("➡️ 处理 lottery 回调", callbackData);
+              const { handleLotteryCallback } = await import("./commands/lottery");
+              await handleLotteryCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+
 
             case "delete_message":
               {
@@ -178,6 +187,15 @@ export default {
                   return new Response("OK", { status: 200 });
                 }
                   */
+
+            case "lottery": {
+              console.log("index: 检测到 /lottery 命令，进入 lottery 逻辑");
+              const { handleLottery } = await import("./commands/lottery");
+              await handleLottery(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /lottery 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
@@ -235,7 +253,7 @@ export default {
               console.log(`index: /roll 处理完成`);
               return new Response("OK", { status: 200 });
             }
-            
+
             //骰点
             case "em":
             case "me":

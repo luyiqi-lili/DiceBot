@@ -136,6 +136,10 @@
 					{
 						"name": "COIN_DO",
 						"class_name": "CoinDO"
+					},
+					{
+						"name": "LOTTERY_DO",
+						"class_name": "LotteryDO"
 					}
 				]
 			},
@@ -143,7 +147,8 @@
 				{
 					"tag": "prod",
 					"new_sqlite_classes": [
-						"CoinDO"
+						"CoinDO",
+						"LotteryDO"
 					]
 				}
 			],
@@ -159,7 +164,6 @@
 			}
 		}
 	}
-
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
