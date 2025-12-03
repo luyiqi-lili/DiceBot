@@ -27,6 +27,7 @@ export type Env = {
 
 };
 export { CoinDO } from './durableObjects/coin_do';
+export { LotteryDO } from './durableObjects/lottery_do';
 
 export default {
 
