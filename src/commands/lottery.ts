@@ -131,7 +131,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `🎫 <b>本期状态</b>\n`;
       if (hasTicket) {
         message += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
-        message += `开奖时自动参与抽奖！\n`;
+        message += `开奖时自动参与抽奖！<blockquote expandable>`;
       } else {
         message += `${userName} 尚未购买本期彩票\n`;
         message += `点击下方按钮花费 ${TICKET_PRICE} 💰 购买一张随机3位数彩票 <blockquote expandable>`;
