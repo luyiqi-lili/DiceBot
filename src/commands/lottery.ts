@@ -151,7 +151,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       }
       
       
-      message += `\n <b>🏆 中奖规则</b>\n`;
+      message += `<b>🏆 中奖规则</b>\n`;
       message += `• 一等奖（完全匹配3位）：分配奖池50%\n`;
       message += `• 二等奖（匹配前2位）：分配奖池30%\n`;
       message += `• 剩余奖金累积到下期奖池\n`;
