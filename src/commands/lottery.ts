@@ -128,6 +128,15 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `   └ 上期累积：${poolAmount} 💰\n`;
       message += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
       
+      message += `🎫 <b>本期状态</b>\n`;
+      if (hasTicket) {
+        message += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
+        message += `开奖时自动参与抽奖！\n`;
+      } else {
+        message += `${userName} 尚未购买本期彩票\n`;
+        message += `点击下方按钮花费 ${TICKET_PRICE} 💰 购买一张随机3位数彩票 <blockquote expandable>`;
+      }
+
       if (lastDrawData.lastDraw) {
         const last = lastDrawData.lastDraw;
         message += `📅 <b>上期开奖结果</b>\n`;
@@ -141,16 +150,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
         message += `\n`;
       }
       
-      message += `🎫 <b>本期状态</b>\n`;
-      if (hasTicket) {
-        message += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
-        message += `开奖时自动参与抽奖！\n`;
-      } else {
-        message += `${userName} 尚未购买本期彩票\n`;
-        message += `点击下方按钮花费 ${TICKET_PRICE} 💰 购买一张随机3位数彩票\n`;
-      }
       
-      message += `\n<b>🏆 中奖规则</b>\n`;
+      message += `\n <b>🏆 中奖规则</b>\n`;
       message += `• 一等奖（完全匹配3位）：分配奖池50%\n`;
       message += `• 二等奖（匹配前2位）：分配奖池30%\n`;
       message += `• 剩余奖金累积到下期奖池\n`;
@@ -159,7 +160,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `<code>/lottery</code> - 查看彩票信息\n`;
       message += `<code>/lottery list</code> - 查看购买记录（管理员）\n`;
       message += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
-      message += `<code>/lottery clean</code> - 清空记录（管理员）\n`;
+      message += `<code>/lottery clean</code> - 清空记录（管理员）</blockquote>`;
       
       // 创建内联键盘 - 如果有票则显示删除按钮，否则显示购买按钮
       // 注意：在购买按钮的callback_data中加入用户ID，确保只有消息的发送者能点击
