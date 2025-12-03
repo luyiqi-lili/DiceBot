@@ -70,7 +70,12 @@
 				{
 					"tag": "v1",
 					"new_sqlite_classes": [
-						"CoinDO",
+						"CoinDO"
+					]
+				},
+				{
+					"tag": "v1",
+					"new_sqlite_classes": [
 						"LotteryDO"
 					]
 				}
@@ -152,7 +157,12 @@
 				{
 					"tag": "prod",
 					"new_sqlite_classes": [
-						"CoinDO",
+						"CoinDO"
+					]
+				},
+				{
+					"tag": "prod",
+					"new_sqlite_classes": [
 						"LotteryDO"
 					]
 				}
