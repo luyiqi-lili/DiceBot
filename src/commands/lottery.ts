@@ -143,10 +143,10 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       
       message += `🎫 <b>本期状态</b>\n`;
       if (hasTicket) {
-        message += `您已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
+        message += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
         message += `开奖时自动参与抽奖！\n`;
       } else {
-        message += `您尚未购买本期彩票\n`;
+        message += `${userName} 尚未购买本期彩票\n`;
         message += `点击下方按钮花费 ${TICKET_PRICE} 💰 购买一张随机3位数彩票\n`;
       }
       
@@ -161,10 +161,10 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
       message += `<code>/lottery clean</code> - 清空记录（管理员）\n`;
       
-      // 创建内联键盘
+      // 创建内联键盘 - 如果有票则显示删除按钮，否则显示购买按钮
       const keyboard = TgMessage.buildInlineKeyboard([
         hasTicket 
-          ? [{ text: `🎫 已购买 (${ticketData.ticketNumber})`, callback_data: "already_bought" }]
+          ? [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
           : [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ type: "lottery", action: "buy" }) }]
       ]);
       
@@ -470,6 +470,35 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
         text: `您已购买本期彩票，号码：${ticketData.ticketNumber}`,
         show_alert: true
       });
+      
+      // 更新消息，显示用户已购买并改为删除按钮
+      const poolRes = await lotteryStub.fetch("https://do/get-pool");
+      const poolData = await poolRes.json() as PoolResponse;
+      const poolAmount = poolData.pool || 0;
+      
+      const countRes = await lotteryStub.fetch("https://do/ticket-count");
+      const countData = await countRes.json() as CountResponse;
+      const ticketCount = countData.count || 0;
+      
+      const totalPrizePool = poolAmount + (ticketCount * TICKET_PRICE);
+      
+      let newMessage = `<b>🎰 大乐透彩票系统</b>\n\n`;
+      newMessage += `💰 <b>奖池总额：</b>${totalPrizePool} 💰\n`;
+      newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
+      newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
+      newMessage += `🎫 <b>本期状态</b>\n`;
+      newMessage += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
+      newMessage += `开奖时自动参与抽奖！\n\n`;
+      newMessage += `🎫 您已经购买过本期彩票`;
+      
+      await TgMessage.editMessageText(env, {
+        chat_id: chatId,
+        message_id: messageId,
+        text: newMessage,
+        parse_mode: "HTML",
+        reply_markup: deleteMarkup
+      });
+      
       return;
     }
 
@@ -534,21 +563,17 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
     newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
     newMessage += `🎫 <b>本期状态</b>\n`;
-    newMessage += `您已购买彩票，号码：<code>${ticketNumber}</code>\n`;
+    newMessage += `${userName} 已购买彩票，号码：<code>${ticketNumber}</code>\n`;
     newMessage += `开奖时自动参与抽奖！\n\n`;
     newMessage += `🎉 购买成功！已扣除 ${TICKET_PRICE} 💰\n`;
     newMessage += `您的新余额：${transferResult.fromNew} 💰`;
-    
-    const keyboard = TgMessage.buildInlineKeyboard([
-      [{ text: `🎫 已购买 (${ticketNumber})`, callback_data: "already_bought" }]
-    ]);
     
     await TgMessage.editMessageText(env, {
       chat_id: chatId,
       message_id: messageId,
       text: newMessage,
       parse_mode: "HTML",
-      reply_markup: keyboard
+      reply_markup: deleteMarkup
     });
     
     await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
