@@ -162,10 +162,15 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `<code>/lottery clean</code> - 清空记录（管理员）\n`;
       
       // 创建内联键盘 - 如果有票则显示删除按钮，否则显示购买按钮
+      // 注意：在购买按钮的callback_data中加入用户ID，确保只有消息的发送者能点击
       const keyboard = TgMessage.buildInlineKeyboard([
         hasTicket 
           ? [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
-          : [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ type: "lottery", action: "buy" }) }]
+          : [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
+              type: "lottery", 
+              action: "buy",
+              userId: userId  // 添加用户ID到回调数据中
+            }) }]
       ]);
       
       await TgMessage.sendText(env, {
@@ -455,13 +460,23 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     return;
   }
 
-  const userId = String(from.id);
-  const userName = await getUserDisplayName(env, chatId, userId);
+  const currentUserId = String(from.id);
+  const currentUserName = await getUserDisplayName(env, chatId, currentUserId);
   const lotteryStub = getLotteryStub(env.LOTTERY_DO);
+
+  // 验证用户是否与回调数据中的用户ID匹配
+  if (callbackData.userId && callbackData.userId !== currentUserId) {
+    console.log(`[lottery] 用户 ${currentUserId} 试图点击用户 ${callbackData.userId} 的购买按钮，已拒绝`);
+    await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+      text: "❌ 这是其他用户的购买按钮，请使用您自己的 /lottery 命令",
+      show_alert: true
+    });
+    return;
+  }
 
   try {
     // 检查是否已购买
-    const ticketRes = await lotteryStub.fetch(`https://do/get-ticket?userId=${encodeURIComponent(userId)}`);
+    const ticketRes = await lotteryStub.fetch(`https://do/get-ticket?userId=${encodeURIComponent(currentUserId)}`);
     const ticketData = await ticketRes.json() as TicketResponse;
     
     if (ticketData.ticketNumber) {
@@ -487,7 +502,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
       newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
       newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
       newMessage += `🎫 <b>本期状态</b>\n`;
-      newMessage += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
+      newMessage += `${currentUserName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
       newMessage += `开奖时自动参与抽奖！\n\n`;
       newMessage += `🎫 您已经购买过本期彩票`;
       
@@ -503,7 +518,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     }
 
     // 检查余额 - 使用 coinService 而不是不存在的 DO 端点
-    const userBalance = await getBalance(env.COIN_DO, userId);
+    const userBalance = await getBalance(env.COIN_DO, currentUserId);
     
     if (userBalance < TICKET_PRICE) {
       await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
@@ -514,7 +529,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     }
 
     // 扣除coin（从用户账户转到国库）
-    const transferResult = await transfer(env, env.COIN_DO, userId, "__treasury__", TICKET_PRICE, false);
+    const transferResult = await transfer(env, env.COIN_DO, currentUserId, "__treasury__", TICKET_PRICE, false);
     
     if (!transferResult.ok) {
       await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
@@ -531,14 +546,14 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     const setTicketRes = await lotteryStub.fetch("https://do/set-ticket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, ticketNumber })
+      body: JSON.stringify({ userId: currentUserId, ticketNumber })
     });
     
     const setTicketData = await setTicketRes.json() as SetTicketResponse;
     
     if (!setTicketData.success) {
       // 购买失败，尝试退款
-      await transfer(env, env.COIN_DO, "__treasury__", userId, TICKET_PRICE, true);
+      await transfer(env, env.COIN_DO, "__treasury__", currentUserId, TICKET_PRICE, true);
       
       await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
         text: `购买失败：${setTicketData.message || "未知错误"}`,
@@ -563,7 +578,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
     newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
     newMessage += `🎫 <b>本期状态</b>\n`;
-    newMessage += `${userName} 已购买彩票，号码：<code>${ticketNumber}</code>\n`;
+    newMessage += `${currentUserName} 已购买彩票，号码：<code>${ticketNumber}</code>\n`;
     newMessage += `开奖时自动参与抽奖！\n\n`;
     newMessage += `🎉 购买成功！已扣除 ${TICKET_PRICE} 💰\n`;
     newMessage += `您的新余额：${transferResult.fromNew} 💰`;
