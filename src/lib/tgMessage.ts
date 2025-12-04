@@ -410,7 +410,7 @@ const TgMessage = {
   },
 
   // 构造一个常用的 inline keyboard 快速函数
-  buildInlineKeyboard(buttons: Array<Array<{ text: string; callback_data?: string; url?: string; switch_inline_query?: string }>>) {
+  buildInlineKeyboard(buttons: Array<Array<{ text: string; callback_data?: string; url?: string; switch_inline_query?: string; switch_inline_query_current_chat?: string }>>) {
     return { inline_keyboard: buttons };
   },
 
