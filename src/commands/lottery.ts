@@ -122,9 +122,9 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
         await TgMessage.sendText(env, {
             chat_id: chatId,
             text: `❌ ${userName}，您已达到购买上限，每人最多购买 ${MAX_TICKETS_PER_USER} 张彩票`,
-            parse_mode: "HTML", 
-
-            message_thread_id: threadId
+            parse_mode: "HTML",
+            message_thread_id: threadId,
+            reply_markup: deleteMarkup  // 失败消息加上删除按钮
         });
         return;
     }
@@ -137,7 +137,8 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
             chat_id: chatId,
             text: `❌ ${userName}，余额不足，购买彩票需要 ${TICKET_PRICE} 💰\n您当前余额：${userBalance} 💰`,
             parse_mode: "HTML",
-            message_thread_id: threadId
+            message_thread_id: threadId,
+            reply_markup: deleteMarkup  // 失败消息加上删除按钮
         });
         return;
     }
@@ -160,7 +161,8 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
             chat_id: chatId,
             text: `❌ ${userName}，扣款失败：${transferResult.reason || "未知错误"}`,
             parse_mode: "HTML",
-            message_thread_id: threadId
+            message_thread_id: threadId,
+            reply_markup: deleteMarkup  // 失败消息加上删除按钮
         });
         return;
     }
@@ -182,7 +184,8 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
             chat_id: chatId,
             text: `❌ ${userName}，购买失败：${addTicketData.message || "未知错误"}`,
             parse_mode: "HTML",
-            message_thread_id: threadId
+            message_thread_id: threadId,
+            reply_markup: deleteMarkup  // 失败消息加上删除按钮
         });
         return;
     }
@@ -220,11 +223,41 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
 
     message += `\n💰 当前奖池总额：${totalPrizePool} 💰`;
 
+    // 创建内联键盘
+    const keyboardRows = [];
+    
+    if (remainingTickets > 0) {
+        // 如果还能购买，添加再次购买按钮
+        const randomNumber = generateTicketNumber();
+        keyboardRows.push([{
+            text: `🎫 再次购买 (${remainingTickets}张剩余)`,
+            switch_inline_query_current_chat: `/lottery buy ${randomNumber}`
+        }]);
+    } else {
+        // 已达上限，显示提示
+        keyboardRows.push([{
+            text: `🎫 已达上限 (${MAX_TICKETS_PER_USER}/5)`,
+            callback_data: JSON.stringify({
+                type: "lottery",
+                action: "limit_reached"
+            })
+        }]);
+    }
+    
+    // 添加删除按钮
+    keyboardRows.push([{
+        text: `🗑️ 删除消息`,
+        callback_data: JSON.stringify({ type: "delete_message" })
+    }]);
+    
+    const keyboard = TgMessage.buildInlineKeyboard(keyboardRows);
+
     await TgMessage.sendText(env, {
         chat_id: chatId,
         text: message,
         parse_mode: "HTML",
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: keyboard  // 成功消息加上购买按钮（如果还能购买）
     });
 }
 
@@ -372,7 +405,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ 获取彩票信息失败，请稍后重试`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup  // 错误消息加上删除按钮
             });
         }
         return;
@@ -386,7 +420,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限查看购买记录。`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup  // 权限不足加上删除按钮
             });
             return;
         }
@@ -485,7 +520,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限开奖。`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup  // 权限不足加上删除按钮
             });
             return;
         }
@@ -501,7 +537,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                     chat_id: chatId,
                     text: `❌ 本期无人购买彩票，无法开奖`,
                     parse_mode: "HTML",
-                    message_thread_id: threadId
+                    message_thread_id: threadId,
+                    reply_markup: deleteMarkup
                 });
                 return;
             }
@@ -622,7 +659,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ 开奖失败：${error.message}`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup
             });
         }
         return;
@@ -636,7 +674,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限清空记录。`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup  // 权限不足加上删除按钮
             });
             return;
         }
@@ -652,7 +691,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                     chat_id: chatId,
                     text: `✅ 彩票系统记录已清空\n所有购买记录和奖池已重置`,
                     parse_mode: "HTML",
-                    message_thread_id: threadId
+                    message_thread_id: threadId,
+                    reply_markup: deleteMarkup
                 });
             } else {
                 throw new Error("清空失败");
@@ -663,7 +703,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
                 chat_id: chatId,
                 text: `❌ 清空记录失败`,
                 parse_mode: "HTML",
-                message_thread_id: threadId
+                message_thread_id: threadId,
+                reply_markup: deleteMarkup
             });
         }
         return;
@@ -679,7 +720,8 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
             `<code>/lottery now</code> 立即开奖（管理员）\n` +
             `<code>/lottery clean</code> 清空记录（管理员）`,
         parse_mode: "HTML",
-        message_thread_id: threadId
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup  // 错误提示加上删除按钮
     });
 }
 
