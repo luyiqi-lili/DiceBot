@@ -11,6 +11,7 @@ type LotteryEnv = EnvLike & {
 // 管理员UID列表（与coin.ts保持一致）
 const ADMIN_UIDS = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
 const TICKET_PRICE = 10;
+const MAX_TICKETS_PER_USER = 50; // 每人最多购买5张彩票
 
 // 定义响应数据类型接口
 interface PoolResponse {
@@ -85,16 +86,11 @@ async function getUserDisplayName(env: LotteryEnv, chatId: number, userId: strin
 }
 
 /**
- * 格式化彩票号码显示
+ * 格式化彩票号码显示（显示全部号码）
  */
 function formatTicketNumbers(ticketNumbers: string[]): string {
   if (ticketNumbers.length === 0) return "无";
-  if (ticketNumbers.length <= 5) {
-    return ticketNumbers.map(num => `<code>${num}</code>`).join(' ');
-  } else {
-    const firstFive = ticketNumbers.slice(0, 5);
-    return firstFive.map(num => `<code>${num}</code>`).join(' ') + ` ...等 ${ticketNumbers.length} 张`;
-  }
+  return ticketNumbers.map(num => `<code>${num}</code>`).join(' ');
 }
 
 /**
@@ -133,6 +129,10 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}`);
       const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
       const userTicketNumbers = userTicketsData.ticketNumbers || [];
+      const userTicketCount = userTicketNumbers.length;
+      
+      // 检查是否已达到购买上限
+      const hasReachedLimit = userTicketCount >= MAX_TICKETS_PER_USER;
       
       // 计算总奖池
       const totalPrizePool = poolAmount + (totalTicketCount * TICKET_PRICE);
@@ -147,10 +147,18 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `   └ 本期购买：${totalTicketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
       
       message += `🎫 <b>本期状态</b>\n`;
-      if (userTicketNumbers.length > 0) {
-        message += `${userName} 已购买 ${userTicketNumbers.length} 张彩票\n`;
+      if (userTicketCount > 0) {
+        message += `${userName} 已购买 ${userTicketCount} 张彩票\n`;
         message += `号码：${formatTicketNumbers(userTicketNumbers)}\n`;
-        message += `开奖时自动参与抽奖！<blockquote expandable>`;
+        message += `开奖时自动参与抽奖！`;
+        
+        if (hasReachedLimit) {
+          message += `\n\n⚠️ <b>购买限制：</b>每人最多购买 ${MAX_TICKETS_PER_USER} 张彩票，您已达到上限。`;
+        } else {
+          message += `\n\n📊 <b>剩余可购买：</b>${MAX_TICKETS_PER_USER - userTicketCount} 张`;
+        }
+        
+        message += ` <blockquote expandable>`;
       } else {
         message += `${userName} 尚未购买本期彩票\n`;
         message += `点击下方按钮花费 ${TICKET_PRICE} 💰 购买一张随机3位数彩票 <blockquote expandable>`;
@@ -181,15 +189,36 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
       message += `<code>/lottery clean</code> - 清空记录（管理员）</blockquote>`;
       
-      // 创建内联键盘 - 总是显示购买按钮，因为可以购买多张
-      const keyboard = TgMessage.buildInlineKeyboard([
-        [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
-          type: "lottery", 
-          action: "buy",
-          userId: userId  // 添加用户ID到回调数据中
-        }) }],
-        [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
-      ]);
+      // 创建内联键盘
+      let keyboardRows = [];
+      
+      if (!hasReachedLimit) {
+        // 未达到上限，显示购买按钮
+        keyboardRows.push([{ 
+          text: `💰 购买彩票 (${TICKET_PRICE} coin)`, 
+          callback_data: JSON.stringify({ 
+            type: "lottery", 
+            action: "buy",
+            userId: userId
+          }) 
+        }]);
+      } else {
+        // 已达到上限，显示提示按钮
+        keyboardRows.push([{ 
+          text: `🎫 已达上限 (${MAX_TICKETS_PER_USER}/5)`, 
+          callback_data: JSON.stringify({ 
+            type: "lottery", 
+            action: "limit_reached"
+          }) 
+        }]);
+      }
+      
+      keyboardRows.push([{ 
+        text: `🗑️ 删除消息`, 
+        callback_data: JSON.stringify({ type: "delete_message" }) 
+      }]);
+      
+      const keyboard = TgMessage.buildInlineKeyboard(keyboardRows);
       
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -263,23 +292,23 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
         let message = `<b>📋 彩票购买记录</b>（第 ${page + 1}/${totalPages} 页）\n\n`;
         message += `总购买人数：${userEntries.length}\n`;
         message += `总购买张数：${tickets.length}\n`;
-        message += `预计奖池增加：${tickets.length * TICKET_PRICE} 💰\n\n`;
+        message += `预计奖池增加：${tickets.length * TICKET_PRICE} 💰\n`;
+        message += `⚠️ 每人限购 ${MAX_TICKETS_PER_USER} 张\n\n`;
         
         for (const [userId, data] of pageUsers) {
+          const isOverLimit = data.count > MAX_TICKETS_PER_USER;
+          const limitIndicator = isOverLimit ? ' ⚠️超限' : '';
+          
           try {
             const displayName = await getUserDisplayName(env, chatId, userId);
-            message += `• ${displayName} - ${data.count} 张\n`;
-            // 显示前3个号码
-            const firstThree = data.tickets.slice(0, 3);
-            message += `  └ ${firstThree.map(num => `<code>${num}</code>`).join(' ')}`;
-            if (data.count > 3) message += ` ...等 ${data.count} 张`;
-            message += `\n`;
+            message += `• ${displayName} - ${data.count} 张${limitIndicator}\n`;
+            // 显示全部号码（因为可能超过5张）
+            const allNumbers = data.tickets.map(num => `<code>${num}</code>`).join(' ');
+            message += `  └ ${allNumbers}\n`;
           } catch (e) {
-            message += `• 用户${userId} - ${data.count} 张\n`;
-            const firstThree = data.tickets.slice(0, 3);
-            message += `  └ ${firstThree.map(num => `<code>${num}</code>`).join(' ')}`;
-            if (data.count > 3) message += ` ...等 ${data.count} 张`;
-            message += `\n`;
+            message += `• 用户${userId} - ${data.count} 张${limitIndicator}\n`;
+            const allNumbers = data.tickets.map(num => `<code>${num}</code>`).join(' ');
+            message += `  └ ${allNumbers}\n`;
           }
         }
         
@@ -542,8 +571,31 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     return;
   }
 
+  // 处理已达上限的回调
+  if (callbackData.action === "limit_reached") {
+    await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+      text: `❌ 您已达到购买上限（${MAX_TICKETS_PER_USER} 张）`,
+      show_alert: true
+    });
+    return;
+  }
+
   try {
-    // 检查余额 - 使用 coinService 而不是不存在的 DO 端点
+    // 检查用户已购买张数
+    const userCountRes = await lotteryStub.fetch(`https://do/get-user-ticket-count?userId=${encodeURIComponent(currentUserId)}`);
+    const userCountData = await userCountRes.json() as UserTicketCountResponse;
+    const userTicketCount = userCountData.count || 0;
+    
+    // 检查是否已达到购买上限
+    if (userTicketCount >= MAX_TICKETS_PER_USER) {
+      await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+        text: `❌ 您已达到购买上限，每人最多购买 ${MAX_TICKETS_PER_USER} 张彩票`,
+        show_alert: true
+      });
+      return;
+    }
+
+    // 检查余额
     const userBalance = await getBalance(env.COIN_DO, currentUserId);
     
     if (userBalance < TICKET_PRICE) {
@@ -601,11 +653,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(currentUserId)}`);
     const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
     const userTicketNumbers = userTicketsData.ticketNumbers || [];
-    
-    // 获取用户彩票数量
-    const userCountRes = await lotteryStub.fetch(`https://do/get-user-ticket-count?userId=${encodeURIComponent(currentUserId)}`);
-    const userCountData = await userCountRes.json() as UserTicketCountResponse;
-    const userTicketCount = userCountData.count || 0;
+    const newUserTicketCount = userTicketNumbers.length;
     
     const totalPrizePool = poolAmount + (totalTicketCount * TICKET_PRICE);
     
@@ -615,10 +663,19 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     newMessage += `   └ 本期购买：${totalTicketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
     
     newMessage += `🎫 <b>本期状态</b>\n`;
-    newMessage += `${currentUserName} 已购买 ${userTicketCount} 张彩票\n`;
+    newMessage += `${currentUserName} 已购买 ${newUserTicketCount} 张彩票\n`;
     newMessage += `最新号码：<code>${ticketNumber}</code>\n`;
     newMessage += `全部号码：${formatTicketNumbers(userTicketNumbers)}\n`;
-    newMessage += `开奖时自动参与抽奖！<blockquote expandable>`;
+    
+    // 检查是否已达到上限
+    const hasReachedLimit = newUserTicketCount >= MAX_TICKETS_PER_USER;
+    if (hasReachedLimit) {
+      newMessage += `\n⚠️ <b>购买限制：</b>每人最多购买 ${MAX_TICKETS_PER_USER} 张彩票，您已达到上限。`;
+    } else {
+      newMessage += `\n📊 <b>剩余可购买：</b>${MAX_TICKETS_PER_USER - newUserTicketCount} 张`;
+    }
+    
+    newMessage += ` <blockquote expandable>`;
     
     // 获取上期开奖信息（如果有）
     try {
@@ -652,15 +709,36 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     newMessage += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
     newMessage += `<code>/lottery clean</code> - 清空记录（管理员）</blockquote>`;
     
-    // 更新后的键盘（仍然可以继续购买）
-    const keyboard = TgMessage.buildInlineKeyboard([
-      [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
-        type: "lottery", 
-        action: "buy",
-        userId: currentUserId
-      }) }],
-      [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
-    ]);
+    // 更新后的键盘
+    let keyboardRows = [];
+    
+    if (hasReachedLimit) {
+      // 已达到上限，显示提示按钮
+      keyboardRows.push([{ 
+        text: `🎫 已达上限 (${MAX_TICKETS_PER_USER}/5)`, 
+        callback_data: JSON.stringify({ 
+          type: "lottery", 
+          action: "limit_reached"
+        }) 
+      }]);
+    } else {
+      // 未达到上限，显示购买按钮
+      keyboardRows.push([{ 
+        text: `💰 购买彩票 (${TICKET_PRICE} coin)`, 
+        callback_data: JSON.stringify({ 
+          type: "lottery", 
+          action: "buy",
+          userId: currentUserId
+        }) 
+      }]);
+    }
+    
+    keyboardRows.push([{ 
+      text: `🗑️ 删除消息`, 
+      callback_data: JSON.stringify({ type: "delete_message" }) 
+    }]);
+    
+    const keyboard = TgMessage.buildInlineKeyboard(keyboardRows);
     
     await TgMessage.editMessageText(env, {
       chat_id: chatId,
@@ -671,7 +749,7 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     });
     
     await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-      text: `购买成功！您的彩票号码：${ticketNumber}\n您已购买 ${userTicketCount} 张彩票`,
+      text: `购买成功！您的彩票号码：${ticketNumber}\n您已购买 ${newUserTicketCount} 张彩票`,
       show_alert: false
     });
     
