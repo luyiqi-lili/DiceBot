@@ -17,9 +17,14 @@ interface PoolResponse {
   pool: number;
 }
 
-interface TicketResponse {
+interface UserTicketsResponse {
   userId: string;
-  ticketNumber: string | null;
+  ticketNumbers: string[];
+}
+
+interface UserTicketCountResponse {
+  userId: string;
+  count: number;
 }
 
 interface CountResponse {
@@ -34,7 +39,7 @@ interface ListTicketsResponse {
   tickets: Array<{ userId: string; ticketNumber: string }>;
 }
 
-interface SetTicketResponse {
+interface AddTicketResponse {
   success: boolean;
   message?: string;
 }
@@ -80,6 +85,19 @@ async function getUserDisplayName(env: LotteryEnv, chatId: number, userId: strin
 }
 
 /**
+ * 格式化彩票号码显示
+ */
+function formatTicketNumbers(ticketNumbers: string[]): string {
+  if (ticketNumbers.length === 0) return "无";
+  if (ticketNumbers.length <= 5) {
+    return ticketNumbers.map(num => `<code>${num}</code>`).join(' ');
+  } else {
+    const firstFive = ticketNumbers.slice(0, 5);
+    return firstFive.map(num => `<code>${num}</code>`).join(' ') + ` ...等 ${ticketNumbers.length} 张`;
+  }
+}
+
+/**
  * 处理 /lottery 命令
  */
 export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv): Promise<void> {
@@ -107,17 +125,17 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       const poolData = await poolRes.json() as PoolResponse;
       const poolAmount = poolData.pool || 0;
       
-      const countRes = await lotteryStub.fetch("https://do/ticket-count");
+      const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
       const countData = await countRes.json() as CountResponse;
-      const ticketCount = countData.count || 0;
+      const totalTicketCount = countData.count || 0;
+      
+      // 获取用户已购买的彩票
+      const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}`);
+      const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
+      const userTicketNumbers = userTicketsData.ticketNumbers || [];
       
       // 计算总奖池
-      const totalPrizePool = poolAmount + (ticketCount * TICKET_PRICE);
-      
-      // 获取用户是否已购买
-      const ticketRes = await lotteryStub.fetch(`https://do/get-ticket?userId=${encodeURIComponent(userId)}`);
-      const ticketData = await ticketRes.json() as TicketResponse;
-      const hasTicket = !!ticketData.ticketNumber;
+      const totalPrizePool = poolAmount + (totalTicketCount * TICKET_PRICE);
       
       // 获取上期开奖信息
       const lastDrawRes = await lotteryStub.fetch("https://do/last-draw");
@@ -126,11 +144,12 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       let message = `<b>🎰 大乐透彩票系统</b>\n\n`;
       message += `💰 <b>奖池总额：</b>${totalPrizePool} 💰\n`;
       message += `   └ 上期累积：${poolAmount} 💰\n`;
-      message += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
+      message += `   └ 本期购买：${totalTicketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
       
       message += `🎫 <b>本期状态</b>\n`;
-      if (hasTicket) {
-        message += `${userName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
+      if (userTicketNumbers.length > 0) {
+        message += `${userName} 已购买 ${userTicketNumbers.length} 张彩票\n`;
+        message += `号码：${formatTicketNumbers(userTicketNumbers)}\n`;
         message += `开奖时自动参与抽奖！<blockquote expandable>`;
       } else {
         message += `${userName} 尚未购买本期彩票\n`;
@@ -141,15 +160,15 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
         const last = lastDrawData.lastDraw;
         message += `📅 <b>上期开奖结果</b>\n`;
         message += `中奖号码：<code>${last.winningNumber}</code>\n`;
+        message += `总购买张数：${last.totalTickets} 张\n`;
         if (last.exactMatches && last.exactMatches.length > 0) {
-          message += `一等奖（完全匹配）：${last.exactMatches.length} 人中奖，每人获得 ${last.exactPrize} 💰\n`;
+          message += `一等奖（完全匹配）：${last.exactMatches.length} 张中奖，每张获得 ${last.exactPrize} 💰\n`;
         }
         if (last.firstTwoMatches && last.firstTwoMatches.length > 0) {
-          message += `二等奖（前两位匹配）：${last.firstTwoMatches.length} 人中奖，每人获得 ${last.firstTwoPrize} 💰\n`;
+          message += `二等奖（前两位匹配）：${last.firstTwoMatches.length} 张中奖，每张获得 ${last.firstTwoPrize} 💰\n`;
         }
         message += `\n`;
       }
-      
       
       message += `<b>🏆 中奖规则</b>\n`;
       message += `• 一等奖（完全匹配3位）：分配奖池50%\n`;
@@ -162,16 +181,14 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       message += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
       message += `<code>/lottery clean</code> - 清空记录（管理员）</blockquote>`;
       
-      // 创建内联键盘 - 如果有票则显示删除按钮，否则显示购买按钮
-      // 注意：在购买按钮的callback_data中加入用户ID，确保只有消息的发送者能点击
+      // 创建内联键盘 - 总是显示购买按钮，因为可以购买多张
       const keyboard = TgMessage.buildInlineKeyboard([
-        hasTicket 
-          ? [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
-          : [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
-              type: "lottery", 
-              action: "buy",
-              userId: userId  // 添加用户ID到回调数据中
-            }) }]
+        [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
+          type: "lottery", 
+          action: "buy",
+          userId: userId  // 添加用户ID到回调数据中
+        }) }],
+        [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
       ]);
       
       await TgMessage.sendText(env, {
@@ -208,7 +225,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     }
     
     try {
-      const listRes = await lotteryStub.fetch("https://do/list-tickets");
+      const listRes = await lotteryStub.fetch("https://do/list-all-tickets");
       const listData = await listRes.json() as ListTicketsResponse;
       const tickets = listData.tickets || [];
       
@@ -223,25 +240,46 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
         return;
       }
       
+      // 统计每个用户的购买张数
+      const userTicketCounts: Record<string, { count: number, tickets: string[] }> = {};
+      for (const ticket of tickets) {
+        if (!userTicketCounts[ticket.userId]) {
+          userTicketCounts[ticket.userId] = { count: 0, tickets: [] };
+        }
+        userTicketCounts[ticket.userId].count++;
+        userTicketCounts[ticket.userId].tickets.push(ticket.ticketNumber);
+      }
+      
       // 分页显示
-      const pageSize = 20;
-      const totalPages = Math.ceil(tickets.length / pageSize);
+      const pageSize = 15;
+      const userEntries = Object.entries(userTicketCounts);
+      const totalPages = Math.ceil(userEntries.length / pageSize);
       
       for (let page = 0; page < totalPages; page++) {
         const startIdx = page * pageSize;
-        const endIdx = Math.min(startIdx + pageSize, tickets.length);
-        const pageTickets = tickets.slice(startIdx, endIdx);
+        const endIdx = Math.min(startIdx + pageSize, userEntries.length);
+        const pageUsers = userEntries.slice(startIdx, endIdx);
         
         let message = `<b>📋 彩票购买记录</b>（第 ${page + 1}/${totalPages} 页）\n\n`;
-        message += `总购买人数：${tickets.length}\n`;
+        message += `总购买人数：${userEntries.length}\n`;
+        message += `总购买张数：${tickets.length}\n`;
         message += `预计奖池增加：${tickets.length * TICKET_PRICE} 💰\n\n`;
         
-        for (const ticket of pageTickets) {
+        for (const [userId, data] of pageUsers) {
           try {
-            const displayName = await getUserDisplayName(env, chatId, ticket.userId);
-            message += `• ${displayName} - <code>${ticket.ticketNumber}</code>\n`;
+            const displayName = await getUserDisplayName(env, chatId, userId);
+            message += `• ${displayName} - ${data.count} 张\n`;
+            // 显示前3个号码
+            const firstThree = data.tickets.slice(0, 3);
+            message += `  └ ${firstThree.map(num => `<code>${num}</code>`).join(' ')}`;
+            if (data.count > 3) message += ` ...等 ${data.count} 张`;
+            message += `\n`;
           } catch (e) {
-            message += `• 用户${ticket.userId} - <code>${ticket.ticketNumber}</code>\n`;
+            message += `• 用户${userId} - ${data.count} 张\n`;
+            const firstThree = data.tickets.slice(0, 3);
+            message += `  └ ${firstThree.map(num => `<code>${num}</code>`).join(' ')}`;
+            if (data.count > 3) message += ` ...等 ${data.count} 张`;
+            message += `\n`;
           }
         }
         
@@ -287,11 +325,11 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     
     try {
       // 首先检查是否有购买记录
-      const countRes = await lotteryStub.fetch("https://do/ticket-count");
+      const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
       const countData = await countRes.json() as CountResponse;
-      const ticketCount = countData.count || 0;
+      const totalTicketCount = countData.count || 0;
       
-      if (ticketCount === 0) {
+      if (totalTicketCount === 0) {
         await TgMessage.sendText(env, {
           chat_id: chatId,
           text: `❌ 本期无人购买彩票，无法开奖`,
@@ -316,23 +354,38 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       // 发送开奖结果
       let resultMessage = `<b>🎉 大乐透开奖结果</b>\n\n`;
       resultMessage += `🏆 <b>中奖号码：</b><code>${drawResult.winningNumber}</code>\n\n`;
-      resultMessage += `💰 <b>本期奖池总额：</b>${drawResult.prizePool} 💰\n\n`;
+      resultMessage += `💰 <b>本期奖池总额：</b>${drawResult.prizePool} 💰\n`;
+      resultMessage += `🎫 <b>本期总购买张数：</b>${totalTicketCount} 张\n\n`;
       
       // 处理一等奖
       if (drawResult.exactMatches.length > 0) {
         resultMessage += `🥇 <b>一等奖（完全匹配）</b>\n`;
-        resultMessage += `奖金：每人 ${drawResult.exactPrize} 💰\n`;
-        resultMessage += `中奖者：\n`;
+        resultMessage += `奖金：每张 ${drawResult.exactPrize} 💰\n`;
+        resultMessage += `中奖彩票：${drawResult.exactMatches.length} 张\n`;
         
+        // 按用户分组统计
+        const userExactMatches: Record<string, { count: number, tickets: string[] }> = {};
         for (const match of drawResult.exactMatches) {
+          if (!userExactMatches[match.userId]) {
+            userExactMatches[match.userId] = { count: 0, tickets: [] };
+          }
+          userExactMatches[match.userId].count++;
+          userExactMatches[match.userId].tickets.push(match.ticketNumber);
+        }
+        
+        resultMessage += `中奖者：\n`;
+        for (const [userId, data] of Object.entries(userExactMatches)) {
           try {
-            const displayName = await getUserDisplayName(env, chatId, match.userId);
-            resultMessage += `• ${displayName} (<code>${match.ticketNumber}</code>)\n`;
+            const displayName = await getUserDisplayName(env, chatId, userId);
+            resultMessage += `• ${displayName}：${data.count} 张\n`;
             
             // 发放奖金（从国库转账给用户）
-            await transfer(env, env.COIN_DO, "__treasury__", match.userId, drawResult.exactPrize, true);
+            const totalPrize = drawResult.exactPrize * data.count;
+            await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
           } catch (e) {
-            resultMessage += `• 用户${match.userId} (<code>${match.ticketNumber}</code>)\n`;
+            resultMessage += `• 用户${userId}：${data.count} 张\n`;
+            const totalPrize = drawResult.exactPrize * data.count;
+            await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
           }
         }
         resultMessage += `\n`;
@@ -343,18 +396,32 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
       // 处理二等奖
       if (drawResult.firstTwoMatches.length > 0) {
         resultMessage += `🥈 <b>二等奖（匹配前两位）</b>\n`;
-        resultMessage += `奖金：每人 ${drawResult.firstTwoPrize} 💰\n`;
-        resultMessage += `中奖者：\n`;
+        resultMessage += `奖金：每张 ${drawResult.firstTwoPrize} 💰\n`;
+        resultMessage += `中奖彩票：${drawResult.firstTwoMatches.length} 张\n`;
         
+        // 按用户分组统计
+        const userFirstTwoMatches: Record<string, { count: number, tickets: string[] }> = {};
         for (const match of drawResult.firstTwoMatches) {
+          if (!userFirstTwoMatches[match.userId]) {
+            userFirstTwoMatches[match.userId] = { count: 0, tickets: [] };
+          }
+          userFirstTwoMatches[match.userId].count++;
+          userFirstTwoMatches[match.userId].tickets.push(match.ticketNumber);
+        }
+        
+        resultMessage += `中奖者：\n`;
+        for (const [userId, data] of Object.entries(userFirstTwoMatches)) {
           try {
-            const displayName = await getUserDisplayName(env, chatId, match.userId);
-            resultMessage += `• ${displayName} (<code>${match.ticketNumber}</code>)\n`;
+            const displayName = await getUserDisplayName(env, chatId, userId);
+            resultMessage += `• ${displayName}：${data.count} 张\n`;
             
             // 发放奖金（从国库转账给用户）
-            await transfer(env, env.COIN_DO, "__treasury__", match.userId, drawResult.firstTwoPrize, true);
+            const totalPrize = drawResult.firstTwoPrize * data.count;
+            await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
           } catch (e) {
-            resultMessage += `• 用户${match.userId} (<code>${match.ticketNumber}</code>)\n`;
+            resultMessage += `• 用户${userId}：${data.count} 张\n`;
+            const totalPrize = drawResult.firstTwoPrize * data.count;
+            await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
           }
         }
         resultMessage += `\n`;
@@ -476,48 +543,6 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
   }
 
   try {
-    // 检查是否已购买
-    const ticketRes = await lotteryStub.fetch(`https://do/get-ticket?userId=${encodeURIComponent(currentUserId)}`);
-    const ticketData = await ticketRes.json() as TicketResponse;
-    
-    if (ticketData.ticketNumber) {
-      // 已购买，回复提示
-      await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-        text: `您已购买本期彩票，号码：${ticketData.ticketNumber}`,
-        show_alert: true
-      });
-      
-      // 更新消息，显示用户已购买并改为删除按钮
-      const poolRes = await lotteryStub.fetch("https://do/get-pool");
-      const poolData = await poolRes.json() as PoolResponse;
-      const poolAmount = poolData.pool || 0;
-      
-      const countRes = await lotteryStub.fetch("https://do/ticket-count");
-      const countData = await countRes.json() as CountResponse;
-      const ticketCount = countData.count || 0;
-      
-      const totalPrizePool = poolAmount + (ticketCount * TICKET_PRICE);
-      
-      let newMessage = `<b>🎰 大乐透彩票系统</b>\n\n`;
-      newMessage += `💰 <b>奖池总额：</b>${totalPrizePool} 💰\n`;
-      newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
-      newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
-      newMessage += `🎫 <b>本期状态</b>\n`;
-      newMessage += `${currentUserName} 已购买彩票，号码：<code>${ticketData.ticketNumber}</code>\n`;
-      newMessage += `开奖时自动参与抽奖！\n\n`;
-      newMessage += `🎫 您已经购买过本期彩票`;
-      
-      await TgMessage.editMessageText(env, {
-        chat_id: chatId,
-        message_id: messageId,
-        text: newMessage,
-        parse_mode: "HTML",
-        reply_markup: deleteMarkup
-      });
-      
-      return;
-    }
-
     // 检查余额 - 使用 coinService 而不是不存在的 DO 端点
     const userBalance = await getBalance(env.COIN_DO, currentUserId);
     
@@ -544,56 +569,109 @@ export async function handleLotteryCallback(callbackQuery: any, callbackData: an
     const ticketNumber = generateTicketNumber();
     
     // 保存彩票
-    const setTicketRes = await lotteryStub.fetch("https://do/set-ticket", {
+    const addTicketRes = await lotteryStub.fetch("https://do/add-ticket", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: currentUserId, ticketNumber })
     });
     
-    const setTicketData = await setTicketRes.json() as SetTicketResponse;
+    const addTicketData = await addTicketRes.json() as AddTicketResponse;
     
-    if (!setTicketData.success) {
+    if (!addTicketData.success) {
       // 购买失败，尝试退款
       await transfer(env, env.COIN_DO, "__treasury__", currentUserId, TICKET_PRICE, true);
       
       await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-        text: `购买失败：${setTicketData.message || "未知错误"}`,
+        text: `购买失败：${addTicketData.message || "未知错误"}`,
         show_alert: true
       });
       return;
     }
 
-    // 更新消息
+    // 获取更新后的信息
     const poolRes = await lotteryStub.fetch("https://do/get-pool");
     const poolData = await poolRes.json() as PoolResponse;
     const poolAmount = poolData.pool || 0;
     
-    const countRes = await lotteryStub.fetch("https://do/ticket-count");
+    const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
     const countData = await countRes.json() as CountResponse;
-    const ticketCount = countData.count || 0;
+    const totalTicketCount = countData.count || 0;
     
-    const totalPrizePool = poolAmount + (ticketCount * TICKET_PRICE);
+    // 获取用户的所有彩票
+    const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(currentUserId)}`);
+    const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
+    const userTicketNumbers = userTicketsData.ticketNumbers || [];
+    
+    // 获取用户彩票数量
+    const userCountRes = await lotteryStub.fetch(`https://do/get-user-ticket-count?userId=${encodeURIComponent(currentUserId)}`);
+    const userCountData = await userCountRes.json() as UserTicketCountResponse;
+    const userTicketCount = userCountData.count || 0;
+    
+    const totalPrizePool = poolAmount + (totalTicketCount * TICKET_PRICE);
     
     let newMessage = `<b>🎰 大乐透彩票系统</b>\n\n`;
     newMessage += `💰 <b>奖池总额：</b>${totalPrizePool} 💰\n`;
     newMessage += `   └ 上期累积：${poolAmount} 💰\n`;
-    newMessage += `   └ 本期购买：${ticketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
+    newMessage += `   └ 本期购买：${totalTicketCount} 张 × ${TICKET_PRICE} 💰\n\n`;
+    
     newMessage += `🎫 <b>本期状态</b>\n`;
-    newMessage += `${currentUserName} 已购买彩票，号码：<code>${ticketNumber}</code>\n`;
-    newMessage += `开奖时自动参与抽奖！\n\n`;
-    newMessage += `🎉 购买成功！已扣除 ${TICKET_PRICE} 💰\n`;
-    newMessage += `您的新余额：${transferResult.fromNew} 💰`;
+    newMessage += `${currentUserName} 已购买 ${userTicketCount} 张彩票\n`;
+    newMessage += `最新号码：<code>${ticketNumber}</code>\n`;
+    newMessage += `全部号码：${formatTicketNumbers(userTicketNumbers)}\n`;
+    newMessage += `开奖时自动参与抽奖！<blockquote expandable>`;
+    
+    // 获取上期开奖信息（如果有）
+    try {
+      const lastDrawRes = await lotteryStub.fetch("https://do/last-draw");
+      const lastDrawData = await lastDrawRes.json() as LastDrawResponse;
+      
+      if (lastDrawData.lastDraw) {
+        const last = lastDrawData.lastDraw;
+        newMessage += `📅 <b>上期开奖结果</b>\n`;
+        newMessage += `中奖号码：<code>${last.winningNumber}</code>\n`;
+        if (last.exactMatches && last.exactMatches.length > 0) {
+          newMessage += `一等奖（完全匹配）：${last.exactMatches.length} 张中奖，每张获得 ${last.exactPrize} 💰\n`;
+        }
+        if (last.firstTwoMatches && last.firstTwoMatches.length > 0) {
+          newMessage += `二等奖（前两位匹配）：${last.firstTwoMatches.length} 张中奖，每张获得 ${last.firstTwoPrize} 💰\n`;
+        }
+        newMessage += `\n`;
+      }
+    } catch (e) {
+      // 忽略上期开奖信息获取失败
+    }
+    
+    newMessage += `<b>🏆 中奖规则</b>\n`;
+    newMessage += `• 一等奖（完全匹配3位）：分配奖池50%\n`;
+    newMessage += `• 二等奖（匹配前2位）：分配奖池30%\n`;
+    newMessage += `• 剩余奖金累积到下期奖池\n`;
+    
+    newMessage += `\n<b>📝 可用命令</b>\n`;
+    newMessage += `<code>/lottery</code> - 查看彩票信息\n`;
+    newMessage += `<code>/lottery list</code> - 查看购买记录（管理员）\n`;
+    newMessage += `<code>/lottery now</code> - 立即开奖（管理员）\n`;
+    newMessage += `<code>/lottery clean</code> - 清空记录（管理员）</blockquote>`;
+    
+    // 更新后的键盘（仍然可以继续购买）
+    const keyboard = TgMessage.buildInlineKeyboard([
+      [{ text: `💰 购买彩票 (${TICKET_PRICE} coin)`, callback_data: JSON.stringify({ 
+        type: "lottery", 
+        action: "buy",
+        userId: currentUserId
+      }) }],
+      [{ text: `🗑️ 删除消息`, callback_data: JSON.stringify({ type: "delete_message" }) }]
+    ]);
     
     await TgMessage.editMessageText(env, {
       chat_id: chatId,
       message_id: messageId,
       text: newMessage,
       parse_mode: "HTML",
-      reply_markup: deleteMarkup
+      reply_markup: keyboard
     });
     
     await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-      text: `购买成功！您的彩票号码：${ticketNumber}`,
+      text: `购买成功！您的彩票号码：${ticketNumber}\n您已购买 ${userTicketCount} 张彩票`,
       show_alert: false
     });
     

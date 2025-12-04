@@ -3,27 +3,18 @@
  * 
  * 数据结构：
  * - pool: 奖池金额
- * - tickets: 用户ID -> 彩票号码映射
+ * - tickets: 用户ID -> 彩票号码数组映射
  * - lastWinner: 上期中奖信息
  */
 
 // 定义接口类型
-interface TicketData {
+interface SetTicketRequest {
   userId: string;
   ticketNumber: string;
 }
 
 interface PoolData {
   amount: number;
-}
-
-interface DrawData {
-  winningNumber: string;
-}
-
-interface SetTicketRequest {
-  userId: string;
-  ticketNumber: string;
 }
 
 interface AddPoolRequest {
@@ -37,7 +28,7 @@ interface DrawRequest {
 export class LotteryDO {
   private state: DurableObjectState;
   private pool: number = 0;
-  private tickets: Record<string, string> = {}; // 使用对象而不是Map，方便持久化
+  private tickets: Record<string, string[]> = {}; // 用户ID -> 彩票号码数组
   private lastWinner: any = null;
 
   constructor(state: DurableObjectState, env: any) {
@@ -48,7 +39,7 @@ export class LotteryDO {
       const pool = await this.state.storage.get<number>("pool");
       this.pool = pool || 0;
       
-      const tickets = await this.state.storage.get<Record<string, string>>("tickets");
+      const tickets = await this.state.storage.get<Record<string, string[]>>("tickets");
       this.tickets = tickets || {};
       
       const lastWinner = await this.state.storage.get<any>("lastWinner");
@@ -64,19 +55,11 @@ export class LotteryDO {
   }
 
   /**
-   * 设置用户彩票
+   * 添加用户彩票（允许多张）
    * @param userId 用户ID
    * @param ticketNumber 彩票号码
    */
-  async setTicket(userId: string, ticketNumber: string): Promise<{ success: boolean; message?: string }> {
-    // 检查用户是否已经购买
-    if (this.tickets[userId]) {
-      return { 
-        success: false, 
-        message: "您已经购买过本期彩票了" 
-      };
-    }
-
+  async addTicket(userId: string, ticketNumber: string): Promise<{ success: boolean; message?: string }> {
     // 验证彩票号码格式（3位数字）
     if (!/^\d{3}$/.test(ticketNumber)) {
       return { 
@@ -85,36 +68,56 @@ export class LotteryDO {
       };
     }
 
-    this.tickets[userId] = ticketNumber;
+    // 初始化用户彩票数组（如果不存在）
+    if (!this.tickets[userId]) {
+      this.tickets[userId] = [];
+    }
+
+    // 添加彩票号码到数组
+    this.tickets[userId].push(ticketNumber);
     await this.saveAll();
     
     return { success: true };
   }
 
   /**
-   * 获取用户彩票号码
+   * 获取用户所有彩票号码
    * @param userId 用户ID
    */
-  async getTicket(userId: string): Promise<string | null> {
-    return this.tickets[userId] || null;
+  async getUserTickets(userId: string): Promise<string[]> {
+    return this.tickets[userId] || [];
   }
 
   /**
-   * 列出所有彩票
+   * 获取用户彩票数量
+   * @param userId 用户ID
    */
-  async listTickets(): Promise<{ userId: string; ticketNumber: string }[]> {
+  async getUserTicketCount(userId: string): Promise<number> {
+    return this.tickets[userId] ? this.tickets[userId].length : 0;
+  }
+
+  /**
+   * 列出所有彩票（展开为平铺列表）
+   */
+  async listAllTickets(): Promise<{ userId: string; ticketNumber: string }[]> {
     const result: { userId: string; ticketNumber: string }[] = [];
-    for (const [userId, ticketNumber] of Object.entries(this.tickets)) {
-      result.push({ userId, ticketNumber });
+    for (const [userId, ticketNumbers] of Object.entries(this.tickets)) {
+      for (const ticketNumber of ticketNumbers) {
+        result.push({ userId, ticketNumber });
+      }
     }
     return result;
   }
 
   /**
-   * 获取购买人数
+   * 获取所有用户的总购买张数
    */
-  async getTicketCount(): Promise<number> {
-    return Object.keys(this.tickets).length;
+  async getTotalTicketCount(): Promise<number> {
+    let total = 0;
+    for (const ticketNumbers of Object.values(this.tickets)) {
+      total += ticketNumbers.length;
+    }
+    return total;
   }
 
   /**
@@ -170,19 +173,23 @@ export class LotteryDO {
       throw new Error("中奖号码必须是3位数字");
     }
 
-    // 计算本期总奖池 = 上期累积 + 本期购买金额
-    const currentPool = this.pool + (Object.keys(this.tickets).length * 10);
+    // 计算本期总奖池 = 上期累积 + (所有彩票数量 * 单价)
+    const totalTickets = await this.getTotalTicketCount();
+    const currentPool = this.pool + (totalTickets * 10);
     
     // 查找匹配的彩票
     const exactMatches: { userId: string; ticketNumber: string }[] = [];
     const firstTwoMatches: { userId: string; ticketNumber: string }[] = [];
     const winningFirstTwo = winningNumber.substring(0, 2);
 
-    for (const [userId, ticketNumber] of Object.entries(this.tickets)) {
-      if (ticketNumber === winningNumber) {
-        exactMatches.push({ userId, ticketNumber });
-      } else if (ticketNumber.substring(0, 2) === winningFirstTwo) {
-        firstTwoMatches.push({ userId, ticketNumber });
+    // 遍历所有用户的彩票数组
+    for (const [userId, ticketNumbers] of Object.entries(this.tickets)) {
+      for (const ticketNumber of ticketNumbers) {
+        if (ticketNumber === winningNumber) {
+          exactMatches.push({ userId, ticketNumber });
+        } else if (ticketNumber.substring(0, 2) === winningFirstTwo) {
+          firstTwoMatches.push({ userId, ticketNumber });
+        }
       }
     }
 
@@ -201,6 +208,7 @@ export class LotteryDO {
       exactPrize,
       firstTwoPrize,
       remainingPrize,
+      totalTickets,
       drawTime: new Date().toISOString()
     };
 
@@ -236,34 +244,45 @@ export class LotteryDO {
     
     try {
       switch (path) {
-        case '/set-ticket': {
+        case '/add-ticket': {
           const data = await request.json() as SetTicketRequest;
-          const result = await this.setTicket(data.userId, data.ticketNumber);
+          const result = await this.addTicket(data.userId, data.ticketNumber);
           return new Response(JSON.stringify(result), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
         
-        case '/get-ticket': {
+        case '/get-user-tickets': {
           const userId = url.searchParams.get('userId');
           if (!userId) {
             return new Response(JSON.stringify({ error: 'userId is required' }), { status: 400 });
           }
-          const ticketNumber = await this.getTicket(userId);
-          return new Response(JSON.stringify({ userId, ticketNumber }), {
+          const ticketNumbers = await this.getUserTickets(userId);
+          return new Response(JSON.stringify({ userId, ticketNumbers }), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
         
-        case '/list-tickets': {
-          const tickets = await this.listTickets();
+        case '/get-user-ticket-count': {
+          const userId = url.searchParams.get('userId');
+          if (!userId) {
+            return new Response(JSON.stringify({ error: 'userId is required' }), { status: 400 });
+          }
+          const count = await this.getUserTicketCount(userId);
+          return new Response(JSON.stringify({ userId, count }), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        case '/list-all-tickets': {
+          const tickets = await this.listAllTickets();
           return new Response(JSON.stringify({ tickets }), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
         
-        case '/ticket-count': {
-          const count = await this.getTicketCount();
+        case '/total-ticket-count': {
+          const count = await this.getTotalTicketCount();
           return new Response(JSON.stringify({ count }), {
             headers: { 'Content-Type': 'application/json' }
           });
