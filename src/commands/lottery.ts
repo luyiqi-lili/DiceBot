@@ -11,7 +11,7 @@ type LotteryEnv = EnvLike & {
 // 管理员UID列表（与coin.ts保持一致）
 const ADMIN_UIDS = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
 const TICKET_PRICE = 10;
-const MAX_TICKETS_PER_USER = 50; // 每人最多购买5张彩票
+const MAX_TICKETS_PER_USER = 5; // 每人最多购买5张彩票
 
 // 定义响应数据类型接口
 interface PoolResponse {
