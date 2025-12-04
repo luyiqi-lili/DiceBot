@@ -72,6 +72,12 @@
 					"new_sqlite_classes": [
 						"CoinDO"
 					]
+				},
+				{
+					"tag": "v_1204",
+					"new_sqlite_classes": [
+						"LotteryDO"
+					]
 				}
 			],
 			"vars": {
