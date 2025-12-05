@@ -9,7 +9,13 @@ type LotteryEnv = EnvLike & {
 };
 
 // 管理员UID列表（与coin.ts保持一致）
-const ADMIN_UIDS = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
+const ADMIN_UIDS = [
+    8080375150,//拉斐尔
+    5621587953,//lich
+    7804622477,//玛丽
+    7476641553,//茜茜
+    1019896885//yolo
+];
 const TICKET_PRICE = 10;
 const MAX_TICKETS_PER_USER = 5; // 每人最多购买5张彩票
 
@@ -225,7 +231,7 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
 
     // 创建内联键盘
     const keyboardRows = [];
-    
+
     if (remainingTickets > 0) {
         // 如果还能购买，添加再次购买按钮
         const randomNumber = generateTicketNumber();
@@ -243,13 +249,13 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
             })
         }]);
     }
-    
+
     // 添加删除按钮
     keyboardRows.push([{
         text: `🗑️ 删除消息`,
         callback_data: JSON.stringify({ type: "delete_message" })
     }]);
-    
+
     const keyboard = TgMessage.buildInlineKeyboard(keyboardRows);
 
     await TgMessage.sendText(env, {
