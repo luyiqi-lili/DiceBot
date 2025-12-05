@@ -24,10 +24,11 @@ export type Env = {
   COIN_DO: any
   COIN_KV: KVNamespace
   LOTTERY_DO: DurableObjectNamespace  // 新增
-
+  ITEM_DO: DurableObjectNamespace  // 新增
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
+export { ItemDO } from './durableObjects/item_do';
 
 export default {
 
