@@ -1,46 +1,39 @@
 // commands/item.ts
 /**
- * item 命令处理器
+ * item 命令处理器（使用 Durable Object 存储）
  *
  * 支持：
- *  - item create    (回复一条消息并发送该命令，创建物品)
+ *  - item create    (管理员功能：回复一条消息并发送该命令，创建物品)
  *  - item list      (直接发送：查看自己的物品；回复某人消息发送：查看该人的物品)
  *  - item use 1     (使用并消费自己的第 1 个物品；支持 #1 格式)
  *  - item send 1    (回复某人消息并发送该命令：把自己的第 1 个物品送给对方)
+ *  - item stats     (管理员功能：查看所有用户的物品统计)
  *
- * 存储：使用 env.NEWS_STORE，key = item:user:<uid>
- *
- * 注：风格、日志与 book.ts 保持一致，方便调试。
+ * 存储：使用 env.ITEM_DO
  */
 
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { deleteMarkup } from "../lib/util";
+import {
+  getUserItems,
+  addItemToUser,
+  removeItemFromUser,
+  transferItem,
+  getAllItemsStats
+} from "../lib/itemService";
+
+// 管理员列表（应与 coin.ts 保持一致或从 liveConfig 导入）
+const ADMIN_UIDS: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885];
 
 export type Env = EnvLike & {
-  ITEM_STORE: KVNamespace;
+  ITEM_DO: DurableObjectNamespace; // 从 KV 改为 DO
 };
 
-function getUserKey(userId: number): string {
-  return `item:user:${userId}`;
-}
-
 function makeMessageLink(chatId: number, messageId: number): string {
-  // 与 book.ts 一致，处理 -100 前缀的私有 chat 链接
   const abs = String(chatId).startsWith("-100")
     ? String(chatId).slice(4)
     : String(Math.abs(chatId));
   return `https://t.me/c/${abs}/${messageId}`;
-}
-
-async function loadList(env: Env, uid: number) {
-  const raw = await env.ITEM_STORE.get(getUserKey(uid));
-  const list = raw ? (JSON.parse(raw) as Array<any>) : [];
-  console.log(`[Item] loadList ${uid}, count=${list.length}`);
-  return list;
-}
-async function saveList(env: Env, uid: number, list: any[]) {
-  await env.ITEM_STORE.put(getUserKey(uid), JSON.stringify(list));
-  console.log(`[Item] saveList ${uid}, new count=${list.length}`);
 }
 
 /**
@@ -56,10 +49,22 @@ function parseIndexToken(token: string | undefined): number | null {
 }
 
 /**
+ * 检查是否是管理员
+ */
+function isAdmin(userId: number): boolean {
+  return ADMIN_UIDS.includes(userId);
+}
+
+/**
  * handleItem 主入口
  */
 export async function handleItem(parsed: ParsedUpdate, env: Env) {
-  console.log("[Item] handleItem invoked, command:", parsed.command, "args:", parsed.args, "isReply:", parsed.isReply);
+  console.log("[Item] handleItem invoked", {
+    command: parsed.command,
+    args: parsed.args,
+    isReply: parsed.isReply,
+    fromId: parsed.from?.id
+  });
 
   const chatId = parsed.chatId!;
   const threadId = parsed.threadId;
@@ -67,60 +72,85 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
   const fromName = parsed.from?.first_name || `用户${fromId}`;
   const reply = parsed.replyToMessage;
 
-  // 参数解析： parsed.args 的第一个为子命令（create/list/use/send），其余为参数
-  const sub = (parsed.args && parsed.args.length > 0) ? parsed.args[0] : "";
-  const rest = (parsed.args && parsed.args.length > 1) ? parsed.args.slice(1) : [];
-  console.log("[Item] subcommand:", sub, "rest:", rest);
+  // 确保用户已登录
+  if (!fromId) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: "❌ 无法识别用户身份",
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+    });
+    return;
+  }
 
-  // 1) item create —— 必须回复一条消息（最好是自己的消息，按需求这里要求回复自己的消息）
+  const args = parsed.args || [];
+  const sub = args[0]?.toLowerCase() || "";
+  const rest = args.slice(1);
+
+  // 1) item create —— 管理员功能
   if (sub === "create") {
-    console.log("[Item] create invoked, isReply:", parsed.isReply);
+    if (!isAdmin(fromId)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: "❌ 此功能仅限管理员使用",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
+    }
 
     if (!parsed.isReply || !reply) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 请以回复的方式对一条消息发送 /item create 来创建物品（只能回复自己的消息）。`,
+        text: "⚠️ 请回复一条消息以创建物品，格式：/item create [备注]",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    // 要求回复的是自己的消息（reply.from.id === fromId）
-    if (reply.from?.id !== fromId) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 创建物品需要回复你自己的消息以作为物品内容。`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    // 取内容：优先 text -> caption -> 来自媒体的简单标记
-    let content = reply.text ?? reply.caption ??rest[0] ??"";
+    // 获取物品内容
+    let content = reply.text ?? reply.caption ?? "";
     if (!content) {
-      // 简单媒体描述
       if (reply.photo) content = "[图片]";
       else if (reply.video) content = "[视频]";
       else if (reply.document) content = `[文件 ${reply.document.file_name || ""}]`;
-      else content = "[未识别内容]";
+      else if (reply.sticker) content = `[贴纸 ${reply.sticker.emoji || ""}]`;
+      else content = "[多媒体内容]";
     }
 
     const remark = rest.join(" ").trim() || "物品";
     const link = makeMessageLink(chatId, reply.message_id);
-    const list = await loadList(env, fromId);
-    // 限制每人最多 200 件物品，超出则删除最早一条
-    if (list.length >= 200) {
-      list.shift();
-      console.log("[Item] 达到上限，删除最旧条目");
+    
+    // 确定物品所有者：如果回复了他人消息，则物品属于被回复者；否则属于消息发送者
+    const targetUserId = reply.from?.id || fromId;
+    const targetUserName = reply.from?.first_name || `用户${targetUserId}`;
+
+    const item = {
+      remark,
+      content: content.slice(0, 500), // 限制内容长度
+      link,
+      timestamp: new Date().toISOString(),
+      createdBy: fromId, // 记录创建者
+      originalMessageId: reply.message_id
+    };
+
+    // 使用 itemService 添加物品
+    const result = await addItemToUser(env.ITEM_DO, targetUserId, item);
+    
+    if (!result.ok) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 创建物品失败：${result.error || "未知错误"}`,
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
     }
-    list.push({ remark, content, link, timestamp: new Date().toISOString() });
-    await saveList(env, fromId, list);
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ 已创建物品：<a href="${link}">${remark}</a>（共 ${list.length} 件）`,
+      text: `✅ 已为 ${targetUserName} 创建物品：<a href="${link}">${remark}</a>（共 ${result.count} 件）`,
       parse_mode: "HTML",
       message_thread_id: threadId,
       reply_markup: deleteMarkup
@@ -128,23 +158,96 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
     return;
   }
 
-  // 2) item list —— 直接查看自己的；回复某人则查看该人的物品
-  if (sub === "list" || sub === "") {
-    // If user only typed "/item" or "/item list" both handled here.
-    // If user replied to someone,查看被回复人的物品；否则查看自己的物品
-    let targetId = fromId;
-    let viewingName = fromName;
-    if (parsed.isReply && reply && reply.from && reply.from.id) {
-      targetId = reply.from.id;
-      viewingName = reply.from.first_name || `用户${targetId}`;
+  // 2) item stats —— 管理员功能：查看统计
+  if (sub === "stats") {
+    if (!isAdmin(fromId)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: "❌ 此功能仅限管理员使用",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
     }
 
-    console.log(`[Item] list for user ${targetId} (viewer: ${fromId})`);
-    const list = await loadList(env, targetId);
-    if (list.length === 0) {
-      const text = (targetId === fromId)
-        ? `📭 ${fromName}，你还没有任何物品，回复一条消息并发送 /item create 即可创建物品～`
+    const start = rest[0]; // 使用 start 而不是 cursor
+    const result = await getAllItemsStats(env.ITEM_DO, 20, start);
+    
+    if (result.items.length === 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: "📭 暂无物品数据",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
+    }
+
+    let text = `📊 物品系统统计（显示前${result.items.length}位用户）\n\n`;
+    
+    for (const stat of result.items) {
+      // 尝试获取用户名
+      let userName = `用户${stat.userId}`;
+      try {
+        const member = await TgMessage.fetchChatMember(env, chatId, parseInt(stat.userId));
+        userName = member.first_name;
+      } catch (e) {
+        // 保持默认用户名
+      }
+      
+      text += `• ${userName}：${stat.count} 件物品\n`;
+      
+      // 显示前几个物品的简要信息
+      if (stat.items && stat.items.length > 0) {
+        stat.items.slice(0, 3).forEach((item, idx) => {
+          text += `  ${idx + 1}. ${item.remark?.slice(0, 20)}${item.remark?.length > 20 ? '...' : ''}\n`;
+        });
+      }
+      
+      text += "\n";
+    }
+
+    // 添加分页信息 - 使用 nextStart 而不是 cursor
+    const replyMarkup = result.nextStart ? {
+      inline_keyboard: [[
+        { 
+          text: "下一页", 
+          callback_data: JSON.stringify({ 
+            type: "item_stats", 
+            start: result.nextStart 
+          }) 
+        }
+      ]]
+    } : deleteMarkup;
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: text,
+      parse_mode: "HTML",
+      message_thread_id: threadId,
+      reply_markup: replyMarkup
+    });
+    return;
+  }
+
+  // 3) item list —— 查看物品列表
+  if (sub === "list" || sub === "") {
+    // 确定查看的目标用户
+    let targetUserId = fromId;
+    let viewingName = fromName;
+    
+    if (parsed.isReply && reply && reply.from && reply.from.id) {
+      targetUserId = reply.from.id;
+      viewingName = reply.from.first_name || `用户${targetUserId}`;
+    }
+
+    const items = await getUserItems(env.ITEM_DO, targetUserId);
+    
+    if (items.length === 0) {
+      const text = (targetUserId === fromId)
+        ? `📭 ${fromName}，你还没有任何物品`
         : `📭 ${viewingName} 暂无物品`;
+      
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text,
@@ -155,14 +258,15 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
     }
 
     let body = "";
-    list.forEach((e, i) => {
-      const remark = e.remark || "物品";
-      body += `${i + 1}. <a href="${e.link}">${remark}</a>\n`;
+    items.forEach((item, i) => {
+      const remark = item.remark || "物品";
+      const preview = item.content?.slice(0, 30) || "";
+      body += `${i + 1}. <a href="${item.link}">${remark}</a> - ${preview}${preview.length === 30 ? '...' : ''}\n`;
     });
 
-    const text = (targetId === fromId)
-      ? `🎒 ${fromName} 的物品：<blockquote expandable>${body}</blockquote>`
-      : `🎁 ${viewingName} 的物品：<blockquote expandable>${body}</blockquote>`;
+    const text = (targetUserId === fromId)
+      ? `🎒 ${fromName} 的物品（共 ${items.length} 件）：\n<blockquote expandable>${body}</blockquote>`
+      : `🎁 ${viewingName} 的物品（共 ${items.length} 件）：\n<blockquote expandable>${body}</blockquote>`;
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -174,46 +278,43 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
     return;
   }
 
-  // 3) item use <idx> 或 item use#<idx>
+  // 4) item use —— 使用物品
   if (sub === "use" || /^use#?\d+$/i.test(sub)) {
-    // 可能形式：
-    // /item use 1
-    // /item use #1
-    // /item use#1 （当 parse 将全部当作一个 token 时）
-    // /item use  （缺参数）
-    let idx = null;
+    let idx: number | null = null;
+    
     if (/^use#?\d+$/i.test(sub)) {
-      // sub itself 包含序号
       idx = parseIndexToken(sub.replace(/^use/i, ""));
     } else {
       idx = parseIndexToken(rest[0]);
     }
+    
     if (!idx) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 请指定要使用的物品序号，例如：/item use 1 或 /item use #1`,
+        text: "⚠️ 请指定要使用的物品序号，例如：/item use 1 或 /item use #1",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    const list = await loadList(env, fromId);
-    if (idx < 1 || idx > list.length) {
+    // 使用 itemService 移除物品（索引从0开始）
+    const result = await removeItemFromUser(env.ITEM_DO, fromId, idx - 1);
+    
+    if (!result.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 无效序号：${idx}（当前共 ${list.length} 件）`,
+        text: `❌ 使用物品失败：${result.error || "未知错误"}`,
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    const item = list.splice(idx - 1, 1)[0];
-    await saveList(env, fromId, list);
-
-    // 使用效果：在当前线程发送该物品的内容，并注明来源
-    const useText = `✅ ${fromName} 使用了物品：<a href="${item.link}">${item.remark || "物品"}</a>\n\n${item.content}`;
+    // 显示物品内容
+    const item = result.removedItem;
+    const useText = `✨ ${fromName} 使用了物品：<a href="${item.link}">${item.remark || "物品"}</a>\n\n${item.content}`;
+    
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: useText,
@@ -224,71 +325,71 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
     return;
   }
 
-  // 4) item send <idx> —— 必须回复要送达的目标用户的消息
+  // 5) item send —— 赠送物品
   if (sub === "send" || /^send#?\d+$/i.test(sub)) {
     if (!parsed.isReply || !reply || !reply.from || !reply.from.id) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 请以回复目标用户的消息的方式发送 /item send <序号> 来赠送物品。`,
+        text: "⚠️ 请回复目标用户的消息来赠送物品，例如：/item send 1",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    // parse index
-    let idx = null;
+    // 解析序号
+    let idx: number | null = null;
     if (/^send#?\d+$/i.test(sub)) {
       idx = parseIndexToken(sub.replace(/^send/i, ""));
     } else {
       idx = parseIndexToken(rest[0]);
     }
+    
     if (!idx) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 请指定要赠送的物品序号，例如：/item send 1 或 /item send #1`,
+        text: "⚠️ 请指定要赠送的物品序号，例如：/item send 1 或 /item send #1",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    const targetId = reply.from.id;
-    const targetName = reply.from.first_name || `用户${targetId}`;
+    const targetUserId = reply.from.id;
+    const targetName = reply.from.first_name || `用户${targetUserId}`;
 
-    // 不能把物品送给自己（建议）
-    if (targetId === fromId) {
+    // 不能赠送给自己
+    if (targetUserId === fromId) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 无需将物品赠送给自己，直接使用 /item use ${idx} 即可。`,
+        text: "⚠️ 不能赠送物品给自己，请使用 /item use 来使用物品",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    const list = await loadList(env, fromId);
-    if (idx < 1 || idx > list.length) {
+    // 使用 itemService 转移物品
+    const result = await transferItem(env, env.ITEM_DO, fromId, targetUserId, idx - 1);
+    
+    if (!result.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `⚠️ 无效序号：${idx}（你当前共 ${list.length} 件）`,
+        text: `❌ 赠送物品失败：${result.error || "未知错误"}`,
         message_thread_id: threadId,
         reply_markup: deleteMarkup
       });
       return;
     }
 
-    const item = list.splice(idx - 1, 1)[0];
-    await saveList(env, fromId, list);
+    // 获取赠送后的物品数量（可选）
+    const senderItems = await getUserItems(env.ITEM_DO, fromId);
+    const receiverItems = await getUserItems(env.ITEM_DO, targetUserId);
 
-    // 将物品加入目标用户列表（append）
-    const targetList = await loadList(env, targetId);
-    if (targetList.length >= 200) targetList.shift();
-    targetList.push(item);
-    await saveList(env, targetId, targetList);
+    const text = `🎁 ${fromName} 已将一件物品赠送给 ${targetName}\n` +
+                 `📦 发送者剩余：${senderItems.length} 件\n` +
+                 `📦 接收者现有：${receiverItems.length} 件`;
 
-    // 通知群组：赠送成功
-    const text = `🎁 ${fromName} 已将物品 <a href="${item.link}">${item.remark || "物品"}</a> 赠送给 ${targetName}（${targetList.length} 件）`;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text,
@@ -296,23 +397,100 @@ export async function handleItem(parsed: ParsedUpdate, env: Env) {
       message_thread_id: threadId,
       reply_markup: deleteMarkup
     });
-
     return;
   }
 
-  // 未知子命令，返回帮助提示
-  const helpText = [
-    `物品命令用法：`,
-    `/item create （回复自己的消息） - 将被回复消息保存为物品；可附带备注，如 /item create 备用`,
-    `/item list - 查看自己的物品；回复某人消息并发送 /item list 则查看该人的物品`,
-    `/item use <序号> - 使用并消费自己的某个物品，例如 /item use 1`,
-    `/item send <序号> （回复目标用户的消息）- 把自己的物品送给对方，例如 /item send 1`
-  ].join("\n");
+  // 6) item help —— 帮助信息
+  if (sub === "help") {
+    let helpText = `📦 <b>物品系统使用指南</b>\n\n`;
+    
+    if (isAdmin(fromId)) {
+      helpText += `👑 <b>管理员命令：</b>\n` +
+                 `/item create - 回复消息创建物品（可加备注）\n` +
+                 `/item stats - 查看所有用户物品统计\n\n`;
+    }
+    
+    helpText += `👤 <b>用户命令：</b>\n` +
+               `/item - 查看自己的物品列表\n` +
+               `/item list - 同上\n` +
+               `/item use <序号> - 使用物品\n` +
+               `/item send <序号> - 回复他人消息赠送物品\n\n` +
+               `📝 <b>使用示例：</b>\n` +
+               `• /item use 1（使用第1件物品）\n` +
+               `• /item use #1（同上）\n` +
+               `• /item send 2（赠送第2件物品给被回复者）`;
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: helpText,
+      parse_mode: "HTML",
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+    });
+    return;
+  }
+
+  // 7) item search —— 搜索物品（可选功能）
+  if (sub === "search") {
+    const keyword = rest.join(" ");
+    if (!keyword) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: "⚠️ 请输入搜索关键词，例如：/item search 重要",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
+    }
+
+    const items = await getUserItems(env.ITEM_DO, fromId);
+    const filtered = items.filter(item => 
+      (item.remark && item.remark.includes(keyword)) ||
+      (item.content && item.content.includes(keyword))
+    );
+
+    if (filtered.length === 0) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `🔍 未找到包含"${keyword}"的物品`,
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup
+      });
+      return;
+    }
+
+    let body = "";
+    filtered.forEach((item, i) => {
+      const remark = item.remark || "物品";
+      const preview = item.content?.slice(0, 30) || "";
+      body += `${i + 1}. <a href="${item.link}">${remark}</a> - ${preview}${preview.length === 30 ? '...' : ''}\n`;
+    });
+
+    const text = `🔍 ${fromName} 的搜索"${keyword}"结果（共 ${filtered.length} 件）：\n<blockquote expandable>${body}</blockquote>`;
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup
+    });
+    return;
+  }
+
+  // 未知命令，显示帮助
+  const unknownText = `❓ 未知命令，请输入以下命令之一：\n` +
+                     `/item - 查看自己的物品\n` +
+                     `/item help - 显示完整帮助\n` +
+                     `/item search <关键词> - 搜索物品\n` +
+                     (isAdmin(fromId) ? `/item create - 创建物品（管理员）\n` : "");
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: helpText,
+    text: unknownText,
     message_thread_id: threadId,
     reply_markup: deleteMarkup
   });
 }
+
+export default handleItem;

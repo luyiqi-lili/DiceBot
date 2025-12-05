@@ -63,6 +63,10 @@
 					{
 						"name": "LOTTERY_DO",
 						"class_name": "LotteryDO"
+					},
+					{
+						"name": "LITEM_DO",
+						"class_name": "ItemDO"
 					}
 				]
 			},
@@ -77,6 +81,12 @@
 					"tag": "v_1204",
 					"new_sqlite_classes": [
 						"LotteryDO"
+					]
+				},
+				{
+					"tag": "v_item",
+					"new_sqlite_classes": [
+						"ItemDO"
 					]
 				}
 			],
@@ -150,6 +160,10 @@
 					{
 						"name": "LOTTERY_DO",
 						"class_name": "LotteryDO"
+					},
+					{
+						"name": "LITEM_DO",
+						"class_name": "ItemDO"
 					}
 				]
 			},
@@ -164,6 +178,12 @@
 					"tag": "prod_LotteryDO",
 					"new_sqlite_classes": [
 						"LotteryDO"
+					]
+				},
+				{
+					"tag": "prod_LItemDO",
+					"new_sqlite_classes": [
+						"ItemDO"
 					]
 				}
 			],
