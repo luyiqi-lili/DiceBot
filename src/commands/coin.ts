@@ -725,8 +725,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         return;
       }
 
-      // 分页处理：每页显示30个用户
-      const pageSize = 30;
+      // 分页处理：每页显示50个用户
+      const pageSize = 50;
       const totalPages = Math.ceil(top.length / pageSize);
 
       for (let page = 0; page < totalPages; page++) {
@@ -811,6 +811,305 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         text: `❌ 查询失败：无法列出余额，请稍后重试。`,
         parse_mode: "HTML",
         reply_markup: deleteMarkup,
+        message_thread_id: threadId
+      });
+      return;
+    }
+  }
+
+  // 在已有的 /coin list 命令之后，添加 /coin list repair 命令
+  if (sub === "list" && args[1] === "repair") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${userName}，你没有权限使用 /coin list repair。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 定义目标群组ID
+    const TARGET_CHAT_ID = -1002742074355;
+
+    // 发送开始清理的消息
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `🔧 开始清理无效数据...\n正在进行用户状态检查和余额调整...`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+
+    try {
+      const id = doNs.idFromName("coins");
+      const stub = doNs.get(id);
+
+      let allBalances: Record<string, number> = {};
+      let cursor = "";
+
+      // 需要清理的用户列表
+      const usersToClean: Array<{
+        uid: string;
+        bal: number;
+        reason: 'invalid_id' | 'negative_balance' | 'not_in_group';
+      }> = [];
+
+      // 分页读取 DO 内所有 key
+      while (true) {
+        const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
+        const data = await res.json();
+        const keys: { name: string }[] = data.keys || [];
+        cursor = data.cursor || "";
+
+        // 遍历 keys
+        for (const { name } of keys) {
+          // 跳过房间和宝库数据
+          if (name.includes('||') || name === TREASURY_KEY || name.startsWith("coin_pray:")) {
+            continue;
+          }
+
+          // 获取余额
+          const bal = await getBalance(doNs, name);
+
+          // 检查用户ID是否有效（必须是数字且为正数）
+          const uidNum = Number(name);
+          const isUidValid = !isNaN(uidNum) && uidNum > 0;
+
+          if (!isUidValid) {
+            // 无效ID
+            usersToClean.push({
+              uid: name,
+              bal,
+              reason: 'invalid_id'
+            });
+            continue;
+          }
+
+          if (bal < 0) {
+            // 负余额
+            usersToClean.push({
+              uid: name,
+              bal,
+              reason: 'negative_balance'
+            });
+            continue;
+          }
+
+          // 检查用户是否在目标群组（只有正余额才需要检查）
+          if (bal > 0) {
+            try {
+              const inTargetGroup = await TgMessage.isUserInChat(env, TARGET_CHAT_ID, uidNum);
+              if (!inTargetGroup) {
+                usersToClean.push({
+                  uid: name,
+                  bal,
+                  reason: 'not_in_group'
+                });
+              }
+            } catch (error) {
+              // 如果查询失败，也视为不在群组
+              console.log(`[coin] 检查用户 ${name} 状态失败:`, error.message);
+              usersToClean.push({
+                uid: name,
+                bal,
+                reason: 'not_in_group'
+              });
+            }
+          }
+
+          // 正常用户，记录余额用于后续统计
+          allBalances[name] = bal;
+        }
+
+        if (!cursor) break;
+      }
+
+      // 如果没有需要清理的用户
+      if (usersToClean.length === 0) {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: `✅ 没有发现需要清理的数据。所有用户数据都是有效的。`,
+          parse_mode: "HTML",
+          message_thread_id: threadId
+        });
+        return;
+      }
+
+      // 按原因分组
+      const byReason = {
+        invalid_id: usersToClean.filter(u => u.reason === 'invalid_id'),
+        negative_balance: usersToClean.filter(u => u.reason === 'negative_balance'),
+        not_in_group: usersToClean.filter(u => u.reason === 'not_in_group')
+      };
+
+      // 发送清理计划
+      let reportText = `📋 清理计划\n`;
+      reportText += `────────────────\n`;
+      reportText += `无效用户ID: ${byReason.invalid_id.length} 个\n`;
+      reportText += `负余额用户: ${byReason.negative_balance.length} 个\n`;
+      reportText += `不在群组用户: ${byReason.not_in_group.length} 个\n`;
+      reportText += `总计: ${usersToClean.length} 个用户需要清理\n\n`;
+      reportText += `⚠️ 确认执行清理吗？此操作不可逆。\n`;
+      reportText += `回复 "确认清理" 开始执行。`;
+
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: reportText,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+
+      // 等待用户确认
+      // 这里需要配合一个确认机制，简单实现：用户需要回复"确认清理"
+      // 在实际使用中，可能需要更复杂的确认机制（如按钮）
+      // 这里我们简单处理，用户需要重新发送 /coin list repair confirm
+
+    } catch (e) {
+      console.error("[coin] /coin list repair error", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 分析失败：无法读取用户数据，请稍后重试。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+  }
+
+  // 添加确认执行的命令
+  if (sub === "list" && args[1] === "repair" && args[2] === "confirm") {
+    const callerNum = Number(userId);
+    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${userName}，你没有权限使用此命令。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+      return;
+    }
+
+    // 定义目标群组ID
+    const TARGET_CHAT_ID = -1002742074355;
+
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `🔄 开始执行清理操作...`,
+      parse_mode: "HTML",
+      message_thread_id: threadId
+    });
+
+    try {
+      const id = doNs.idFromName("coins");
+      const stub = doNs.get(id);
+
+      let cursor = "";
+      let cleanedCount = 0;
+      let totalAmount = 0;
+      let cleanupLog: string[] = [];
+
+      // 先获取当前国库余额
+      const originalTreasury = await getTreasury(doNs);
+
+      // 分页读取 DO 内所有 key
+      while (true) {
+        const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
+        const data = await res.json();
+        const keys: { name: string }[] = data.keys || [];
+        cursor = data.cursor || "";
+
+        for (const { name } of keys) {
+          // 跳过房间和宝库数据
+          if (name.includes('||') || name === TREASURY_KEY || name.startsWith("coin_pray:")) {
+            continue;
+          }
+
+          const bal = await getBalance(doNs, name);
+
+          // 检查是否需要清理
+          const uidNum = Number(name);
+          const isUidValid = !isNaN(uidNum) && uidNum > 0;
+          let needCleanup = false;
+          let reason = '';
+
+          if (!isUidValid) {
+            needCleanup = true;
+            reason = '无效ID';
+          } else if (bal < 0) {
+            needCleanup = true;
+            reason = '负余额';
+          } else if (bal > 0) {
+            try {
+              const inTargetGroup = await TgMessage.isUserInChat(env, TARGET_CHAT_ID, uidNum);
+              if (!inTargetGroup) {
+                needCleanup = true;
+                reason = '不在群组';
+              }
+            } catch (error) {
+              needCleanup = true;
+              reason = '查询失败';
+            }
+          }
+
+          if (needCleanup) {
+            // 调整国库余额
+            const treasuryChange = bal; // 正余额加回国库，负余额从国库扣除
+            const newTreasury = await getTreasury(doNs);
+            await doPutRaw(doNs, TREASURY_KEY, String(newTreasury + treasuryChange));
+
+            // 删除用户账户（设置为0）
+            await doPutRaw(doNs, name, "0");
+
+            cleanedCount++;
+            totalAmount += Math.abs(bal);
+
+            // 记录日志（每10个用户记录一次）
+            if (cleanedCount % 10 === 0) {
+              cleanupLog.push(`已清理 ${cleanedCount} 个用户，调整金额: ${totalAmount} 💰`);
+            }
+
+            // 避免请求过快
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+
+        if (!cursor) break;
+      }
+
+      // 获取清理后的国库余额
+      const finalTreasury = await getTreasury(doNs);
+      const treasuryChange = finalTreasury - originalTreasury;
+
+      // 发送清理报告
+      let reportText = `✅ 清理完成\n`;
+      reportText += `────────────────\n`;
+      reportText += `清理用户数: ${cleanedCount} 个\n`;
+      reportText += `调整总金额: ${totalAmount} 💰\n`;
+      reportText += `国库变化: ${treasuryChange > 0 ? '+' : ''}${treasuryChange} 💰\n`;
+      reportText += `原始国库: ${originalTreasury} 💰\n`;
+      reportText += `当前国库: ${finalTreasury} 💰\n\n`;
+
+      if (cleanupLog.length > 0) {
+        reportText += `📝 清理记录:\n`;
+        reportText += cleanupLog.join('\n');
+      }
+
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: reportText,
+        parse_mode: "HTML",
+        message_thread_id: threadId
+      });
+
+      return;
+
+    } catch (e) {
+      console.error("[coin] /coin list repair confirm error", e);
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 清理失败：执行过程中出现错误。`,
+        parse_mode: "HTML",
         message_thread_id: threadId
       });
       return;
