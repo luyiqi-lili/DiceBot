@@ -507,7 +507,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const amount = parseInt(args[1] || "", 10);
-    if (isNaN(amount) || amount <= 0) {
+    if (isNaN(amount) ) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，请指定正确的取款数量，例如：<code>/coin remove 100</code>。`,
