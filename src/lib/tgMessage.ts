@@ -469,11 +469,155 @@ const TgMessage = {
     if (opts.reply_markup) body.reply_markup = opts.reply_markup;
     return await TgMessage.send(env, 'editMessageCaption', body);
   },
+
+  // 在 TgMessage 对象中添加以下方法：
+
   /**
- * 获取 chat 中某个 user 的信息（first_name, username）
- * - 直接调用 getChatMember Telegram API
- * - 返回示例：{ first_name: '张三', username: 'zhangsan' }
- */
+   * 检查用户是否在指定群组中
+   * 核心方法：调用 getChatMember API 并解析用户状态
+   * 
+   * @param env - 包含 BOT_TOKEN 的环境对象
+   * @param chatId - 要检查的群组ID (支持数字ID或@username格式)
+   * @param userId - 要检查的用户ID
+   * @returns 返回完整的 ChatMember 对象，可通过 status 字段判断用户状态
+   * 
+   * 使用示例：
+   * const memberInfo = await TgMessage.checkChatMemberStatus(env, -100123456789, 987654321);
+   * if (memberInfo.status === 'member' || memberInfo.status === 'administrator' || memberInfo.status === 'creator') {
+   *   // 用户在群内
+   * }
+   * 
+   * 主要状态说明：
+   * - 'creator': 群组创建者
+   * - 'administrator': 管理员
+   * - 'member': 普通成员
+   * - 'restricted': 受限成员（仍在群内但权限受限）
+   * - 'left': 已离开群组
+   * - 'kicked': 已被踢出/封禁
+   */
+  async checkChatMemberStatus(
+    env: EnvLike,
+    chatId: number | string,
+    userId: number
+  ): Promise<any> {
+    const method = 'getChatMember';
+    const body = {
+      chat_id: chatId,
+      user_id: userId
+    };
+
+    log(`检查用户 ${userId} 在群组 ${chatId} 的成员状态`, body);
+
+    try {
+      const response = await callTelegramApi(env, method, body);
+
+      if (response.ok && response.result) {
+        log(`✅ ${method} 成功 - 用户状态: ${response.result.status}`, response.result);
+        return response.result;
+      } else {
+        log(`⚠️ ${method} 失败`, response);
+        // 可以根据不同的错误代码进行更详细的处理
+        if (response.error_code === 400) {
+          throw new Error(`请求参数错误: ${response.description || '未知错误'}`);
+        } else if (response.error_code === 403) {
+          throw new Error(`机器人无权查询此群组成员信息（可能需要管理员权限）`);
+        } else if (response.error_code === 404) {
+          throw new Error(`用户 ${userId} 未找到或不在群组中`);
+        }
+        throw new Error(`Telegram API 错误: ${response.description || '未知错误'}`);
+      }
+    } catch (error) {
+      log(`❌ ${method} 调用异常`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * 便捷函数：快速判断用户是否在指定群组中
+   * 
+   * @param env - 包含 BOT_TOKEN 的环境对象
+   * @param chatId - 要检查的群组ID
+   * @param userId - 要检查的用户ID
+   * @returns boolean - true 表示用户在群内，false 表示不在群内或查询失败
+   * 
+   * 使用示例：
+   * const isMember = await TgMessage.isUserInChat(env, -100123456789, 987654321);
+   * if (isMember) {
+   *   // 处理用户是群成员的情况
+   * }
+   */
+  async isUserInChat(
+    env: EnvLike,
+    chatId: number | string,
+    userId: number
+  ): Promise<boolean> {
+    try {
+      const memberInfo = await TgMessage.checkChatMemberStatus(env, chatId, userId);
+
+      // 判断用户是否在群内的状态
+      const inChatStatuses = ['member', 'restricted', 'administrator', 'creator'];
+
+      const isInChat = inChatStatuses.includes(memberInfo.status);
+      log(`用户 ${userId} 在群组 ${chatId} 中: ${isInChat} (状态: ${memberInfo.status})`);
+
+      return isInChat;
+    } catch (error) {
+      // 查询失败时，保守返回 false
+      log(`⚠️ 检查用户 ${userId} 是否在群组失败，默认返回 false`, error);
+      return false;
+    }
+  },
+
+  /**
+   * 获取用户在群组中的详细信息（增强版）
+   * 结合了成员状态和用户信息，适用于需要更多上下文的场景
+   * 
+   * @param env - 包含 BOT_TOKEN 的环境对象
+   * @param chatId - 群组ID
+   * @param userId - 用户ID
+   * @returns 包含状态和用户信息的对象，格式为:
+   *   {
+   *     status: 'member' | 'administrator' | 'creator' | 'restricted' | 'left' | 'kicked',
+   *     user: { id, first_name, last_name, username, ... },
+   *     custom_title?: string,  // 管理员自定义头衔
+   *     until_date?: number,    // 限制/封禁截止时间
+   *     can_send_messages?: boolean, // 是否能发送消息
+   *     // ... 其他字段根据状态不同而存在
+   *   }
+   */
+  async getDetailedChatMemberInfo(
+    env: EnvLike,
+    chatId: number | string,
+    userId: number
+  ): Promise<any> {
+    const memberInfo = await TgMessage.checkChatMemberStatus(env, chatId, userId);
+
+    // 为不同状态添加一些有用的计算属性
+    const enhancedInfo = {
+      ...memberInfo,
+      // 添加一些便捷的计算属性
+      _isInChat: ['member', 'restricted', 'administrator', 'creator'].includes(memberInfo.status),
+      _isAdmin: ['administrator', 'creator'].includes(memberInfo.status),
+      _isRestricted: memberInfo.status === 'restricted',
+      _hasLeft: memberInfo.status === 'left',
+      _isKicked: memberInfo.status === 'kicked',
+      _statusDescription: getStatusDescription(memberInfo.status)
+    };
+
+    log(`获取用户 ${userId} 的详细群组信息`, {
+      status: enhancedInfo.status,
+      isInChat: enhancedInfo._isInChat,
+      isAdmin: enhancedInfo._isAdmin
+    });
+
+    return enhancedInfo;
+  },
+
+  /**
+* 获取 chat 中某个 user 的信息（first_name, username）
+* - 直接调用 getChatMember Telegram API
+* - 返回示例：{ first_name: '张三', username: 'zhangsan' }
+*/
   async fetchChatMember(env: EnvLike, chatId: number, userId: number) {
     try {
       const res = await callTelegramApi(env, 'getChatMember', { chat_id: chatId, user_id: userId });
@@ -495,3 +639,7 @@ const TgMessage = {
 };
 
 export default TgMessage;
+function getStatusDescription(status: any) {
+  throw new Error("Function not implemented.");
+}
+

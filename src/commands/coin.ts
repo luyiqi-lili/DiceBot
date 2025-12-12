@@ -20,7 +20,7 @@ type CoinEnv = EnvLike & {
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885,6367789964];
+const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885, 6367789964];
 const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
 const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
@@ -507,7 +507,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const amount = parseInt(args[1] || "", 10);
-    if (isNaN(amount) ) {
+    if (isNaN(amount)) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，请指定正确的取款数量，例如：<code>/coin remove 100</code>。`,
@@ -652,6 +652,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // /coin list - 修改为分页发送
+  // /coin list - 修改为分页发送并添加群组检查
   if (sub === "list") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -663,6 +664,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       });
       return;
     }
+
+    // 定义目标群组ID
+    const TARGET_CHAT_ID = -1002742074355;
 
     try {
       const id = doNs.idFromName("coins");
@@ -717,7 +721,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       }
 
       // 分页处理：每页显示30个用户
-      const pageSize = 50;
+      const pageSize = 30;
       const totalPages = Math.ceil(top.length / pageSize);
 
       for (let page = 0; page < totalPages; page++) {
@@ -726,25 +730,58 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         const pageData = top.slice(startIdx, endIdx);
 
         const textLines = [];
-        for (const [idx, [uid, bal]] of pageData.entries()) {
-          const globalIdx = startIdx + idx + 1; // 全局排名
-          if (!isNaN(Number(uid))) {
-            try {
-              const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
-              const prayDate = prayRecords[uid];
-              const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
-              textLines.push(`${globalIdx}. ${member.first_name} ${uid} :${bal}💰${prayInfo}`);
-            } catch (e) {
-              // 如果获取用户信息失败，只显示UID
-              const prayDate = prayRecords[uid];
-              const prayInfo = prayDate ? ` | 最后祈祷: ${prayDate}` : ` | 从未祈祷`;
-              textLines.push(`${globalIdx}. 用户${uid} :${bal}💰${prayInfo}`);
+
+        // 批量检查群组成员状态
+        const memberChecks = await Promise.all(
+          pageData.map(async ([uid, bal]) => {
+            const globalIdx = startIdx + pageData.findIndex(([u, _]) => u === uid) + 1;
+
+            // 检查用户是否在目标群组
+            let inTargetGroup = false;
+            let userDisplayName = `用户${uid}`;
+
+            if (!isNaN(Number(uid))) {
+              try {
+                // 尝试获取用户在当前群组的信息
+                const member = await TgMessage.fetchChatMember(env, chatId, Number(uid));
+                userDisplayName = member.first_name || userDisplayName;
+
+                // 检查用户是否在目标群组
+                inTargetGroup = await TgMessage.isUserInChat(env, TARGET_CHAT_ID, Number(uid));
+              } catch (e) {
+                // 如果获取用户信息失败，记录日志但继续处理
+                console.log(`[coin] 获取用户 ${uid} 信息失败:`, e.message);
+              }
             }
-          }
+
+            return {
+              uid,
+              bal,
+              globalIdx,
+              userDisplayName,
+              inTargetGroup,
+              prayDate: prayRecords[uid]
+            };
+          })
+        );
+
+        // 构建文本行
+        for (const check of memberChecks) {
+          const prayInfo = check.prayDate ? ` | 最后祈祷: ${check.prayDate}` : ` | 从未祈祷`;
+          const groupStatus = check.inTargetGroup ? "✅" : "❌";
+
+          textLines.push(
+            `${check.globalIdx}. ${check.userDisplayName} ${check.uid} :${check.bal}💰 ${groupStatus}${prayInfo}`
+          );
         }
 
         const pageInfo = totalPages > 1 ? `（第 ${page + 1}/${totalPages} 页）` : '';
-        const out = `🏆 财富榜${pageInfo}\n<blockquote expandable>` + textLines.join("\n") + `</blockquote>`;
+        const out = `🏆 财富榜${pageInfo}\n` +
+          `目标群组: ${TARGET_CHAT_ID} 成员检查\n` +
+          `✅ = 在群组中 | ❌ = 不在群组中\n` +
+          `<blockquote expandable>` +
+          textLines.join("\n") +
+          `</blockquote>`;
 
         await TgMessage.sendText(env, {
           chat_id: chatId,
@@ -759,6 +796,20 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
+
+      // 发送汇总统计
+      const totalUsers = top.length;
+      const inGroupCount = await Promise.all(
+        top.slice(0, 50).map(async ([uid, _]) => {
+          if (isNaN(Number(uid))) return false;
+          try {
+            return await TgMessage.isUserInChat(env, TARGET_CHAT_ID, Number(uid));
+          } catch (e) {
+            return false;
+          }
+        })
+      ).then(results => results.filter(Boolean).length);
+
       return;
     } catch (e) {
       console.error("[coin] /coin list error", e);
