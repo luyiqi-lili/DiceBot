@@ -614,7 +614,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // /coin create - 保持不变
-  if (sub === "create") {
+  if (sub === "create")  {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
       await TgMessage.sendText(env, {
@@ -818,7 +818,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // 在已有的 /coin list 命令之后，添加 /coin list repair 命令
-  if (sub === "list" && args[1] === "repair") {
+  if (sub === "repair" ) {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
@@ -978,7 +978,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // 添加确认执行的命令
-  if (sub === "list" && args[1] === "repair" && args[2] === "confirm") {
+  if (sub === "confirm" ) {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
