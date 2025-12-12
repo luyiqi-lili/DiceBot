@@ -685,6 +685,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
         // 遍历 keys，分别处理余额和祈祷记录
         for (const { name } of keys) {
+          // 跳过房间和宝库数据
+          if (name.includes('||') || name === TREASURY_KEY) {
+            continue;
+          }
+
           if (name.startsWith("coin_pray:")) {
             // 处理祈祷记录
             const prayUserId = name.replace("coin_pray:", "");
@@ -730,11 +735,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         const pageData = top.slice(startIdx, endIdx);
 
         const textLines = [];
+        const globalStartIdx = startIdx + 1;
 
         // 批量检查群组成员状态
         const memberChecks = await Promise.all(
-          pageData.map(async ([uid, bal]) => {
-            const globalIdx = startIdx + pageData.findIndex(([u, _]) => u === uid) + 1;
+          pageData.map(async ([uid, bal], idx) => {
+            const globalIdx = globalStartIdx + idx;
 
             // 检查用户是否在目标群组
             let inTargetGroup = false;
@@ -796,19 +802,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
-
-      // 发送汇总统计
-      const totalUsers = top.length;
-      const inGroupCount = await Promise.all(
-        top.slice(0, 50).map(async ([uid, _]) => {
-          if (isNaN(Number(uid))) return false;
-          try {
-            return await TgMessage.isUserInChat(env, TARGET_CHAT_ID, Number(uid));
-          } catch (e) {
-            return false;
-          }
-        })
-      ).then(results => results.filter(Boolean).length);
 
       return;
     } catch (e) {
