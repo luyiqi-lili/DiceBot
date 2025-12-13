@@ -99,6 +99,7 @@ export const fishList = [
   
   { name: "<a href=\"tg://user?id=8445100282\" >🐭鼠鼠</a>", hookRate: 0.40, value: 1 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐒海猴</a>", hookRate: 0.40, value: 1 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🕸钓鱼佬绝不空军</a>", hookRate: 0.40, value: 1 },
 
 
   { name: "<a href=\"tg://user?id=8445100282\" >🍜“何意味”泡面</a>", hookRate: 0.35, value: 2 },
@@ -217,7 +218,9 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🫙纸星瓶</a>", hookRate: 0.23, value: 6 },
   { name: "<a href=\"tg://user?id=8445100282\" >💤睡觉鱼</a>", hookRate: 0.23, value: 6 },
   { name: "<a href=\"tg://user?id=8445100282\" >🎣鱼竿</a>", hookRate: 0.23, value: 6 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🐖群友</a>", hookRate: 0.23, value: 6 },
 
+  { name: "<a href=\"tg://user?id=6788664480\" >🥷忍者</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=6788664480\" >🐊鳄鱼</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=6788664480\" >🍀幸運葉子</a>", hookRate: 0.20, value: 7 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐬彩虹海豚</a>", hookRate: 0.20, value: 7 },
@@ -242,6 +245,7 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🌠翻折的祈愿星</a>", hookRate: 0.16, value: 10 },
   { name: "<a href=\"tg://user?id=8445100282\" >🏆金奖杯！</a>", hookRate: 0.16, value: 10 },
   { name: "<a href=\"tg://user?id=8445100282\" >🎄圣诞树</a>", hookRate: 0.16, value: 10 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🐻窝窝头</a>", hookRate: 0.16, value: 10 },
 
   { name: "<a href=\"tg://user?id=8445100282\" >🐉红蛟</a>", hookRate: 0.15, value: 11 },
   { name: "<a href=\"tg://user?id=8445100282\" >🧬远古海马</a>", hookRate: 0.15, value: 11 },
@@ -257,6 +261,7 @@ export const fishList = [
 
 
   { name: "<a href=\"tg://user?id=8445100282\" >🐙章鱼哥</a>", hookRate: 0.11, value: 12 },
+  { name: "<a href=\"tg://user?id=8445100282\" >🐚神奇海螺</a>", hookRate: 0.11, value: 12 },
 
   { name: "<a href=\"tg://user?id=8445100282\" >💍神秘戒指</a>", hookRate: 0.10, value: 13 },
   { name: "<a href=\"tg://user?id=8445100282\" >📒琉璃的回忆相册</a>", hookRate: 0.10, value: 13 },
