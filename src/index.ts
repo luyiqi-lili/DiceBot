@@ -24,6 +24,8 @@ export type Env = {
   COIN_DO: any
   COIN_KV: KVNamespace
   LOTTERY_DO: DurableObjectNamespace  // 新增
+  DB: D1Database;  // 添加 D1 数据库
+
 
 };
 export { CoinDO } from './durableObjects/coin_do';
@@ -124,6 +126,14 @@ export default {
               // 引入新的 handler
               const { handleFishCallback } = await import("./commands/fish");
               await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
+              return new Response("OK", { status: 200 });
+            }
+            case "rule": {
+              console.log("index: 检测到 /rule 命令，进入 rule 逻辑");
+              const { handleRule } = await import("./commands/rule");
+              await handleRule(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /rule 处理完成`);
               return new Response("OK", { status: 200 });
             }
             case "groll": {
