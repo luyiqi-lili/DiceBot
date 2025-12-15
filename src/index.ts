@@ -128,14 +128,6 @@ export default {
               await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
               return new Response("OK", { status: 200 });
             }
-            case "rule": {
-              console.log("index: 检测到 /rule 命令，进入 rule 逻辑");
-              const { handleRule } = await import("./commands/rule");
-              await handleRule(parsedMessage, env);
-              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
-              console.log(`index: /rule 处理完成`);
-              return new Response("OK", { status: 200 });
-            }
             case "groll": {
               // callbackQuery 为 parsedMessage.callbackQuery
               // callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
@@ -365,6 +357,14 @@ export default {
               await handleNews(parsedMessage, env);
               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
               console.log(`index: news处理完成`);
+              return new Response("OK", { status: 200 });
+            }
+            case "rule": {
+              console.log("index: 检测到 /rule 命令，进入 rule 逻辑");
+              const { handleRule } = await import("./commands/rule");
+              await handleRule(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /rule 处理完成`);
               return new Response("OK", { status: 200 });
             }
             // 默认提示
