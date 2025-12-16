@@ -150,14 +150,16 @@
 					{
 						"name": "LOTTERY_DO",
 						"class_name": "LotteryDO"
-					},
-					{
-						"name": "DB",
-						"type": "dice-bot",
-						"id": "19c3c908-6b28-4e67-bfac-1c5fffe95119"
 					}
 				]
 			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "dicebot-db",
+					"database_id": "19c3c908-6b28-4e67-bfac-1c5fffe95119"
+				}
+			],
 			"migrations": [
 				{
 					"tag": "prod",
