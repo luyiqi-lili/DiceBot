@@ -1,4 +1,4 @@
-import { backupConfig } from './liveConfig';
+import { backupConfig, deleteUids } from './liveConfig';  // 假设 liveConfig 中已添加 deleteUids 配置
 import TgMessage, { ParsedUpdate, EnvLike } from './tgMessage';
 
 // 备份配置类型定义（如果 liveConfig 中已有可不重复定义）
@@ -94,10 +94,59 @@ async function sendSenderLabel(env: EnvLike, dest: BackupTarget, senderLabel: st
 }
 
 /**
+ * 删除原始群组中的消息
+ * @returns 是否成功删除
+ */
+async function deleteOriginalMessageIfNeeded(parsed: ParsedUpdate, env: EnvLike): Promise<boolean> {
+  try {
+    // 检查是否有需要删除的 UID 配置
+    if (!deleteUids || deleteUids.length === 0) {
+      return false;
+    }
+
+    // 获取发送者 UID
+    const msg = parsed.message || {};
+    const from = parsed.from || msg.from || msg.sender_chat || null;
+    const userId = from?.id || from?.user_id;
+    
+    if (!userId) {
+      return false;
+    }
+
+    // 检查是否在删除列表中
+    if (!deleteUids.includes(userId)) {
+      return false;
+    }
+
+    // 检查是否有权限删除消息（需要 bot 是管理员且有删除消息权限）
+    const deleteOpts = {
+      chat_id: parsed.chatId,
+      message_id: parsed.message.message_id ,
+    };
+
+    log('检测到需要删除的用户消息', { userId, chatId: parsed.chatId, messageId: parsed.message.message_id });
+    
+    try {
+      // 尝试删除原始群组的消息
+      await TgMessage.send(env, 'deleteMessage', deleteOpts);
+      log('成功删除原始群组消息', deleteOpts);
+      return true;
+    } catch (deleteError) {
+      // 如果没有删除权限或其他错误
+      log('删除原始消息失败，可能没有权限', deleteOpts, deleteError);
+      return true; // 即使删除失败也返回 true，表示应该阻止备份
+    }
+  } catch (error) {
+    log('删除消息检查过程中出错', error);
+    return false;
+  }
+}
+
+/**
  * handleBackup
- * - 尽量将各种类型的消息由 bot 重新发送到目标群组/话题
- * - 重新发送非纯文本消息前会先发送一条说明："Firstname Lastname :"，表示此消息的原始发送者
- * - 优先使用原始的 file_id（避免下载/上传），并尽量把原始发送者作为 caption/说明带上
+ * - 先检查是否需要删除原始消息
+ * - 如果需要删除，则不进行备份
+ * - 否则继续原有的备份逻辑
  */
 export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
   try {
@@ -114,6 +163,13 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
     // 只对非命令消息进行备份（调用处应已判断 parsed.isCommand 为 false）
     if (parsed.isCommand) {
       log('消息为命令，跳过备份', { command: parsed.command });
+      return null;
+    }
+
+    // 检查是否需要删除消息
+    const shouldDelete = await deleteOriginalMessageIfNeeded(parsed, env);
+    if (shouldDelete) {
+      log('消息已删除或需要删除，跳过备份');
       return null;
     }
 

@@ -7,6 +7,11 @@ export const ALLOWED_CHAT_IDS = new Set([
   -1002661676227
 ]);
 
+export const deleteUids: number[] = [
+  8080375150, // 需要删除消息的用户 ID 1
+  987654321, // 需要删除消息的用户 ID 2
+  // 添加更多 UID
+];
 
 export const MAJOR_ARCANA = [
   { name: "愚者", file: "https://luyiqi-lili.github.io/pic/0.jpg" },
