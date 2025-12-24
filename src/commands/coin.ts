@@ -652,8 +652,6 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     return;
   }
 
-  // /coin list - 修改为分页发送
-  // /coin list - 修改为分页发送并添加群组检查
   // /coin list - 修改为分页发送并添加群组检查和最后发言时间
   if (sub === "list") {
     const callerNum = Number(userId);
@@ -747,21 +745,15 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           if (env.DB) {
             const userIds = pageData.map(([uid]) => uid).filter(uid => !isNaN(Number(uid)));
             if (userIds.length > 0) {
-              // 使用 IN 查询批量获取最后发言时间 - 修复参数绑定
+              // 方法1：使用展开运算符
               const placeholders = userIds.map(() => '?').join(',');
               const query = `SELECT user_id, last_active_at FROM user_last_active WHERE user_id IN (${placeholders})`;
 
-              // 正确的方式：一次性绑定所有参数
-              const stmt = env.DB.prepare(query);
+              // 正确的方式：使用展开运算符传递参数
+              let stmt = env.DB.prepare(query);
+              stmt = stmt.bind(...userIds);
 
-              // 注意：bind 方法接受的是展开的参数，不是数组
-              // 我们需要将 userIds 数组展开作为参数
-              let boundStmt = stmt;
-              for (let i = 0; i < userIds.length; i++) {
-                boundStmt = boundStmt.bind(userIds[i]);
-              }
-
-              const result = await boundStmt.all();
+              const result = await stmt.all();
               result.results.forEach((row: any) => {
                 userLastActiveTimes[String(row.user_id)] = row.last_active_at;
               });
@@ -769,7 +761,30 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           }
         } catch (e) {
           console.error("[coin] 批量查询最后发言时间失败:", e);
-          // 即使查询失败，也要继续显示列表，只是不显示最后发言时间
+          // 尝试另一种方法：单独查询
+          if (env.DB) {
+            console.log("[coin] 尝试单独查询最后发言时间...");
+            try {
+              // 对每个用户单独查询
+              for (const [uid] of pageData) {
+                if (isNaN(Number(uid))) continue;
+
+                try {
+                  const result = await env.DB.prepare(
+                    "SELECT last_active_at FROM user_last_active WHERE user_id = ?"
+                  ).bind(uid).first();
+
+                  if (result) {
+                    userLastActiveTimes[uid] = result.last_active_at;
+                  }
+                } catch (singleError) {
+                  console.error(`[coin] 查询用户 ${uid} 最后发言时间失败:`, singleError);
+                }
+              }
+            } catch (batchError) {
+              console.error("[coin] 单独查询也失败:", batchError);
+            }
+          }
         }
 
         // 批量检查群组成员状态
