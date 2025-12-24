@@ -747,23 +747,29 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           if (env.DB) {
             const userIds = pageData.map(([uid]) => uid).filter(uid => !isNaN(Number(uid)));
             if (userIds.length > 0) {
-              // 使用 IN 查询批量获取最后发言时间
+              // 使用 IN 查询批量获取最后发言时间 - 修复参数绑定
               const placeholders = userIds.map(() => '?').join(',');
               const query = `SELECT user_id, last_active_at FROM user_last_active WHERE user_id IN (${placeholders})`;
 
+              // 正确的方式：一次性绑定所有参数
               const stmt = env.DB.prepare(query);
+
+              // 注意：bind 方法接受的是展开的参数，不是数组
+              // 我们需要将 userIds 数组展开作为参数
+              let boundStmt = stmt;
               for (let i = 0; i < userIds.length; i++) {
-                stmt.bind(i, userIds[i]);
+                boundStmt = boundStmt.bind(userIds[i]);
               }
 
-              const result = await stmt.all();
+              const result = await boundStmt.all();
               result.results.forEach((row: any) => {
-                userLastActiveTimes[row.user_id] = row.last_active_at;
+                userLastActiveTimes[String(row.user_id)] = row.last_active_at;
               });
             }
           }
         } catch (e) {
           console.error("[coin] 批量查询最后发言时间失败:", e);
+          // 即使查询失败，也要继续显示列表，只是不显示最后发言时间
         }
 
         // 批量检查群组成员状态
