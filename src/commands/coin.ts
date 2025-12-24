@@ -15,6 +15,7 @@ import {
 type CoinEnv = EnvLike & {
   BOT_USERNAME?: string;
   COIN_DO: DurableObjectNamespace;
+  DB: D1Database;
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
@@ -614,7 +615,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // /coin create - 保持不变
-  if (sub === "create")  {
+  if (sub === "create") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
       await TgMessage.sendText(env, {
@@ -653,6 +654,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   // /coin list - 修改为分页发送
   // /coin list - 修改为分页发送并添加群组检查
+  // /coin list - 修改为分页发送并添加群组检查和最后发言时间
   if (sub === "list") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
@@ -737,6 +739,33 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         const textLines = [];
         const globalStartIdx = startIdx + 1;
 
+        // 批量获取用户最后发言时间
+        let userLastActiveTimes: Record<string, string | null> = {};
+
+        try {
+          // 批量查询最后发言时间
+          if (env.DB) {
+            const userIds = pageData.map(([uid]) => uid).filter(uid => !isNaN(Number(uid)));
+            if (userIds.length > 0) {
+              // 使用 IN 查询批量获取最后发言时间
+              const placeholders = userIds.map(() => '?').join(',');
+              const query = `SELECT user_id, last_active_at FROM user_last_active WHERE user_id IN (${placeholders})`;
+
+              const stmt = env.DB.prepare(query);
+              for (let i = 0; i < userIds.length; i++) {
+                stmt.bind(i, userIds[i]);
+              }
+
+              const result = await stmt.all();
+              result.results.forEach((row: any) => {
+                userLastActiveTimes[row.user_id] = row.last_active_at;
+              });
+            }
+          }
+        } catch (e) {
+          console.error("[coin] 批量查询最后发言时间失败:", e);
+        }
+
         // 批量检查群组成员状态
         const memberChecks = await Promise.all(
           pageData.map(async ([uid, bal], idx) => {
@@ -745,6 +774,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
             // 检查用户是否在目标群组
             let inTargetGroup = false;
             let userDisplayName = `用户${uid}`;
+            let lastActiveTime = userLastActiveTimes[uid] || null;
 
             if (!isNaN(Number(uid))) {
               try {
@@ -760,13 +790,42 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
               }
             }
 
+            // 格式化最后发言时间
+            let lastActiveText = "从未发言";
+            if (lastActiveTime) {
+              try {
+                const lastActiveDate = new Date(lastActiveTime);
+                const now = new Date();
+                const diffMs = now.getTime() - lastActiveDate.getTime();
+                const diffMins = Math.floor(diffMs / (1000 * 60));
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+                if (diffMins < 1) lastActiveText = "刚刚";
+                else if (diffMins < 60) lastActiveText = `${diffMins}分钟前`;
+                else if (diffHours < 24) lastActiveText = `${diffHours}小时前`;
+                else if (diffDays < 7) lastActiveText = `${diffDays}天前`;
+                else {
+                  // 超过7天显示具体日期
+                  lastActiveText = lastActiveDate.toLocaleDateString('zh-CN', {
+                    month: 'numeric',
+                    day: 'numeric'
+                  });
+                }
+              } catch (e) {
+                console.error(`[coin] 格式化最后发言时间失败 ${uid}:`, e);
+                lastActiveText = "时间未知";
+              }
+            }
+
             return {
               uid,
               bal,
               globalIdx,
               userDisplayName,
               inTargetGroup,
-              prayDate: prayRecords[uid]
+              prayDate: prayRecords[uid],
+              lastActiveText
             };
           })
         );
@@ -777,7 +836,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
           const groupStatus = check.inTargetGroup ? "✅" : "❌";
 
           textLines.push(
-            `${check.globalIdx}. ${check.userDisplayName} ${check.uid} :${check.bal}💰 ${groupStatus}${prayInfo}`
+            `${check.globalIdx}. ${check.userDisplayName} ${check.uid} :${check.bal}💰 ${groupStatus} | 最后发言: ${check.lastActiveText}${prayInfo}`
           );
         }
 
@@ -816,9 +875,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
   }
-
   // 在已有的 /coin list 命令之后，添加 /coin list repair 命令
-  if (sub === "repair" ) {
+  if (sub === "repair") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
@@ -978,7 +1036,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // 添加确认执行的命令
-  if (sub === "confirm" ) {
+  if (sub === "confirm") {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
