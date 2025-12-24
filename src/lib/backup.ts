@@ -1,9 +1,82 @@
 import { backupConfig, deleteUids } from './liveConfig';  // 假设 liveConfig 中已添加 deleteUids 配置
 import TgMessage, { ParsedUpdate, EnvLike } from './tgMessage';
-
+ 
 // 备份配置类型定义（如果 liveConfig 中已有可不重复定义）
 export type BackupTarget = { chat_id: number; threadId?: number };
 export type BackupMapping = { from: { chat_id: number; threadId?: number }; to: BackupTarget[] };
+
+
+export interface UserInfo {
+  user_id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
+/**
+ * 记录用户最后一次活跃时间
+ */
+async function recordUserLastActive(
+  env: EnvLike & { DB: D1Database }, 
+  parsed: ParsedUpdate
+): Promise<void> {
+  try {
+    if (!env.DB) {
+      log('未配置 D1 数据库，跳过记录用户活跃时间');
+      return;
+    }
+
+    const msg = parsed.message || {};
+    const from = parsed.from || msg.from || msg.sender_chat || null;
+    
+    if (!from || !from.id) {
+      log('无法获取用户信息，跳过记录');
+      return;
+    }
+
+    const userId = from.id;
+    const username = from.username || undefined;
+    const firstName = from.first_name || from.title || from.name || undefined;
+    const lastName = from.last_name || undefined;
+    const chatId = parsed.chatId;
+
+    // 使用 UPSERT 更新或插入记录
+    const now = new Date().toISOString();
+    
+    const result = await env.DB.prepare(`
+      INSERT INTO user_last_active (user_id, username, first_name, last_name, chat_id, last_active_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET
+        username = excluded.username,
+        first_name = excluded.first_name,
+        last_name = excluded.last_name,
+        chat_id = excluded.chat_id,
+        last_active_at = excluded.last_active_at
+    `)
+    .bind(
+      userId,
+      username || null,
+      firstName || null,
+      lastName || null,
+      chatId,
+      now,
+      now
+    )
+    .run();
+
+    log('用户活跃时间记录成功', { 
+      userId, 
+      username, 
+      firstName,
+      chatId,
+      rowsAffected: result.meta.changes 
+    });
+
+  } catch (error) {
+    log('记录用户活跃时间失败', error);
+  }
+} 
+
 
 // 统一日志
 function log(prefix: string, ...args: any[]) {
@@ -148,7 +221,7 @@ async function deleteOriginalMessageIfNeeded(parsed: ParsedUpdate, env: EnvLike)
  * - 如果需要删除，则不进行备份
  * - 否则继续原有的备份逻辑
  */
-export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
+export async function handleBackup(parsed: ParsedUpdate, env: EnvLike & { DB: D1Database }) {
   try {
     if (!parsed) {
       log('未提供 parsed 参数，跳过备份');
@@ -172,6 +245,9 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike) {
       log('消息已删除或需要删除，跳过备份');
       return null;
     }
+
+    await recordUserLastActive(env, parsed);
+
 
     const srcChatId = parsed.chatId;
     const srcThreadId = parsed.threadId;
