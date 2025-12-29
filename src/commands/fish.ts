@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import {   getBalance as coinGetBalance,   addToTreasury, takeFromTreasury } from "../lib/coinService";
+import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../lib/coinService";
 import { fishList, getCastDesc } from "../lib/liveConfig";
 import { escapeHtml, stripHtml } from "../lib/util";
 
@@ -125,7 +125,7 @@ function showFishingRecord(record: FishingRecord): string {
         rev.forEach((r, idx) => {
             resultText += `<b>第${todayCount - idx}次:</b> 花费 ${r.baitCost}💰, `;
             if (r.hooked) {
-                const cleanFishTest=stripHtml(String(r.fishValue));
+                const cleanFishTest = stripHtml(String(r.fishValue));
                 resultText += `钓到  ${cleanFishTest}`;
             } else {
                 resultText += `未钓到鱼`;
@@ -148,7 +148,7 @@ function showFishingRecord(record: FishingRecord): string {
  */
 export async function handleFishCallback(callbackQuery: any, callbackData: any, env: FishEnv) {
     // 解析 callbackData（可能是字符串）
- 
+
     let dataObj: any = callbackData;
     if (typeof dataObj === "string") {
         try {
@@ -164,7 +164,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     const chatId = callbackQuery.message?.chat?.id;
     const messageId = callbackQuery.message?.message_id;
     const clickerId = callbackQuery.from?.id;
-    const clickerName= (await TgMessage.fetchChatMember(env,chatId,clickerId)).first_name;
+    const clickerName = (await TgMessage.fetchChatMember(env, chatId, clickerId)).first_name;
 
     // 只有发起者本人可以拉杆
     if (clickerId !== ownerId) {
@@ -183,7 +183,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
     // 读取余额与记录
     const ownerIdStr = String(ownerId);
-    const currentBal = await coinGetBalance( env.COIN_DO, ownerIdStr);
+    const currentBal = await coinGetBalance(env.COIN_DO, ownerIdStr);
     const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
 
     const zeroCount = (fishingRecord.results || []).filter(r => r.fishValue === 0).length;
@@ -276,8 +276,8 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
         // 给用户发奖（允许国库赤字）
         const payout = Number(chosen.value) || 0;
         const newOwnerBal = currentBal + payout;
-        await takeFromTreasury(env,  env.COIN_DO, ownerIdStr, payout, "渔获（保底）");
- 
+        await takeFromTreasury(env, env.COIN_DO, ownerIdStr, payout, "渔获（保底）");
+
         // 更新鱼塘当天 payout
         const today = nowDateYMD();
         await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
@@ -385,8 +385,8 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
     if (hooked && chosen) {
         const payout = Number(chosen.value) || 0;
         const newOwnerBal = currentBal + payout;
-        await takeFromTreasury(env,  env.COIN_DO, ownerIdStr, payout, "渔获");
- 
+        await takeFromTreasury(env, env.COIN_DO, ownerIdStr, payout, "渔获");
+
         // 更新鱼塘当日 payout
         const today = nowDateYMD();
         await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
@@ -426,7 +426,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
  * parsedMessage: ParsedUpdate（由 TgMessage.parseUpdate 返回）
  */
 export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
-    const kvBackend =  env.COIN_DO
+    const kvBackend = env.COIN_DO
     // 如果是 callback_query，转给 callback handler
     if (parsedMessage.type === "callback_query" && parsedMessage.callbackQuery) {
         // parsedMessage.callbackData 可能已被 parseCallbackData 转成 object；也可能是字符串
@@ -490,6 +490,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     // 检查是否在允许钓鱼的房间（使用你原来的 allowed 规则）
     const allowed =
         (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
+        (chatId === -1002970430696 && [89].includes(threadId ?? 0)) ||
         (chatId === -1002742074355 && [454656].includes(threadId ?? 0));
     if (!allowed) {
         await TgMessage.sendText(env, {
@@ -526,9 +527,9 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     }
 
     // 扣除用户余额（直接用 coinSetBalance）
- 
+
     // 把鱼饵费用计入艾丽莎宝库（若要计费可使用 addToTreasury）
-    await addToTreasury(env, env.COIN_DO,ownerIdStr, baitCost, "鱼饵");
+    await addToTreasury(env, env.COIN_DO, ownerIdStr, baitCost, "鱼饵");
 
     // 同时把鱼饵消耗计入鱼塘当天汇总
     const today = nowDateYMD();
