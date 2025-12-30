@@ -23,7 +23,7 @@ const reply_delete = {
 
 // 决斗氛围图片 ID
                        
-const DUEL_IMAGE_ID = "AgACAgUAAyEGAASpyGJZAAKPGWkf2s8ys6vx0T_eRWdMBuUqIsMjAAKiDWsb7gzwV0KqjLuqU6CnAQADAgADeAADNgQ";
+const DUEL_IMAGE_PATH = "https://luyiqi-lili.github.io/pic/sticker.jpg";
 
 /**
  * 处理 /duel 发起（通过回复消息确认决斗对象）
@@ -137,7 +137,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     // 使用 sendPhoto 发送包含图片、文本和按钮的单条消息
     await TgMessage.sendPhoto(env, {
       chat_id,
-      photo: DUEL_IMAGE_ID,
+      photo: DUEL_IMAGE_PATH,
       caption: captionText,
       parse_mode: "HTML",
       reply_markup: {
