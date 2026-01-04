@@ -9,9 +9,9 @@ export const ALLOWED_CHAT_IDS = new Set([
 ]);
 
 export const deleteUids: number[] = [
-//  8080375150, // 需要删除消息的用户 ID 1
-//  6839700093, 小皮
-//  987654321, // 需要删除消息的用户 ID 2
+  //  8080375150, // 需要删除消息的用户 ID 1
+  //  6839700093, 小皮
+  //  987654321, // 需要删除消息的用户 ID 2
   // 添加更多 UID
 ];
 
@@ -103,7 +103,7 @@ export const fishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >💵两Coin</a>", hookRate: 0.40, value: 1 },
   { name: "<a href=\"tg://user?id=8445100282\" >😋杂鱼</a>", hookRate: 0.40, value: 1 },
 
-  
+
   { name: "<a href=\"tg://user?id=8445100282\" >🐭鼠鼠</a>", hookRate: 0.40, value: 1 },
   { name: "<a href=\"tg://user?id=8445100282\" >🐒海猴</a>", hookRate: 0.40, value: 1 },
   { name: "<a href=\"tg://user?id=8445100282\" >🕸钓鱼佬绝不空军</a>", hookRate: 0.40, value: 1 },
@@ -947,5 +947,213 @@ export const backupConfig: BackupMapping[] = [
       { chat_id: -1003066803437, threadId: 2027 }
     ]
   },
+
+  
+
+  //匹配区
+  {
+    from: { chat_id: -1002970430696, threadId: 302677 },
+    to: [
+      { chat_id: -1003066803437, threadId: 4 }
+    ]
+  },
+  //紫罗兰之花
+  {
+    from: { chat_id: -1002970430696, threadId: 184 },
+    to: [
+      { chat_id: -1003066803437, threadId: 6 }
+    ]
+  },
+  //酒馆
+  {
+    from: { chat_id: -1002970430696, threadId: 210 },
+    to: [
+      { chat_id: -1003066803437, threadId: 8 }
+    ]
+  }, 
+  //艺术馆
+  {
+    from: { chat_id: -1002970430696, threadId: 158 },
+    to: [
+      { chat_id: -1003066803437, threadId: 12 }
+    ]
+  }, 
+  //摄影棚 
+  {
+    from: { chat_id: -1002970430696, threadId: 168 },
+    to: [
+      { chat_id: -1003066803437, threadId: 91 }
+    ]
+  },    
+  //审判庭
+  {
+    from: { chat_id: -1002970430696, threadId: 314 },
+    to: [
+      { chat_id: -1003066803437, threadId: 75 }
+    ]
+  },   
+  //闪闪
+  {
+    from: { chat_id: -1002970430696, threadId: 180 },
+    to: [
+      { chat_id: -1003066803437, threadId: 67 }
+    ]
+  },
+  //广场 
+  {
+    from: { chat_id: -1002970430696, threadId: 178 },
+    to: [
+      { chat_id: -1003066803437, threadId: 65 }
+    ]
+  }, 
+  //大会堂 
+  {
+    from: { chat_id: -1002970430696, threadId: 67 },
+    to: [
+      { chat_id: -1003066803437, threadId: 63 }
+    ]
+  },
+  //大会堂 
+  {
+    from: { chat_id: -1002970430696, threadId: 1 },
+    to: [
+      { chat_id: -1003066803437, threadId: 63 }
+    ]
+  },
+  //爬塔
+  {
+    from: { chat_id: -1002970430696, threadId: 182 },
+    to: [
+      { chat_id: -1003066803437, threadId: 61 }
+    ]
+  },
+  //耀阳
+  {
+    from: { chat_id: -1002970430696, threadId: 162 },
+    to: [
+      { chat_id: -1003066803437, threadId: 59 }
+    ]
+  }, 
+  //酥酥
+  {
+    from: { chat_id: -1002970430696, threadId: 172 },
+    to: [
+      { chat_id: -1003066803437, threadId: 55 }
+    ]
+  },
+  //人设
+  {
+    from: { chat_id: -1002970430696, threadId: 155 },
+    to: [
+      { chat_id: -1003066803437, threadId: 53 }
+    ]
+  },
+  //软软
+  {
+    from: { chat_id: -1002970430696, threadId: 177 },
+    to: [
+      { chat_id: -1003066803437, threadId: 51 }
+    ]
+  },
+  //琉璃
+  {
+    from: { chat_id: -1002970430696, threadId: 176 },
+    to: [
+      { chat_id: -1003066803437, threadId: 49 }
+    ]
+  },  
+  //万事屋
+  {
+    from: { chat_id: -1002970430696, threadId: 170 },
+    to: [
+      { chat_id: -1003066803437, threadId: 43 }
+    ]
+  },
+
+  //牡丹群岛
+  {
+    from: { chat_id: -1002970430696, threadId: 166 },
+    to: [
+      { chat_id: -1003066803437, threadId: 41 }
+    ]
+  },
+ 
+
+  //缘宝
+  {
+    from: { chat_id: -1002970430696, threadId: 175 },
+    to: [
+      { chat_id: -1003066803437, threadId: 37 }
+    ]
+  }, 
+
+  //桌游
+  {
+    from: { chat_id: -1002970430696, threadId: 160 },
+    to: [
+      { chat_id: -1003066803437, threadId: 31 }
+    ]
+  },   
+  //电竞
+  {
+    from: { chat_id: -1002970430696, threadId: 161 },
+    to: [
+      { chat_id: -1003066803437, threadId: 22 }
+    ]
+  },
+  //魔法少女
+  {
+    from: { chat_id: -1002970430696, threadId: 159 },
+    to: [
+      { chat_id: -1003066803437, threadId: 20 }
+    ]
+  },
+  //兰兰
+  {
+    from: { chat_id: -1002970430696, threadId: 171 },
+    to: [
+      { chat_id: -1003066803437, threadId: 18 }
+    ]
+  },
+  //小母龙
+  {
+    from: { chat_id: -1002970430696, threadId: 174 },
+    to: [
+      { chat_id: -1003066803437, threadId: 16 }
+    ]
+  },
+  //音
+  {
+    from: { chat_id: -1002970430696, threadId: 173 },
+    to: [
+      { chat_id: -1003066803437, threadId: 14 }
+    ]
+  }, 
+  
+  //魔枢
+
+  {
+    from: { chat_id: -1002970430696, threadId: 89 },
+    to: [
+      { chat_id: -1003066803437, threadId: 63 }
+    ]
+  },
+  //神殿
+
+  {
+    from: { chat_id: -1002970430696, threadId: 157 },
+    to: [
+      { chat_id: -1003066803437, threadId: 63 }
+    ]
+  },
+  //农场https://t.me/c/3066803437/572947/572948
+  {
+    from: { chat_id: -1002970430696, threadId: 179 },
+    to: [
+      { chat_id: -1003066803437, threadId: 572947 }
+    ]
+  },
+
+
 
 ];
