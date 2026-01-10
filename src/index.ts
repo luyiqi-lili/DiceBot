@@ -68,7 +68,7 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 // CoinDO API 处理
 async function handleCoinAPI(request: Request, env: Env, path: string): Promise<Response> {
   // 获取 CoinDO 的 stub（单例模式）
-  const id = env.COIN_DO.idFromName("singleton");
+  const id = env.COIN_DO.idFromName("coins");
   const stub = env.COIN_DO.get(id);
 
   // 构造转发到 Durable Object 的请求
