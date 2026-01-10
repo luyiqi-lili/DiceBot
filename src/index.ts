@@ -25,11 +25,66 @@ export type Env = {
   COIN_KV: KVNamespace
   LOTTERY_DO: DurableObjectNamespace  // 新增
   DB: D1Database;  // 添加 D1 数据库
+  EXTERNAL_API_KEY?: string;  // 添加外部 API 密钥
 
 
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
+
+// 外部 API 处理函数
+async function handleExternalAPI(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  // 1. 验证 API 密钥
+  const apiKey = request.headers.get('X-API-Key') || url.searchParams.get('api_key');
+  if (env.EXTERNAL_API_KEY && apiKey !== env.EXTERNAL_API_KEY) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // 2. 处理 CoinDO 相关接口
+  if (path.startsWith('/api/coin')) {
+    return handleCoinAPI(request, env, path);
+  }
+
+  // 3. 处理其他 API 端点
+  if (path === '/api/health') {
+    return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  // 4. 返回 404
+  return new Response(JSON.stringify({ error: 'Not Found' }), {
+    status: 404,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+// CoinDO API 处理
+async function handleCoinAPI(request: Request, env: Env, path: string): Promise<Response> {
+  // 获取 CoinDO 的 stub（单例模式）
+  const id = env.COIN_DO.idFromName("singleton");
+  const stub = env.COIN_DO.get(id);
+
+  // 构造转发到 Durable Object 的请求
+  const doPath = path.replace('/api/coin', '');
+  const doUrl = new URL(request.url);
+  doUrl.pathname = doPath;
+  
+  const doRequest = new Request(doUrl, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+  });
+
+  return await stub.fetch(doRequest);
+}
+
 
 export default {
 
@@ -38,6 +93,13 @@ export default {
   },
 
   async fetch(request, env) {
+    const url = new URL(request.url);
+
+    // 1. 处理外部 API 请求（路径以 /api/ 开头）
+    if (url.pathname.startsWith('/api/')) {
+      return handleExternalAPI(request, env);
+    }
+    
 
     //1. 日记记录原始请求
     console.log("index: 收到请求", {
