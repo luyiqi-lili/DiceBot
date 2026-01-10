@@ -491,6 +491,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
     const allowed =
         (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
         (chatId === -1002970430696 && [89].includes(threadId ?? 0)) ||
+        (chatId === -1002970430696 && [166].includes(threadId ?? 0)) ||
         (chatId === -1002742074355 && [454656].includes(threadId ?? 0));
     if (!allowed) {
         await TgMessage.sendText(env, {
