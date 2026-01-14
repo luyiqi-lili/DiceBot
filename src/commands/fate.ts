@@ -48,6 +48,8 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
         // 权限/线程判断（保留你原有的限制）
         const allowed =
             (chatId === -1002848481881 && [66].includes(threadId as number)) ||
+            (chatId === -1002970430696 && [89].includes(threadId as number)) ||
+            (chatId === -1002970430696 && [160].includes(threadId as number)) ||
             (chatId === -1002742074355 && [345].includes(threadId as number));
         if (!allowed) {
             await TgMessage.sendText(env, {
