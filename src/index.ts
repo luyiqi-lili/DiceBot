@@ -261,6 +261,14 @@ export default {
               console.log(`index: /lottery 处理完成`);
               return new Response("OK", { status: 200 });
             }
+            case "report": {
+              console.log("index: 检测到 /report 命令，进入 report 逻辑");
+              const { handleReport } = await import("./commands/report");
+              await handleReport(parsedMessage, env);
+              await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+              console.log(`index: /report 处理完成`);
+              return new Response("OK", { status: 200 });
+            }
             case "book": {
               console.log("index: 检测到 /book 命令，进入 book逻辑");
               const { handleBook } = await import("./commands/book");
