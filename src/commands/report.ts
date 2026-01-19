@@ -46,7 +46,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
   try {
     // 从 D1 查询 message_history
     // 只取必要字段并按时间升序排列，限制条数以防过大
-    const limit = 500;
+    const limit = 2000;
     let sql = `
       SELECT user_id, username, first_name, last_name, topic_name, message_id, text_content, created_at
       FROM message_history
@@ -127,7 +127,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
         parts: [
           {
             text:
-              `你是一个专业的群聊报告生成器。只输出汇报内容，不要多余的前言或结尾。尽量简洁，分点列出,包含主要用户之间的互动内容。`
+              `你是一个专业的群聊报告生成器。只输出汇报内容，不要多余的前言或结尾。分点列出,包含主要用户之间的互动内容。`
           }
         ]
       },
