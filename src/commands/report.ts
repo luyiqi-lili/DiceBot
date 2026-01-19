@@ -127,7 +127,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
         parts: [
           {
             text:
-              `你是一个专业的会议/群聊报告生成器。只输出汇报内容，不要多余的前言或结尾。尽量简洁，分点列出。`
+              `你是一个专业的群聊报告生成器。只输出汇报内容，不要多余的前言或结尾。尽量简洁，分点列出,包含主要用户之间的互动内容。`
           }
         ]
       },
