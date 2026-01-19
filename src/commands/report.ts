@@ -134,7 +134,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
       },
       generationConfig: {
         thinkingConfig: { thinkingBudget: -1 },
-        maxOutputTokens: 800
+        //maxOutputTokens: 800
       }
     };
 
