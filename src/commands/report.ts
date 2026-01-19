@@ -129,7 +129,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
         parts: [
           {
             text:
-              `你是一个专业的群聊报告生成器。只输出汇报内容，不要多余的前言或结尾。分点列出,包含主要用户之间的互动内容。`
+              `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感色情内容`
           }
         ]
       },
