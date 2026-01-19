@@ -167,6 +167,73 @@ async function sendSenderLabel(env: EnvLike, dest: BackupTarget, senderLabel: st
 }
 
 /**
+ * 记录每条消息的文本内容、时间、房间(topic)等到 message_history 表
+ */
+async function recordMessageContent(
+  env: EnvLike & { DB: D1Database },
+  parsed: ParsedUpdate
+): Promise<void> {
+  try {
+    if (!env.DB) {
+      log('未配置 D1 数据库，跳过记录消息内容');
+      return;
+    }
+
+    const msg = parsed.message || {};
+    const from = parsed.from || msg.from || msg.sender_chat || null;
+    if (!from) {
+      log('无法获取发送者信息，跳过记录消息内容');
+      return;
+    }
+
+    const userId = from.id || from.user_id || null;
+    const username = from.username || null;
+    const firstName = from.first_name || from.title || from.name || null;
+    const lastName = from.last_name || null;
+    const chatId = parsed.chatId || null;
+    // threadId / topic：尽可能从不同位置提取（依据你的 parsed 结构）
+    const threadId = parsed.threadId ?? msg.message_thread_id ?? null;
+    // topic 名称可能不总是在 parsed 中；尝试常见字段名，最后回退为 null
+    const topicName =
+      (parsed as any).topicName ??
+      (msg as any).topic_name ??
+      (msg as any).forum_topic ??
+      (msg as any).forum_topic_name ??
+      null;
+
+    // 文本优先：parsed.text -> caption -> textPreview -> null
+    const textContent = parsed.text ?? msg.caption ?? (parsed as any).textPreview ?? null;
+    const messageId = msg.message_id ?? null;
+    const now = new Date().toISOString();
+
+    await env.DB.prepare(`
+      INSERT INTO message_history
+        (user_id, username, first_name, last_name, chat_id, thread_id, topic_name, message_id, text_content, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    .bind(
+      userId,
+      username || null,
+      firstName || null,
+      lastName || null,
+      chatId,
+      threadId,
+      topicName || null,
+      messageId,
+      textContent || null,
+      now
+    )
+    .run();
+
+    log('记录 message_history 成功', { userId, chatId, threadId, messageId });
+
+  } catch (error) {
+    log('记录消息内容失败', error);
+  }
+}
+
+
+/**
  * 删除原始群组中的消息
  * @returns 是否成功删除
  */
@@ -247,6 +314,12 @@ export async function handleBackup(parsed: ParsedUpdate, env: EnvLike & { DB: D1
     }
 
     await recordUserLastActive(env, parsed);
+
+     try {
+      await recordMessageContent(env, parsed);
+    } catch (e) {
+      log('记录消息内容时发生异常（但不阻止备份）', e);
+    }
 
 
     const srcChatId = parsed.chatId;
