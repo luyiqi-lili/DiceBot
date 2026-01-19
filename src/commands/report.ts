@@ -31,6 +31,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
     console.error("[Report] ⛔️ 无 chatId，无法发送回复");
     return;
   }
+ 
 
   // 检查 API keys
   const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
@@ -89,7 +90,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 
     let messagesText = formatted.join("\n");
     // 限制整段长度，超出则截断
-    const maxTotalChars = 16000; // 约束整体 prompt 大小（根据需要调整）
+    const maxTotalChars = 64000; // 约束整体 prompt 大小（根据需要调整）
     if (messagesText.length > maxTotalChars) {
       messagesText = messagesText.slice(0, maxTotalChars) + "\n...[additional messages truncated]";
     }
@@ -98,7 +99,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
     const chatLabel = `chat_id=${chatId}${threadId ? `, thread_id=${threadId}` : ""}${rows[0]?.topic_name ? `, topic=${rows[0].topic_name}` : ""}`;
     const promptHeader = `你是一个助理，请基于下面的聊天记录生成一个**简短的24小时内汇报**（面向群管理者），要求：\n` +
       `1) 用中文输出（简洁）\n` +
-      `2) 包含「主要事件/话题要点」、「可能需要注意的问题或争议」、「建议的下一步行动（最多3条）」\n` +
+      `2) 包含「主要事件/话题要点/参与用户」、「可能需要注意的问题或争议」、「建议的下一步行动（最多3条）」\n` +
       `3) 使用要点/短句（不超过 200 字）并在末尾列出 3 条关键消息摘录（每条不超过一行）\n` +
       `4) 不需要引入额外信息或主观价值判断，直接给出事实要点与建议。\n\n` +
       `上下文：(${chatLabel})\n\n` +
