@@ -107,7 +107,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 
     const finalPromptContent = `${promptHeader}${messagesText}`;
 
-    console.log("[Report] 📤 发送给 Gemini 的 prompt 预览:", finalPromptContent.slice(0, 1000));
+    console.log("[Report] 📤 发送给 Gemini 的 prompt 预览:", finalPromptContent);
 
     // 调用 Gemini
     const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
