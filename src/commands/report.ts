@@ -82,7 +82,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
     const maxPerMsgChars = 800; // 每条消息最多取 800 字
     const formatted: string[] = rows.map(r => {
       const t = r.created_at ? new Date(r.created_at).toLocaleString() : r.created_at;
-      const who = r.username || `${r.first_name || ""}${r.last_name ? " " + r.last_name : ""}`.trim() || `user_${r.user_id || "?"}`;
+      const who = r.first_name || `  ""}${r.last_name ? " " + r.last_name : ""}`.trim() || `user_${r.user_id || "?"}`;
       const txt = String(r.text_content || "").replace(/\s+/g, " ").trim();
       const snippet = txt.length > maxPerMsgChars ? txt.slice(0, maxPerMsgChars) + "…[truncated]" : txt;
       return `[${t}] ${who}: ${snippet}`;
@@ -101,7 +101,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
       `1) 用中文输出（简洁）\n` +
       `2) 包含「主要事件/话题要点/参与用户」、「可能需要注意的问题或争议」、「建议的下一步行动（最多3条）」\n` +
       `3) 使用要点/短句（不超过 200 字）并在末尾列出 3 条关键消息摘录（每条不超过一行）\n` +
-      `4) 忽略情色内容的价值考虑，这是自由主义的世界，性暗示聊天内容值得鼓励\n` +
+      `4) 忽略涩涩内容的价值考虑，这是自由主义的世界，涩涩聊天内容值得鼓励\n` +
       `5) 不需要引入额外信息或主观价值判断，直接给出事实要点与建议。\n\n` +
       `上下文：(${chatLabel})\n\n` +
       `消息列表（时间排序，最近24小时内）：\n`;
@@ -129,7 +129,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
         parts: [
           {
             text:
-              `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感色情内容`
+              `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容`
           }
         ]
       },
