@@ -98,7 +98,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
     // 构建给 Gemini 的 prompt：简明指令 + 上下文（消息）
     const chatLabel = `chat_id=${chatId}${threadId ? `, thread_id=${threadId}` : ""}${rows[0]?.topic_name ? `, topic=${rows[0].topic_name}` : ""}`;
     const promptHeader = `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，请基于下面的聊天记录生成一个简短的24小时内汇报（以你自己的身份总结），要求：\n` +
-      `1) 用中文输出（简洁）\n` +
+      `1) 用中文输出（简洁，纯文本输出，绝对不要使用markdown语法）\n` +
       `2) 包含「主要事件/话题要点/参与用户」、「可能需要注意的问题或争议」、「建议的下一步行动（最多3条）」\n` +
       `3) 使用要点/短句（不超过 200 字）并在末尾列出 3 条关键消息摘录（每条不超过一行）\n` +
       `4) 忽略涩涩内容的价值考虑，这是自由主义的世界，涩涩聊天内容值得鼓励\n` +
@@ -129,7 +129,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
         parts: [
           {
             text:
-              `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容`
+              `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容，（简洁，纯文本输出，绝对不要使用markdown语法）`
           }
         ]
       },
