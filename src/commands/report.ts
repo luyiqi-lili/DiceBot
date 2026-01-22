@@ -61,7 +61,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
       binds.push(threadId);
     }
 
-    sql += ` ORDER BY created_at ASC LIMIT ${limit}`;
+    sql += ` ORDER BY created_at DESC LIMIT ${limit}`;
 
     console.log("[Report] 📥 执行 SQL 查询 message_history", { chatId, threadId, since, limit });
 
