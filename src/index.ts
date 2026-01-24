@@ -7,6 +7,7 @@ import { incrementUsageCount } from "./commands/like";
 import { runCoinCheck } from "./cron/cron";
 import { handleBackup } from './lib/backup';
 
+import { handleWebRequest } from './web/router';
 
 
 
@@ -95,6 +96,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+      // 🌐 0. Web 页面处理（放最前）
+  if (url.pathname.startsWith('/web/')) {
+    const webResp = await handleWebRequest(request, env);
+    if (webResp) return webResp;
+  }
+  
     // 1. 处理外部 API 请求（路径以 /api/ 开头）
     if (url.pathname.startsWith('/api/')) {
       return handleExternalAPI(request, env);
