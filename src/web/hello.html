@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hello Web</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+      padding: 24px;
+    }
+    button {
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 12px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello World 👋</h1>
+  <p>这是 Cloudflare Worker Web Hello</p>
+
+  <button id="btn">点我请求后端</button>
+  <pre id="out"></pre>
+
+  <script>
+    const btn = document.getElementById('btn');
+    const out = document.getElementById('out');
+
+    btn.onclick = async () => {
+      out.textContent = '请求中...';
+      const res = await fetch('/web/hello', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msg: 'hello from browser' })
+      });
+      out.textContent = JSON.stringify(await res.json(), null, 2);
+    };
+  </script>
+</body>
+</html>
