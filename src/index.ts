@@ -162,9 +162,16 @@ export default {
 							// 获取用户信息
 							const userId = callbackQuery.from.id;
 							const userName = callbackQuery.from.first_name || 'User';
+							const userLastName = callbackQuery.from.last_name || '';
+							const userUsername = callbackQuery.from.username || '';
 
 							// 构建游戏 URL，传递用户信息
-							const gameUrl = `https://telegram-bot.luyiqi-lili.workers.dev/web/hello?user_id=${userId}&username=${encodeURIComponent(userName)}`;
+							const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/hello');
+							gameUrl.searchParams.set('user_id', userId.toString());
+							gameUrl.searchParams.set('username', encodeURIComponent(userName));
+							gameUrl.searchParams.set('user_last_name', encodeURIComponent(userLastName));
+							gameUrl.searchParams.set('user_username', userUsername);
+							gameUrl.searchParams.set('start_param', 'hello_game');
 
 							// 必须 answerCallbackQuery
 							await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
@@ -172,7 +179,7 @@ export default {
 								headers: { 'Content-Type': 'application/json' },
 								body: JSON.stringify({
 									callback_query_id: callbackQuery.id,
-									url: gameUrl,
+									url: gameUrl.toString(),
 								}),
 							});
 							return new Response('ok');

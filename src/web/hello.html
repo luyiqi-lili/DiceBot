@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Hello Telegram Game</title>
+  
+  <!-- 添加 Telegram 游戏 SDK -->
+  <script src="https://telegram.org/js/games.js"></script>
 
   <style>
     body {
@@ -58,6 +61,7 @@
   <div class="card">
     <h3>游戏得分提交测试</h3>
     <button id="submit-score">提交得分 (100分)</button>
+    <button id="submit-higher-score">提交更高分 (500分)</button>
     <div id="score-result"></div>
   </div>
 
@@ -69,30 +73,58 @@
 
   <!-- 获取用户信息 -->
   <div class="card">
-    <h3>用户信息（通过 Bot API 获取）</h3>
-    <button id="get-user-info">获取用户信息</button>
+    <h3>用户信息</h3>
     <pre id="user-info"></pre>
+    <button id="share-game">分享游戏</button>
+  </div>
+
+  <!-- 调试信息 -->
+  <div class="card">
+    <h3>调试信息</h3>
+    <button id="check-sdk">检查 SDK</button>
+    <pre id="debug-info"></pre>
   </div>
 
   <script>
     const statusEl = document.getElementById('tg-status');
     const urlParamsEl = document.getElementById('url-params');
     const submitScoreBtn = document.getElementById('submit-score');
+    const submitHigherScoreBtn = document.getElementById('submit-higher-score');
     const scoreResultEl = document.getElementById('score-result');
-    const getUserInfoBtn = document.getElementById('get-user-info');
     const userInfoEl = document.getElementById('user-info');
+    const shareGameBtn = document.getElementById('share-game');
+    const checkSdkBtn = document.getElementById('check-sdk');
+    const debugInfoEl = document.getElementById('debug-info');
 
-    // 检查 TelegramGame 环境
-    if (!window.TelegramGame) {
-      statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境</span>';
-      statusEl.innerHTML += '<p>可能的原因：</p><ul>';
-      statusEl.innerHTML += '<li>没有通过 game 链接打开</li>';
-      statusEl.innerHTML += '<li>Telegram 游戏 SDK 加载失败</li>';
-      statusEl.innerHTML += '</ul>';
-    } else {
-      statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram Game 中打开</span>';
+    // 立即检查 TelegramGame
+    console.log('window.TelegramGame:', window.TelegramGame);
+    console.log('window.Telegram:', window.Telegram);
+    console.log('window.location.search:', window.location.search);
+
+    // 检查环境
+    function checkEnvironment() {
+      let envInfo = '';
       
-      // 显示 URL 参数
+      // 检查 TelegramGame
+      if (window.TelegramGame) {
+        statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram Game 环境中</span>';
+        envInfo += '✅ TelegramGame: 存在\n';
+        
+        // 显示可用的方法
+        envInfo += '可用的方法: ' + Object.keys(window.TelegramGame).join(', ') + '\n';
+      } else {
+        statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境</span>';
+        envInfo += '❌ TelegramGame: 不存在\n';
+      }
+      
+      // 检查 Telegram.WebApp (不同系统的 API)
+      if (window.Telegram && window.Telegram.WebApp) {
+        envInfo += '✅ Telegram.WebApp: 存在\n';
+      } else {
+        envInfo += '❌ Telegram.WebApp: 不存在\n';
+      }
+      
+      // 检查 URL 参数
       const urlParams = new URLSearchParams(window.location.search);
       const paramsObj = {};
       urlParams.forEach((value, key) => {
@@ -100,61 +132,82 @@
       });
       urlParamsEl.textContent = JSON.stringify(paramsObj, null, 2);
       
-      // 检查是否有必要的参数
-      if (!urlParams.has('user_id') && !urlParams.has('start_param')) {
-        statusEl.innerHTML += '<p class="bad">⚠️ 缺少 user_id 或 start_param，无法直接获取用户信息</p>';
+      // 显示用户信息（从 URL 参数获取）
+      const userId = urlParams.get('user_id');
+      const userName = urlParams.get('username');
+      if (userId) {
+        userInfoEl.textContent = JSON.stringify({
+          id: userId,
+          name: userName || '未知',
+          platform: 'Telegram Game'
+        }, null, 2);
       }
+      
+      debugInfoEl.textContent = envInfo;
     }
+
+    // 页面加载后检查
+    setTimeout(checkEnvironment, 100);
 
     // 提交得分测试
     submitScoreBtn.onclick = () => {
       if (window.TelegramGame) {
-        // 提交得分到 Telegram
-        TelegramGame.setScore(100, (success) => {
-          if (success) {
-            scoreResultEl.innerHTML = '<span class="ok">✅ 得分提交成功！</span>';
-            scoreResultEl.innerHTML += '<p>用户现在可以在 @gamebot 中看到他们的最高分</p>';
-          } else {
-            scoreResultEl.innerHTML = '<span class="bad">❌ 得分提交失败</span>';
-          }
-        });
+        scoreResultEl.innerHTML = '提交中...';
+        try {
+          // 提交得分到 Telegram
+          TelegramGame.setScore(100, (success) => {
+            if (success) {
+              scoreResultEl.innerHTML = '<span class="ok">✅ 得分提交成功！</span>';
+              scoreResultEl.innerHTML += '<p>用户现在可以在 @gamebot 中看到他们的最高分</p>';
+            } else {
+              scoreResultEl.innerHTML = '<span class="bad">❌ 得分提交失败</span>';
+            }
+          });
+        } catch (e) {
+          scoreResultEl.innerHTML = '<span class="bad">❌ 提交出错: ' + e.toString() + '</span>';
+        }
       } else {
         scoreResultEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境中</span>';
       }
     };
 
-    // 获取用户信息
-    getUserInfoBtn.onclick = async () => {
-      userInfoEl.textContent = '正在获取用户信息...';
-      
-      try {
-        // 方法1: 通过 start_param 获取用户信息
-        // 在 index.ts 中，当处理 callback_query 时，可以通过 callbackQuery.from 获取用户信息
-        // 并传递给游戏页面
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const startParam = urlParams.get('start_param') || urlParams.get('startparam');
-        
-        if (startParam) {
-          // 假设 start_param 是经过编码的用户信息或用户ID
-          userInfoEl.textContent = `start_param: ${startParam}\n\n`;
-          userInfoEl.textContent += '注意: 在游戏中，您需要将用户信息通过 start_param 传递。\n';
-          userInfoEl.textContent += '在 index.ts 中，处理 callback_query 时，可以这样设置：\n';
-          userInfoEl.textContent += `\`url: 'https://your-domain.com/web/hello?user_id=' + callbackQuery.from.id\``;
-        } else {
-          // 尝试从 URL 中提取用户 ID
-          const userId = urlParams.get('user_id');
-          if (userId) {
-            userInfoEl.textContent = `用户 ID: ${userId}\n\n`;
-            userInfoEl.textContent += '您可以通过这个 ID 在服务器端查询用户信息。';
-          } else {
-            userInfoEl.textContent = '无法获取用户信息：缺少 user_id 或 start_param 参数。\n\n';
-            userInfoEl.textContent += '在 Telegram 游戏中，通常需要通过 start_param 传递用户信息。';
-          }
+    // 提交更高分
+    submitHigherScoreBtn.onclick = () => {
+      if (window.TelegramGame) {
+        scoreResultEl.innerHTML = '提交中...';
+        try {
+          TelegramGame.setScore(500, true, (success) => {
+            if (success) {
+              scoreResultEl.innerHTML = '<span class="ok">✅ 更高分提交成功！</span>';
+              scoreResultEl.innerHTML += '<p>已更新最高分到 500</p>';
+            } else {
+              scoreResultEl.innerHTML = '<span class="bad">❌ 更高分提交失败</span>';
+            }
+          });
+        } catch (e) {
+          scoreResultEl.innerHTML = '<span class="bad">❌ 提交出错: ' + e.toString() + '</span>';
         }
-      } catch (e) {
-        userInfoEl.textContent = '获取用户信息失败: ' + e.toString();
+      } else {
+        scoreResultEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境中</span>';
       }
+    };
+
+    // 分享游戏
+    shareGameBtn.onclick = () => {
+      if (window.TelegramGame) {
+        try {
+          TelegramGame.shareScore();
+        } catch (e) {
+          alert('分享失败: ' + e.toString());
+        }
+      } else {
+        alert('不在 Telegram Game 环境中');
+      }
+    };
+
+    // 检查 SDK
+    checkSdkBtn.onclick = () => {
+      checkEnvironment();
     };
   </script>
 </body>
