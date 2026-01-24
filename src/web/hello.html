@@ -4,42 +4,136 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Hello Web</title>
+
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont;
-      padding: 24px;
+      padding: 16px;
+      line-height: 1.4;
+    }
+    h1 {
+      margin-top: 0;
     }
     button {
       padding: 8px 14px;
       border-radius: 6px;
       cursor: pointer;
+      margin-top: 12px;
     }
     pre {
       background: #f5f5f5;
       padding: 12px;
       border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+    }
+    .ok {
+      color: green;
+      font-weight: 600;
+    }
+    .bad {
+      color: red;
+      font-weight: 600;
     }
   </style>
 </head>
+
 <body>
   <h1>Hello World 👋</h1>
-  <p>这是 Cloudflare Worker Web Hello</p>
+  <p>Cloudflare Worker + Telegram Game WebApp</p>
 
-  <button id="btn">点我请求后端</button>
-  <pre id="out"></pre>
+  <!-- WebApp 状态 -->
+  <div class="card">
+    <h3>Telegram WebApp 状态</h3>
+    <div id="tg-status">检测中...</div>
+  </div>
+
+  <!-- 用户信息 -->
+  <div class="card">
+    <h3>用户信息（initDataUnsafe.user）</h3>
+    <pre id="user"></pre>
+  </div>
+
+  <!-- initData -->
+  <div class="card">
+    <h3>initData（原始字符串）</h3>
+    <pre id="initData"></pre>
+  </div>
+
+  <!-- initDataUnsafe -->
+  <div class="card">
+    <h3>initDataUnsafe（完整对象）</h3>
+    <pre id="initDataUnsafe"></pre>
+  </div>
+
+  <!-- 请求后端 -->
+  <div class="card">
+    <h3>请求 Worker 后端</h3>
+    <button id="btn">点我请求后端</button>
+    <pre id="out"></pre>
+  </div>
 
   <script>
+    const statusEl = document.getElementById('tg-status');
+    const userEl = document.getElementById('user');
+    const initDataEl = document.getElementById('initData');
+    const unsafeEl = document.getElementById('initDataUnsafe');
+    const outEl = document.getElementById('out');
     const btn = document.getElementById('btn');
-    const out = document.getElementById('out');
 
+    const tg = window.Telegram && window.Telegram.WebApp;
+
+    if (!tg) {
+      statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram WebApp 环境</span>';
+    } else {
+      statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram WebApp 中打开</span>';
+
+      // 建议调用一次
+      tg.ready();
+
+      // 用户信息
+      userEl.textContent = JSON.stringify(
+        tg.initDataUnsafe?.user ?? null,
+        null,
+        2
+      );
+
+      // 原始 initData（用于后端验签）
+      initDataEl.textContent = tg.initData || '';
+
+      // 完整 unsafe 对象（调试用）
+      unsafeEl.textContent = JSON.stringify(
+        tg.initDataUnsafe ?? {},
+        null,
+        2
+      );
+    }
+
+    // 请求 Worker 后端（示例）
     btn.onclick = async () => {
-      out.textContent = '请求中...';
-      const res = await fetch('/web/hello', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msg: 'hello from browser' })
-      });
-      out.textContent = JSON.stringify(await res.json(), null, 2);
+      outEl.textContent = '请求中...';
+
+      try {
+        const res = await fetch('/web/hello', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'webapp',
+            initData: tg?.initData || null,
+            user: tg?.initDataUnsafe?.user || null
+          })
+        });
+
+        outEl.textContent = JSON.stringify(await res.json(), null, 2);
+      } catch (e) {
+        outEl.textContent = String(e);
+      }
     };
   </script>
 </body>
