@@ -158,20 +158,25 @@ export default {
 				if (callbackQuery.game_short_name) {
 					console.log('index:parsedMessage.callbackQuery.game_short_name', callbackQuery.game_short_name);
 					switch (callbackQuery.game_short_name) {
-						case 'hello':
-							{
-								// 必须 answerCallbackQuery
-								await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
-									method: 'POST',
-									headers: { 'Content-Type': 'application/json' },
-									body: JSON.stringify({
-										callback_query_id: callbackQuery.id,
-										url: 'https://telegram-bot.luyiqi-lili.workers.dev/web/hello',
-									}),
-								});
-							}
+						case 'hello': {
+							// 获取用户信息
+							const userId = callbackQuery.from.id;
+							const userName = callbackQuery.from.first_name || 'User';
 
+							// 构建游戏 URL，传递用户信息
+							const gameUrl = `https://telegram-bot.luyiqi-lili.workers.dev/web/hello?user_id=${userId}&username=${encodeURIComponent(userName)}`;
+
+							// 必须 answerCallbackQuery
+							await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({
+									callback_query_id: callbackQuery.id,
+									url: gameUrl,
+								}),
+							});
 							return new Response('ok');
+						}
 					}
 				}
 				// 处理回调命令

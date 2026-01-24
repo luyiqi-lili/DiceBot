@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hello Web</title>
+  <title>Hello Telegram Game</title>
 
   <style>
     body {
@@ -45,94 +45,115 @@
 </head>
 
 <body>
-  <h1>Hello World 👋</h1>
-  <p>Cloudflare Worker + Telegram Game WebApp</p>
+  <h1>Hello Telegram Game 👋</h1>
+  <p>Telegram Game 环境测试</p>
 
-  <!-- WebApp 状态 -->
+  <!-- Telegram Game 状态 -->
   <div class="card">
-    <h3>Telegram WebApp 状态</h3>
+    <h3>Telegram Game 状态</h3>
     <div id="tg-status">检测中...</div>
   </div>
 
-  <!-- 用户信息 -->
+  <!-- 游戏得分提交测试 -->
   <div class="card">
-    <h3>用户信息（initDataUnsafe.user）</h3>
-    <pre id="user"></pre>
+    <h3>游戏得分提交测试</h3>
+    <button id="submit-score">提交得分 (100分)</button>
+    <div id="score-result"></div>
   </div>
 
-  <!-- initData -->
+  <!-- URL 参数 -->
   <div class="card">
-    <h3>initData（原始字符串）</h3>
-    <pre id="initData"></pre>
+    <h3>URL 参数</h3>
+    <pre id="url-params"></pre>
   </div>
 
-  <!-- initDataUnsafe -->
+  <!-- 获取用户信息 -->
   <div class="card">
-    <h3>initDataUnsafe（完整对象）</h3>
-    <pre id="initDataUnsafe"></pre>
-  </div>
-
-  <!-- 请求后端 -->
-  <div class="card">
-    <h3>请求 Worker 后端</h3>
-    <button id="btn">点我请求后端</button>
-    <pre id="out"></pre>
+    <h3>用户信息（通过 Bot API 获取）</h3>
+    <button id="get-user-info">获取用户信息</button>
+    <pre id="user-info"></pre>
   </div>
 
   <script>
     const statusEl = document.getElementById('tg-status');
-    const userEl = document.getElementById('user');
-    const initDataEl = document.getElementById('initData');
-    const unsafeEl = document.getElementById('initDataUnsafe');
-    const outEl = document.getElementById('out');
-    const btn = document.getElementById('btn');
+    const urlParamsEl = document.getElementById('url-params');
+    const submitScoreBtn = document.getElementById('submit-score');
+    const scoreResultEl = document.getElementById('score-result');
+    const getUserInfoBtn = document.getElementById('get-user-info');
+    const userInfoEl = document.getElementById('user-info');
 
-    const tg = window.Telegram && window.Telegram.WebApp;
-
-    if (!tg) {
-      statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram WebApp 环境</span>';
+    // 检查 TelegramGame 环境
+    if (!window.TelegramGame) {
+      statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境</span>';
+      statusEl.innerHTML += '<p>可能的原因：</p><ul>';
+      statusEl.innerHTML += '<li>没有通过 game 链接打开</li>';
+      statusEl.innerHTML += '<li>Telegram 游戏 SDK 加载失败</li>';
+      statusEl.innerHTML += '</ul>';
     } else {
-      statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram WebApp 中打开</span>';
-
-      // 建议调用一次
-      tg.ready();
-
-      // 用户信息
-      userEl.textContent = JSON.stringify(
-        tg.initDataUnsafe?.user ?? null,
-        null,
-        2
-      );
-
-      // 原始 initData（用于后端验签）
-      initDataEl.textContent = tg.initData || '';
-
-      // 完整 unsafe 对象（调试用）
-      unsafeEl.textContent = JSON.stringify(
-        tg.initDataUnsafe ?? {},
-        null,
-        2
-      );
+      statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram Game 中打开</span>';
+      
+      // 显示 URL 参数
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramsObj = {};
+      urlParams.forEach((value, key) => {
+        paramsObj[key] = value;
+      });
+      urlParamsEl.textContent = JSON.stringify(paramsObj, null, 2);
+      
+      // 检查是否有必要的参数
+      if (!urlParams.has('user_id') && !urlParams.has('start_param')) {
+        statusEl.innerHTML += '<p class="bad">⚠️ 缺少 user_id 或 start_param，无法直接获取用户信息</p>';
+      }
     }
 
-    // 请求 Worker 后端（示例）
-    btn.onclick = async () => {
-      outEl.textContent = '请求中...';
-
-      try {
-        const res = await fetch('/web/hello', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: 'webapp',
-            initData: tg?.initData || null,
-            user: tg?.initDataUnsafe?.user || null
-          })
+    // 提交得分测试
+    submitScoreBtn.onclick = () => {
+      if (window.TelegramGame) {
+        // 提交得分到 Telegram
+        TelegramGame.setScore(100, (success) => {
+          if (success) {
+            scoreResultEl.innerHTML = '<span class="ok">✅ 得分提交成功！</span>';
+            scoreResultEl.innerHTML += '<p>用户现在可以在 @gamebot 中看到他们的最高分</p>';
+          } else {
+            scoreResultEl.innerHTML = '<span class="bad">❌ 得分提交失败</span>';
+          }
         });
+      } else {
+        scoreResultEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境中</span>';
+      }
+    };
 
-        outEl.textContent = JSON.stringify(await res.json(), null, 2);
+    // 获取用户信息
+    getUserInfoBtn.onclick = async () => {
+      userInfoEl.textContent = '正在获取用户信息...';
+      
+      try {
+        // 方法1: 通过 start_param 获取用户信息
+        // 在 index.ts 中，当处理 callback_query 时，可以通过 callbackQuery.from 获取用户信息
+        // 并传递给游戏页面
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const startParam = urlParams.get('start_param') || urlParams.get('startparam');
+        
+        if (startParam) {
+          // 假设 start_param 是经过编码的用户信息或用户ID
+          userInfoEl.textContent = `start_param: ${startParam}\n\n`;
+          userInfoEl.textContent += '注意: 在游戏中，您需要将用户信息通过 start_param 传递。\n';
+          userInfoEl.textContent += '在 index.ts 中，处理 callback_query 时，可以这样设置：\n';
+          userInfoEl.textContent += `\`url: 'https://your-domain.com/web/hello?user_id=' + callbackQuery.from.id\``;
+        } else {
+          // 尝试从 URL 中提取用户 ID
+          const userId = urlParams.get('user_id');
+          if (userId) {
+            userInfoEl.textContent = `用户 ID: ${userId}\n\n`;
+            userInfoEl.textContent += '您可以通过这个 ID 在服务器端查询用户信息。';
+          } else {
+            userInfoEl.textContent = '无法获取用户信息：缺少 user_id 或 start_param 参数。\n\n';
+            userInfoEl.textContent += '在 Telegram 游戏中，通常需要通过 start_param 传递用户信息。';
+          }
+        }
       } catch (e) {
-        outEl.textContent = String(e);
+        userInfoEl.textContent = '获取用户信息失败: ' + e.toString();
       }
     };
   </script>
