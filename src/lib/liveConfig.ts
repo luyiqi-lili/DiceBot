@@ -6,7 +6,8 @@ export const ALLOWED_CHAT_IDS = new Set([
   -1002848481881,
   -1002661676227,
   -1002796780505,
-  -1002970430696
+  -1002970430696,
+  0
 ]);
 
 export const deleteUids: number[] = [
