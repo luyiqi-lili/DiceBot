@@ -83,7 +83,7 @@ function log(prefix: string, ...args: any[]) {
 }
 
 // 将 fetch 请求封装为一个函数，便于复用并输出详细日志
-async function callTelegramApi(env: EnvLike, method: string, body: any) {
+export async function callTelegramApi(env: EnvLike, method: string, body: any) {
   const url = `https://api.telegram.org/bot${env.TOKEN}/${method}`;
   log(`调用 Telegram API -> ${method}`, body);
   try {
