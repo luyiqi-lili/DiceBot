@@ -182,6 +182,17 @@ export default {
 									url: gameUrl.toString(),
 								}),
 							});
+
+							// 可选：设置最高分
+							await fetch(`https://api.telegram.org/bot${env.TOKEN}/setGameScore`, {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({
+									user_id: callbackQuery.from.id,
+									score: callbackQuery.score,
+									force: true, // 即使不是最高分也更新
+								}),
+							});
 							return new Response('ok');
 						}
 					}
