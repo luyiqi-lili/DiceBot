@@ -158,7 +158,7 @@ export default {
 				if (callbackQuery.game_short_name) {
 					console.log('index:parsedMessage.callbackQuery.game_short_name', callbackQuery.game_short_name);
 					switch (callbackQuery.game_short_name) {
-						case 'fish': {
+						case 'hello': {
 							// 获取用户信息
 							const userId = callbackQuery.from.id;
 							const userName = callbackQuery.from.first_name || 'User';
