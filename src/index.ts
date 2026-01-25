@@ -158,7 +158,7 @@ export default {
 				if (callbackQuery.game_short_name) {
 					console.log('index:parsedMessage.callbackQuery.game_short_name', callbackQuery.game_short_name);
 					switch (callbackQuery.game_short_name) {
-						case 'hello': {
+						case 'fish': {
 							// 获取用户信息
 							const userId = callbackQuery.from.id;
 							const userName = callbackQuery.from.first_name || 'User';
@@ -171,8 +171,7 @@ export default {
 							gameUrl.searchParams.set('username', encodeURIComponent(userName));
 							gameUrl.searchParams.set('user_last_name', encodeURIComponent(userLastName));
 							gameUrl.searchParams.set('user_username', userUsername);
-							gameUrl.searchParams.set('start_param', 'hello_game');
-
+							gameUrl.searchParams.set('start_param', callbackQuery.start_param);  
 							// 必须 answerCallbackQuery
 							await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
 								method: 'POST',
@@ -182,17 +181,7 @@ export default {
 									url: gameUrl.toString(),
 								}),
 							});
-
-							// 可选：设置最高分
-							await fetch(`https://api.telegram.org/bot${env.TOKEN}/setGameScore`, {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({
-									user_id: callbackQuery.from.id,
-									score: callbackQuery.score,
-									force: true, // 即使不是最高分也更新
-								}),
-							});
+ 
 							return new Response('ok');
 						}
 					}
