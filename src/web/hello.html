@@ -1,214 +1,145 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Hello Telegram Game</title>
-  
-  <!-- 添加 Telegram 游戏 SDK -->
-  <script src="https://telegram.org/js/games.js"></script>
-
-  <style>
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont;
-      padding: 16px;
-      line-height: 1.4;
-    }
-    h1 {
-      margin-top: 0;
-    }
-    button {
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      margin-top: 12px;
-    }
-    pre {
-      background: #f5f5f5;
-      padding: 12px;
-      border-radius: 6px;
-      overflow-x: auto;
-      font-size: 13px;
-    }
-    .card {
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-    }
-    .ok {
-      color: green;
-      font-weight: 600;
-    }
-    .bad {
-      color: red;
-      font-weight: 600;
-    }
-  </style>
-</head>
-
-<body>
-  <h1>Hello Telegram Game 👋</h1>
-  <p>Telegram Game 环境测试</p>
-
-  <!-- Telegram Game 状态 -->
-  <div class="card">
-    <h3>Telegram Game 状态</h3>
-    <div id="tg-status">检测中...</div>
-  </div>
-
-  <!-- 游戏得分提交测试 -->
-  <div class="card">
-    <h3>游戏得分提交测试</h3>
-    <button id="submit-score">提交得分 (100分)</button>
-    <button id="submit-higher-score">提交更高分 (500分)</button>
-    <div id="score-result"></div>
-  </div>
-
-  <!-- URL 参数 -->
-  <div class="card">
-    <h3>URL 参数</h3>
-    <pre id="url-params"></pre>
-  </div>
-
-  <!-- 获取用户信息 -->
-  <div class="card">
-    <h3>用户信息</h3>
-    <pre id="user-info"></pre>
-    <button id="share-game">分享游戏</button>
-  </div>
-
-  <!-- 调试信息 -->
-  <div class="card">
-    <h3>调试信息</h3>
-    <button id="check-sdk">检查 SDK</button>
-    <pre id="debug-info"></pre>
-  </div>
-
-  <script>
-    const statusEl = document.getElementById('tg-status');
-    const urlParamsEl = document.getElementById('url-params');
-    const submitScoreBtn = document.getElementById('submit-score');
-    const submitHigherScoreBtn = document.getElementById('submit-higher-score');
-    const scoreResultEl = document.getElementById('score-result');
-    const userInfoEl = document.getElementById('user-info');
-    const shareGameBtn = document.getElementById('share-game');
-    const checkSdkBtn = document.getElementById('check-sdk');
-    const debugInfoEl = document.getElementById('debug-info');
-
-    // 立即检查 TelegramGame
-    console.log('window.TelegramGame:', window.TelegramGame);
-    console.log('window.Telegram:', window.Telegram);
-    console.log('window.location.search:', window.location.search);
-
-    // 检查环境
-    function checkEnvironment() {
-      let envInfo = '';
-      
-      // 检查 TelegramGame
-      if (window.TelegramGame) {
-        statusEl.innerHTML = '<span class="ok">✅ 已在 Telegram Game 环境中</span>';
-        envInfo += '✅ TelegramGame: 存在\n';
+    <title>Hello Game</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/games.js"></script>
+    <script>
+        // Telegram Web App 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 检查是否在 Telegram 环境中
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                // 初始化
+                Telegram.WebApp.ready();
+                
+                // 获取 URL 参数中的用户信息
+                const urlParams = new URLSearchParams(window.location.search);
+                const userId = urlParams.get('user_id');
+                
+                console.log('Telegram WebApp 初始化完成，用户ID:', userId);
+            }
+        });
         
-        // 显示可用的方法
-        envInfo += '可用的方法: ' + Object.keys(window.TelegramGame).join(', ') + '\n';
-      } else {
-        statusEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境</span>';
-        envInfo += '❌ TelegramGame: 不存在\n';
-      }
-      
-      // 检查 Telegram.WebApp (不同系统的 API)
-      if (window.Telegram && window.Telegram.WebApp) {
-        envInfo += '✅ Telegram.WebApp: 存在\n';
-      } else {
-        envInfo += '❌ Telegram.WebApp: 不存在\n';
-      }
-      
-      // 检查 URL 参数
-      const urlParams = new URLSearchParams(window.location.search);
-      const paramsObj = {};
-      urlParams.forEach((value, key) => {
-        paramsObj[key] = value;
-      });
-      urlParamsEl.textContent = JSON.stringify(paramsObj, null, 2);
-      
-      // 显示用户信息（从 URL 参数获取）
-      const userId = urlParams.get('user_id');
-      const userName = urlParams.get('username');
-      if (userId) {
-        userInfoEl.textContent = JSON.stringify({
-          id: userId,
-          name: userName || '未知',
-          platform: 'Telegram Game'
-        }, null, 2);
-      }
-      
-      debugInfoEl.textContent = envInfo;
-    }
-
-    // 页面加载后检查
-    setTimeout(checkEnvironment, 100);
-
-    // 提交得分测试
-    submitScoreBtn.onclick = () => {
-      if (window.TelegramGame) {
-        scoreResultEl.innerHTML = '提交中...';
-        try {
-          // 提交得分到 Telegram
-          TelegramGame.setScore(100, (success) => {
-            if (success) {
-              scoreResultEl.innerHTML = '<span class="ok">✅ 得分提交成功！</span>';
-              scoreResultEl.innerHTML += '<p>用户现在可以在 @gamebot 中看到他们的最高分</p>';
-            } else {
-              scoreResultEl.innerHTML = '<span class="bad">❌ 得分提交失败</span>';
+        // 提交分数的函数
+        function submitScore(score) {
+            console.log('尝试提交分数:', score);
+            
+            // 方法1: 使用 TelegramGameProxy（旧版）
+            if (typeof TelegramGameProxy !== 'undefined') {
+                TelegramGameProxy.sendScore(score);
+                console.log('使用 TelegramGameProxy 提交分数');
+                return;
             }
-          });
-        } catch (e) {
-          scoreResultEl.innerHTML = '<span class="bad">❌ 提交出错: ' + e.toString() + '</span>';
-        }
-      } else {
-        scoreResultEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境中</span>';
-      }
-    };
-
-    // 提交更高分
-    submitHigherScoreBtn.onclick = () => {
-      if (window.TelegramGame) {
-        scoreResultEl.innerHTML = '提交中...';
-        try {
-          TelegramGame.setScore(500, true, (success) => {
-            if (success) {
-              scoreResultEl.innerHTML = '<span class="ok">✅ 更高分提交成功！</span>';
-              scoreResultEl.innerHTML += '<p>已更新最高分到 500</p>';
-            } else {
-              scoreResultEl.innerHTML = '<span class="bad">❌ 更高分提交失败</span>';
+            
+            // 方法2: 使用 Telegram WebApp（新版）
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                Telegram.WebApp.sendData(JSON.stringify({
+                    action: 'submit_score',
+                    score: score
+                }));
+                console.log('使用 Telegram.WebApp 提交分数');
+                return;
             }
-          });
-        } catch (e) {
-          scoreResultEl.innerHTML = '<span class="bad">❌ 提交出错: ' + e.toString() + '</span>';
+            
+            // 方法3: 直接调用 Bot API（作为后备）
+            console.log('非Telegram环境，无法提交分数');
+            alert(`你的分数是: ${score}\n（在Telegram中打开以提交分数）`);
         }
-      } else {
-        scoreResultEl.innerHTML = '<span class="bad">❌ 不在 Telegram Game 环境中</span>';
-      }
-    };
-
-    // 分享游戏
-    shareGameBtn.onclick = () => {
-      if (window.TelegramGame) {
-        try {
-          TelegramGame.shareScore();
-        } catch (e) {
-          alert('分享失败: ' + e.toString());
+        
+        // 示例：游戏结束时的处理
+        function gameOver() {
+            // 假设游戏得分为 100
+            const score = 100;
+            
+            // 提交分数
+            submitScore(score);
+            
+            // 显示结果
+            document.getElementById('result').innerHTML = `
+                <h3>游戏结束！</h3>
+                <p>你的分数: ${score}</p>
+                <p>分数已提交到排行榜</p>
+            `;
         }
-      } else {
-        alert('不在 Telegram Game 环境中');
-      }
-    };
-
-    // 检查 SDK
-    checkSdkBtn.onclick = () => {
-      checkEnvironment();
-    };
-  </script>
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+            width: 90%;
+        }
+        button {
+            background: #fff;
+            color: #764ba2;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            font-weight: bold;
+            transition: transform 0.3s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        #result {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎮 Hello Game</h1>
+        <p>这是一个简单的Telegram游戏示例</p>
+        
+        <div style="margin: 30px 0;">
+            <h3>模拟游戏过程：</h3>
+            <p>点击下面的按钮模拟游戏完成</p>
+            <button onclick="gameOver()">🎯 完成游戏并提交分数</button>
+        </div>
+        
+        <div id="result">
+            <p>游戏结果将显示在这里</p>
+        </div>
+        
+        <div style="margin-top: 30px; font-size: 14px; opacity: 0.8;">
+            <p>在 Telegram 中打开此页面以获得完整功能</p>
+        </div>
+    </div>
+    
+    <script>
+        // 获取并显示URL参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('user_id');
+        const username = urlParams.get('username');
+        
+        if (userId) {
+            document.getElementById('result').innerHTML = `
+                <p>👤 玩家: ${decodeURIComponent(username || '匿名')}</p>
+                <p>🆔 ID: ${userId}</p>
+            `;
+        }
+    </script>
 </body>
 </html>
