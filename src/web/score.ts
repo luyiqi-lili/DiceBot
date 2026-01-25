@@ -60,7 +60,7 @@ export async function handleScoreSubmit(request: Request, env: Env): Promise<Res
 			console.log('使用 inline 模式提交分数，消息ID:', inline_message_id);
 			console.log('使用 inline 模式提交分数，token:', env.TOKEN);
 
-			telegramResponse = await callTelegramApi(env, 'setInlineGameScore', {
+			telegramResponse = await callTelegramApi(env, 'setGameScore', {
 				user_id: numericUserId,
 				score: numericScore,
 				inline_message_id: inline_message_id,
