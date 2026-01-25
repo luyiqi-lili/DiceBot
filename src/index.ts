@@ -171,7 +171,11 @@ export default {
 							gameUrl.searchParams.set('username', encodeURIComponent(userName));
 							gameUrl.searchParams.set('user_last_name', encodeURIComponent(userLastName));
 							gameUrl.searchParams.set('user_username', userUsername);
-							gameUrl.searchParams.set('start_param', callbackQuery.start_param);  
+							gameUrl.searchParams.set('start_param', callbackQuery.start_param);
+							gameUrl.searchParams.set('chat_id', parsedMessage.chatId?.toString() || '');
+							gameUrl.searchParams.set('message_id', callbackQuery.message?.message_id?.toString() || '');
+              gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id || '');
+
 							// 必须 answerCallbackQuery
 							await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
 								method: 'POST',
@@ -181,7 +185,7 @@ export default {
 									url: gameUrl.toString(),
 								}),
 							});
- 
+
 							return new Response('ok');
 						}
 					}
