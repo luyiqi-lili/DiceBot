@@ -493,7 +493,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
         (chatId === -1002970430696 && [89].includes(threadId ?? 0)) ||
         (chatId === -1002970430696 && [166].includes(threadId ?? 0)) ||
         (chatId === -1002742074355 && [454656].includes(threadId ?? 0));
-    if (!allowed && chatId=== -1002970430696 ) {
+    if (!allowed  ) {
         await TgMessage.sendText(env, {
             chat_id: chatId,
             text: `🎣 这里不适合钓鱼。或许前往群岛，才能收获渔获……`,
