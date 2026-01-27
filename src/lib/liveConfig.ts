@@ -413,8 +413,8 @@ export interface PayConfig {
 
 export const payConfigs: PayConfig[] = [
   {
-    chatId: -1002742074355,
-    threadIds: [182],
+    chatId: -1002970430696,
+    threadIds: [177],
     placeName: "天狐宫的祈愿箱",
     enabled: true,
     successMessage:
@@ -425,8 +425,8 @@ export const payConfigs: PayConfig[] = [
       + "${place}现已累积 ${total} 💰。"
   },
   {
-    chatId: -1002742074355,
-    threadIds: [62],
+    chatId: -1002970430696,
+    threadIds: [178],
     placeName: "紫罗兰教堂的募捐箱",
     enabled: true,
     successMessage:
