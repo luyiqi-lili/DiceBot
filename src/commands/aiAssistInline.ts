@@ -176,7 +176,7 @@ function buildAIPrompt(
     return `[${time}] ${name}: ${content}`;
   }).join('\n');
   
-  const prompt = `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，正在参与话题「${topicName}」的聊天。
+  const prompt = `
 
 以下是最近的聊天记录（按时间顺序）：
 ${historyText}
