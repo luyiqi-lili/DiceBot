@@ -133,6 +133,19 @@ export default {
 
 		switch (parsedMessage.type) {
 			//5.1 处理房间修改
+
+			// 5.1.5 处理 inline_query（AI 辅助聊天）
+			case 'inline_query': {
+				console.log('index: 检测到 inline_query，进入 AI 辅助逻辑');
+				try {
+					const { handleInlineAI } = await import('./commands/aiAssistInline');
+					await handleInlineAI(parsedMessage, env);
+				} catch (e) {
+					console.error('❌ handleInlineAI 失败', e);
+				}
+				return new Response('OK', { status: 200 });
+			}
+
 			case 'topic_edited': {
 				console.log('index: 检测到 topic_edited，尝试处理话题标题编辑');
 				try {
