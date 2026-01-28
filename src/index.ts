@@ -174,7 +174,7 @@ export default {
 							gameUrl.searchParams.set('start_param', callbackQuery.start_param);
 							gameUrl.searchParams.set('chat_id', parsedMessage.chatId?.toString() || '');
 							gameUrl.searchParams.set('message_id', callbackQuery.message?.message_id?.toString() || '');
-              gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id || '');
+							gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id || '');
 
 							// 必须 answerCallbackQuery
 							await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
@@ -184,6 +184,29 @@ export default {
 									callback_query_id: callbackQuery.id,
 									url: gameUrl.toString(),
 								}),
+							});
+
+							return new Response('ok');
+						}
+
+						case 'fish': {
+							// 钓鱼游戏启动
+							const userId = callbackQuery.from.id;
+							const userName = callbackQuery.from.first_name || 'User';
+
+							// 构建游戏URL
+							const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/fish');
+							gameUrl.searchParams.set('user_id', userId.toString());
+							gameUrl.searchParams.set('username', encodeURIComponent(userName));
+
+							// 如果是inline游戏，传递 inline_message_id
+							if (callbackQuery.inline_message_id) {
+								gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id);
+							}
+
+							// 必须 answerCallbackQuery
+							await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+								url: gameUrl.toString(),
 							});
 
 							return new Response('ok');
