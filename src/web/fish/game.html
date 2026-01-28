@@ -226,37 +226,6 @@
             font-weight: 500;
         }
         
-        .fish-list {
-            margin-top: 30px;
-        }
-        
-        .fish-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .fish-card {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border: 2px solid #26d0ce;
-        }
-        
-        .fish-name {
-            font-weight: bold;
-            color: #1a2980;
-            margin-bottom: 5px;
-        }
-        
-        .fish-value {
-            color: #4CAF50;
-            font-weight: bold;
-        }
-        
         .status-message {
             text-align: center;
             padding: 15px;
@@ -294,10 +263,6 @@
         @media (max-width: 600px) {
             .stats-grid {
                 grid-template-columns: 1fr;
-            }
-            
-            .fish-grid {
-                grid-template-columns: repeat(2, 1fr);
             }
         }
     </style>
@@ -370,12 +335,7 @@
             </div>
         </div>
         
-        <div class="fish-list">
-            <h3>🐟 可钓鱼类</h3>
-            <div class="fish-grid" id="fishGrid">
-                <!-- 鱼类列表会动态加载 -->
-            </div>
-        </div>
+        <!-- 已移除可钓鱼类显示部分 -->
         
         <div class="debug-info" id="debugInfo" style="display: none;">
             <h4>调试信息</h4>
@@ -393,8 +353,7 @@
             maxAttempts: 20,
             castData: null,
             startTime: null,
-            timerInterval: null,
-            fishList: []
+            timerInterval: null
         };
         
         // DOM 元素
@@ -413,7 +372,6 @@
             resultPanel: document.getElementById('resultPanel'),
             resultContent: document.getElementById('resultContent'),
             recordsList: document.getElementById('recordsList'),
-            fishGrid: document.getElementById('fishGrid'),
             statusMessage: document.getElementById('statusMessage'),
             debugInfo: document.getElementById('debugInfo'),
             debugContent: document.getElementById('debugContent')
@@ -430,9 +388,6 @@
             
             // 加载用户数据
             await loadUserData();
-            
-            // 加载鱼类列表
-            await loadFishList();
             
             // 设置鱼饵滑块事件
             elements.baitSlider.addEventListener('input', updateBaitCost);
@@ -464,7 +419,6 @@
                     gameData.todayCount = data.todayCount || 0;
                     gameData.remainingAttempts = data.remainingAttempts || 0;
                     gameData.maxAttempts = data.maxAttempts || 20;
-                    gameData.fishList = data.fishList || [];
                     
                     // 计算最佳渔获
                     if (data.records && data.records.length > 0) {
@@ -487,30 +441,6 @@
             } catch (error) {
                 console.error('加载用户数据失败:', error);
                 updateStatus(`加载失败: ${error.message}`, 'error');
-            }
-        }
-        
-        // 加载鱼类列表
-        async function loadFishList() {
-            try {
-                updateStatus('加载鱼类列表...');
-                
-                elements.fishGrid.innerHTML = '';
-                
-                gameData.fishList.forEach(fish => {
-                    const fishCard = document.createElement('div');
-                    fishCard.className = 'fish-card';
-                    fishCard.innerHTML = `
-                        <div class="fish-name">${escapeHtml(fish.name)}</div>
-                        <div class="fish-value">${fish.value} 💰</div>
-                        ${fish.description ? `<div style="font-size: 0.8em; color: #666; margin-top: 5px;">${escapeHtml(fish.description)}</div>` : ''}
-                    `;
-                    elements.fishGrid.appendChild(fishCard);
-                });
-                
-                updateStatus('鱼类列表加载完成');
-            } catch (error) {
-                console.error('加载鱼类列表失败:', error);
             }
         }
         
@@ -688,7 +618,7 @@
             
             if (result.hooked && result.fishName) {
                 resultHTML += `
-                    <p><strong>渔获:</strong> ${result.fishName}</p>
+                    <p><strong>渔获:</strong> ${escapeHtml(result.fishName)}</p>
                     <p><strong>价值:</strong> ${result.fishValue} 💰</p>
                     <p><strong>恭喜！</strong> 🎉</p>
                 `;
@@ -731,7 +661,7 @@
                 
                 let desc = '';
                 if (record.hooked && record.fishName) {
-                    desc = `🎣 钓到 ${record.fishName} (${record.fishValue}💰)`;
+                    desc = `🎣 钓到 ${escapeHtml(record.fishName)} (${record.fishValue}💰)`;
                 } else if (record.score < 100) {
                     desc = '🎣 没有鱼咬钩';
                 } else {
