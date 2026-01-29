@@ -23,6 +23,7 @@ export type Env = {
 	LOTTERY_DO: DurableObjectNamespace; // 新增
 	DB: D1Database; // 添加 D1 数据库
 	EXTERNAL_API_KEY?: string; // 添加外部 API 密钥
+	AI: any;
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
