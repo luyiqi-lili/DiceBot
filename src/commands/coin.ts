@@ -669,7 +669,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 定义目标群组ID
-    const TARGET_CHAT_ID = -1002742074355;
+    const TARGET_CHAT_ID = -1002970430696;
 
     try {
       const id = doNs.idFromName("coins");
