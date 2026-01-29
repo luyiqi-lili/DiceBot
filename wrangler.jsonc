@@ -93,6 +93,9 @@
 		},
 		"prod": {
 			"$schema": "node_modules/wrangler/config-schema.json",
+			"ai": {
+				"binding": "AI"
+			},
 			"name": "telegram-bot",
 			"main": "src/index.ts",
 			"compatibility_date": "2025-06-28",
