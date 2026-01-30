@@ -207,7 +207,9 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 	}
 
 	// 检查命令参数
-	const commandText = parsedMessage.text?.trim().toLowerCase() || '';
+	const args = parsedMessage.args ?? [];
+
+	const commandText = args[0];
 	console.log('[Report] 📝 命令参数:', commandText);
 
 	// 如果是 /report memo 命令，显示长期记忆
