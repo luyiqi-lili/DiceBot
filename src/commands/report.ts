@@ -25,6 +25,7 @@ interface LongTermMemory {
 	created_at?: string;
 	updated_at?: string;
 }
+
 /**
  * 更新长期记忆
  */
@@ -154,6 +155,40 @@ async function getLongTermMemory(env: Env, chatId: string, threadId: string | nu
 		return '';
 	}
 }
+
+/**
+ * 获取长期记忆的详细信息（包括创建和更新时间）
+ */
+async function getLongTermMemoryWithDetails(
+	env: Env,
+	chatId: string,
+	threadId: string | null,
+): Promise<{
+	memory_text: string;
+	created_at: string;
+	updated_at: string;
+} | null> {
+	try {
+		let sql: string;
+		const binds: any[] = [chatId];
+
+		if (threadId === null || threadId === undefined) {
+			sql = `SELECT memory_text, created_at, updated_at FROM long_term_memory WHERE chat_id = ? AND thread_id IS NULL`;
+		} else {
+			sql = `SELECT memory_text, created_at, updated_at FROM long_term_memory WHERE chat_id = ? AND thread_id = ?`;
+			binds.push(threadId);
+		}
+
+		const result = await env.DB.prepare(sql)
+			.bind(...binds)
+			.first();
+		return result || null;
+	} catch (error) {
+		console.error('[Report] ❌ 查询长期记忆详情失败:', error);
+		return null;
+	}
+}
+
 /**
  * /report 命令处理器
  * - 查询过去 24 小时内的 message_history（按 chat_id，若有 threadId 则再按 thread_id）
@@ -169,6 +204,64 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 	if (!chatId) {
 		console.error('[Report] ⛔️ 无 chatId，无法发送回复');
 		return;
+	}
+
+	// 检查命令参数
+	const commandText = parsedMessage.text?.trim().toLowerCase() || '';
+	console.log('[Report] 📝 命令参数:', commandText);
+
+	// 如果是 /report memo 命令，显示长期记忆
+	if (commandText === 'memo') {
+		console.log('[Report] 📚 显示长期记忆内容');
+
+		try {
+			const memoryDetails = await getLongTermMemoryWithDetails(env, chatId.toString(), threadId?.toString() || null);
+
+			if (!memoryDetails) {
+				await TgMessage.sendText(env, {
+					chat_id: chatId,
+					text: '📭 当前对话还没有建立长期记忆，使用 /report 生成第一次汇报后会自动创建。',
+					parse_mode: 'HTML',
+					message_thread_id: threadId,
+				});
+				return;
+			}
+
+			const { memory_text, created_at, updated_at } = memoryDetails;
+			const createdDate = new Date(created_at).toLocaleString();
+			const updatedDate = new Date(updated_at).toLocaleString();
+
+			// 限制输出长度，防止消息过长
+			const maxLength = 3000;
+			let displayMemory = memory_text;
+			if (displayMemory.length > maxLength) {
+				displayMemory = displayMemory.substring(0, maxLength) + '...\n\n(内容过长，已截断)';
+			}
+
+			const memoryInfo =
+				`💾 <b>长期记忆详情</b>\n\n` +
+				`📅 创建时间：${createdDate}\n` +
+				`🔄 最后更新：${updatedDate}\n\n` +
+				`📝 <b>记忆内容：</b>\n${escapeHtml(displayMemory)}`;
+
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: memoryInfo,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+
+			console.log('[Report] ✅ 长期记忆已显示');
+			return;
+		} catch (error) {
+			console.error('[Report] ❌ 显示长期记忆时发生错误:', error);
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: '⚠️ 获取长期记忆时发生错误，请稍后重试。',
+				message_thread_id: threadId,
+			});
+			return;
+		}
 	}
 
 	// 检查 API keys
