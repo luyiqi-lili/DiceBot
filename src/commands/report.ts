@@ -25,23 +25,124 @@ interface LongTermMemory {
 	created_at?: string;
 	updated_at?: string;
 }
+/**
+ * 更新长期记忆
+ */
+async function updateLongTermMemory(env: Env, chatId: string, threadId: string | null, memoryText: string): Promise<void> {
+	try {
+		// 清理过长的记忆文本
+		const cleanedMemory = memoryText.length > 10000 ? memoryText.substring(0, 10000) + '...[已截断]' : memoryText;
+
+		// 使用简单的 UPSERT，但要注意处理 NULL 的情况
+		// 由于 UNIQUE(chat_id, thread_id) 约束，对于 threadId 为 null 的情况需要特殊处理
+		if (threadId === null || threadId === undefined) {
+			// 对于没有 thread_id 的情况，使用 IS NULL 条件
+			const sql = `
+        INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
+        VALUES (?, NULL, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(chat_id, thread_id) 
+        DO UPDATE SET 
+          memory_text = excluded.memory_text,
+          updated_at = datetime('now')
+      `;
+
+			await env.DB.prepare(sql).bind(chatId, cleanedMemory).run();
+		} else {
+			// 对于有 thread_id 的情况
+			const sql = `
+        INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
+        VALUES (?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(chat_id, thread_id) 
+        DO UPDATE SET 
+          memory_text = excluded.memory_text,
+          updated_at = datetime('now')
+      `;
+
+			await env.DB.prepare(sql).bind(chatId, threadId, cleanedMemory).run();
+		}
+
+		console.log('[Report] ✅ 长期记忆已更新');
+	} catch (error) {
+		console.error('[Report] ❌ 更新长期记忆失败:', error);
+		// 如果 UPSERT 失败，回退到手动更新
+		//await fallbackUpdateLongTermMemory(env, chatId, threadId, cleanedMemory);
+	}
+}
+
+/**
+ * 回退方法：手动更新长期记忆
+ */
+async function fallbackUpdateLongTermMemory(env: Env, chatId: string, threadId: string | null, memoryText: string): Promise<void> {
+	try {
+		// 清理过长的记忆文本
+		const cleanedMemory = memoryText.length > 10000 ? memoryText.substring(0, 10000) + '...[已截断]' : memoryText;
+
+		// 开始事务
+		await env.DB.exec('BEGIN TRANSACTION');
+
+		let updateSql: string;
+		let binds: any[];
+
+		if (threadId === null || threadId === undefined) {
+			// 对于没有 thread_id 的情况
+			updateSql = `
+        UPDATE long_term_memory 
+        SET memory_text = ?, updated_at = datetime('now')
+        WHERE chat_id = ? AND thread_id IS NULL
+      `;
+			binds = [cleanedMemory, chatId];
+		} else {
+			// 对于有 thread_id 的情况
+			updateSql = `
+        UPDATE long_term_memory 
+        SET memory_text = ?, updated_at = datetime('now')
+        WHERE chat_id = ? AND thread_id = ?
+      `;
+			binds = [cleanedMemory, chatId, threadId];
+		}
+
+		const result = await env.DB.prepare(updateSql)
+			.bind(...binds)
+			.run();
+
+		// 如果没有更新到任何行，则插入新记录
+		if (result.changes === 0) {
+			if (threadId === null || threadId === undefined) {
+				const insertSql = `
+          INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
+          VALUES (?, NULL, ?, datetime('now'), datetime('now'))
+        `;
+				await env.DB.prepare(insertSql).bind(chatId, cleanedMemory).run();
+			} else {
+				const insertSql = `
+          INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
+          VALUES (?, ?, ?, datetime('now'), datetime('now'))
+        `;
+				await env.DB.prepare(insertSql).bind(chatId, threadId, cleanedMemory).run();
+			}
+		}
+
+		await env.DB.exec('COMMIT');
+		console.log('[Report] ✅ 长期记忆已通过回退方法更新');
+	} catch (error) {
+		await env.DB.exec('ROLLBACK');
+		console.error('[Report] ❌ 回退方法更新长期记忆失败:', error);
+	}
+}
 
 /**
  * 获取或创建长期记忆
  */
 async function getLongTermMemory(env: Env, chatId: string, threadId: string | null): Promise<string> {
 	try {
-		let sql = `
-      SELECT memory_text FROM long_term_memory 
-      WHERE chat_id = ? 
-    `;
+		let sql: string;
 		const binds: any[] = [chatId];
 
-		if (threadId !== null && threadId !== undefined) {
-			sql += ` AND thread_id = ?`;
-			binds.push(threadId);
+		if (threadId === null || threadId === undefined) {
+			sql = `SELECT memory_text FROM long_term_memory WHERE chat_id = ? AND thread_id IS NULL`;
 		} else {
-			sql += ` AND thread_id IS NULL`;
+			sql = `SELECT memory_text FROM long_term_memory WHERE chat_id = ? AND thread_id = ?`;
+			binds.push(threadId);
 		}
 
 		const result = await env.DB.prepare(sql)
@@ -53,33 +154,6 @@ async function getLongTermMemory(env: Env, chatId: string, threadId: string | nu
 		return '';
 	}
 }
-
-/**
- * 更新长期记忆
- */
-async function updateLongTermMemory(env: Env, chatId: string, threadId: string | null, memoryText: string): Promise<void> {
-	try {
-		// 清理过长的记忆文本
-		const cleanedMemory = memoryText.length > 10000 ? memoryText.substring(0, 10000) + '...[已截断]' : memoryText;
-
-		// 使用 UPSERT 更新或插入
-		const sql = `
-      INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
-      VALUES (?, ?, ?, datetime('now'), datetime('now'))
-      ON CONFLICT(chat_id, COALESCE(thread_id, 'NULL')) 
-      DO UPDATE SET 
-        memory_text = excluded.memory_text,
-        updated_at = datetime('now')
-    `;
-
-		await env.DB.prepare(sql).bind(chatId, threadId, cleanedMemory).run();
-
-		console.log('[Report] ✅ 长期记忆已更新');
-	} catch (error) {
-		console.error('[Report] ❌ 更新长期记忆失败:', error);
-	}
-}
-
 /**
  * /report 命令处理器
  * - 查询过去 24 小时内的 message_history（按 chat_id，若有 threadId 则再按 thread_id）
