@@ -1,6 +1,6 @@
 import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
 import { deleteMarkup } from '../lib/util';
-import { transfer } from '../lib/coinService';
+import { getBalance, transfer } from '../lib/coinService';
 
 interface CongratsCallbackData {
 	type: string;
@@ -137,6 +137,15 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 		return;
 	}
 
+	// 验证金额不能为负数
+	if (data.a <= 0) {
+		await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+			text: '❌ 金额必须为正数',
+			show_alert: true,
+		});
+		return;
+	}
+
 	// 获取 CoinDO 的 namespace
 	const doNs = (env as any).COIN_DO;
 	if (!doNs) {
@@ -148,10 +157,20 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 		return;
 	}
 
-	// 转账逻辑
+	// 先检查余额是否足够
+	const currentBalance = await getBalance(doNs, data.t);
+	if (currentBalance < data.a) {
+		await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+			text: `❌ 余额不足，当前只有 ${currentBalance} 💰`,
+			show_alert: true,
+		});
+		return;
+	}
+
+	// 转账逻辑 - 使用 coinService 的 transfer 函数
 	try {
 		// 使用 transfer 函数进行转账
-		const transferResult = await transfer(env, doNs, data.t, data.r, data.a);
+		const transferResult = await transfer(env, doNs, data.t, data.r, data.a, false, 'coins');
 
 		if (!transferResult.ok) {
 			let errorMsg = '转账失败';
@@ -159,6 +178,8 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 				errorMsg = '余额不足';
 			} else if (transferResult.reason === 'invalid amount') {
 				errorMsg = '金额无效';
+			} else if (transferResult.reason === 'internal_error') {
+				errorMsg = '系统内部错误';
 			}
 
 			await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
