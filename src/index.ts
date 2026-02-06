@@ -234,24 +234,10 @@ export default {
 					console.log('index:parsedMessage.callbackData.type', callbackData.type);
 					switch (callbackData.type) {
 						// 在index.ts的callback_query处理部分添加
-						case 'red_packet': {
-							console.log('➡️ 处理 red_packet 回调', callbackData);
-							const { handleRedPacketCallback } = await import('./commands/redPacket');
-							await handleRedPacketCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-
-						case 'red_packet_amount': {
-							console.log('➡️ 处理 red_packet_amount 回调', callbackData);
-							const { handleRedPacketAmountCallback } = await import('./commands/redPacket');
-							await handleRedPacketAmountCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-
-						case 'red_packet_custom': {
-							console.log('➡️ 处理 red_packet_custom 回调', callbackData);
-							const { handleRedPacketCustomCallback } = await import('./commands/redPacket');
-							await handleRedPacketCustomCallback(parsedMessage.callbackQuery, callbackData, env);
+						case 'congrats': {
+							console.log('➡️ 处理恭喜发财回调', callbackData);
+							const { handleCongratsCallback } = await import('./commands/congrats');
+							await handleCongratsCallback(parsedMessage.callbackQuery, callbackData, env);
 							return new Response('OK', { status: 200 });
 						}
 						case '21': {
@@ -341,10 +327,11 @@ export default {
 						// 在index.ts的message命令处理switch中添加
 						case '恭喜发财，红包拿来':
 						case '妈妈': {
-							console.log('index: 检测到红包命令，进入redPacket逻辑');
-							const { handleRedPacket } = await import('./commands/redPacket');
-							await handleRedPacket(parsedMessage, env);
+							console.log('index: 检测到 /恭喜发财，红包拿来 或 /妈妈 命令');
+							const { handleCongrats } = await import('./commands/congrats');
+							await handleCongrats(parsedMessage, env);
 							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							console.log(`index: /恭喜发财，红包拿来 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
 						case 'lottery': {
