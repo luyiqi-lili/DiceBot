@@ -332,7 +332,7 @@ export default {
 							console.log('index: 检测到 /恭喜发财，红包拿来 或 /妈妈 命令');
 							const { handleCongrats } = await import('./commands/congrats');
 							await handleCongrats(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							//await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
 							console.log(`index: /恭喜发财，红包拿来 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
