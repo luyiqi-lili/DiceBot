@@ -325,7 +325,8 @@ export default {
                 }
                   */
 						// 在index.ts的message命令处理switch中添加
-						case '恭喜发财，红包拿来':
+						case '恭喜发财':
+						case '恭喜發財':
 						case '媽媽':
 						case '妈妈': {
 							console.log('index: 检测到 /恭喜发财，红包拿来 或 /妈妈 命令');
