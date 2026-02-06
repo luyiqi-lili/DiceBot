@@ -75,9 +75,7 @@ export async function handleCongrats(parsedMessage: ParsedUpdate, env: EnvLike):
 					t: String(userB.id),
 					a: 1,
 				} as CongratsCallbackData),
-			},
-		],
-		[
+			}, 
 			{
 				text: '发 5 💰',
 				callback_data: JSON.stringify({
@@ -86,9 +84,7 @@ export async function handleCongrats(parsedMessage: ParsedUpdate, env: EnvLike):
 					t: String(userB.id),
 					a: 5,
 				} as CongratsCallbackData),
-			},
-		],
-		[
+			}, 
 			{
 				text: '发 10 💰',
 				callback_data: JSON.stringify({
@@ -205,7 +201,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 
 		// 成功提示
 		await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-			text: `✅ 成功发送 ${data.a} 💰 给 ${escapeHtml(recipientName)}！`,
+			text: `✅ 成功发送 ${data.a} ！`,
 			show_alert: true,
 		});
 
