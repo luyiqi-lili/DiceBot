@@ -229,9 +229,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 							t: data.t,
 							a: 1,
 						}),
-					},
-				],
-				[
+					}, 
 					{
 						text: '再发 5 💰',
 						callback_data: JSON.stringify({
@@ -240,9 +238,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 							t: data.t,
 							a: 5,
 						}),
-					},
-				],
-				[
+					}, 
 					{
 						text: '再发 10 💰',
 						callback_data: JSON.stringify({
