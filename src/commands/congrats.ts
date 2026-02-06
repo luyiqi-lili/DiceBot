@@ -1,5 +1,5 @@
 import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
-import { deleteMarkup } from '../lib/util';
+import { deleteMarkup, escapeHtml } from '../lib/util';
 import { getBalance, transfer } from '../lib/coinService';
 
 interface CongratsCallbackData {
@@ -108,7 +108,7 @@ export async function handleCongrats(parsedMessage: ParsedUpdate, env: EnvLike):
 		text:
 			`🎉 <b>恭喜发财，红包拿来！</b>\n\n` +
 			`👤 ${userAName} 向 ${userBName} 讨要红包啦！\n` +
-			`💰 点击下方按钮发送金币吧～\n` +
+			`💰 点击下方按钮发送红包吧～\n` +
 			`<i>（只有被回复的人可以点击哦）</i>`,
 		parse_mode: 'HTML',
 		message_thread_id: threadId,
@@ -205,7 +205,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 
 		// 成功提示
 		await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-			text: `✅ 成功发送 ${data.a} 💰 给 ${recipientName}！`,
+			text: `✅ 成功发送 ${data.a} 💰 给 ${escapeHtml(recipientName)}！`,
 			show_alert: true,
 		});
 
