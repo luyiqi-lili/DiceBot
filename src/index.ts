@@ -233,6 +233,27 @@ export default {
 				if (typeof callbackData === 'object' && callbackData.type) {
 					console.log('index:parsedMessage.callbackData.type', callbackData.type);
 					switch (callbackData.type) {
+						// 在index.ts的callback_query处理部分添加
+						case 'red_packet': {
+							console.log('➡️ 处理 red_packet 回调', callbackData);
+							const { handleRedPacketCallback } = await import('./commands/redPacket');
+							await handleRedPacketCallback(parsedMessage.callbackQuery, callbackData, env);
+							return new Response('OK', { status: 200 });
+						}
+
+						case 'red_packet_amount': {
+							console.log('➡️ 处理 red_packet_amount 回调', callbackData);
+							const { handleRedPacketAmountCallback } = await import('./commands/redPacket');
+							await handleRedPacketAmountCallback(parsedMessage.callbackQuery, callbackData, env);
+							return new Response('OK', { status: 200 });
+						}
+
+						case 'red_packet_custom': {
+							console.log('➡️ 处理 red_packet_custom 回调', callbackData);
+							const { handleRedPacketCustomCallback } = await import('./commands/redPacket');
+							await handleRedPacketCustomCallback(parsedMessage.callbackQuery, callbackData, env);
+							return new Response('OK', { status: 200 });
+						}
 						case '21': {
 							// callbackQuery 为 parsedMessage.callbackQuery
 							// callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
@@ -317,7 +338,15 @@ export default {
                   return new Response("OK", { status: 200 });
                 }
                   */
-
+						// 在index.ts的message命令处理switch中添加
+						case '恭喜发财，红包拿来':
+						case '妈妈': {
+							console.log('index: 检测到红包命令，进入redPacket逻辑');
+							const { handleRedPacket } = await import('./commands/redPacket');
+							await handleRedPacket(parsedMessage, env);
+							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							return new Response('OK', { status: 200 });
+						}
 						case 'lottery': {
 							console.log('index: 检测到 /lottery 命令，进入 lottery 逻辑');
 							const { handleLottery } = await import('./commands/lottery');
