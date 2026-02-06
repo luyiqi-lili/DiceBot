@@ -1,6 +1,6 @@
 import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
-import { deleteMarkup, escapeHtml } from '../lib/util';
-import { getBalance, transfer } from '../lib/coinService';
+import { deleteMarkup } from '../lib/util';
+import { transfer } from '../lib/coinService';
 
 interface CongratsCallbackData {
 	type: string;
@@ -107,7 +107,7 @@ export async function handleCongrats(parsedMessage: ParsedUpdate, env: EnvLike):
 		chat_id: chatId,
 		text:
 			`🎉 <b>恭喜发财，红包拿来！</b>\n\n` +
-			`👤 <b>${escapeHtml(userAName)}</b> 向 <b>${escapeHtml(userBName)}</b> 讨要红包啦！\n` +
+			`👤 ${userAName} 向 ${userBName} 讨要红包啦！\n` +
 			`💰 点击下方按钮发送金币吧～\n` +
 			`<i>（只有被回复的人可以点击哦）</i>`,
 		parse_mode: 'HTML',
@@ -188,18 +188,15 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 			show_alert: true,
 		});
 
-		// 更新消息显示
-		const newText =
-			`🎉 <b>恭喜发财，红包拿来！</b>\n\n` +
-			`👤 <b>${escapeHtml(recipientName)}</b> 向 <b>${escapeHtml(targetName)}</b> 讨要红包啦！\n` +
-			`💰 点击下方按钮发送金币吧～\n` +
-			`<i>（只有被回复的人可以点击哦）</i>\n\n` +
-			`✨ <b>${escapeHtml(targetName)}</b> 已经发送了 <b>${data.a} 💰</b>！`;
-
+		// 获取当前消息文本，并追加新的红包记录
+		const currentText = callbackQuery.message.text;
+		const newRecord = `\n✨ ${targetName} 发送了 <b>${data.a} 💰</b> 给 ${recipientName}！`;
+		
+		// 更新消息显示，追加新的红包记录
 		await TgMessage.editMessageText(env, {
 			chat_id: chatId,
 			message_id: messageId,
-			text: newText,
+			text: currentText + newRecord,
 			parse_mode: 'HTML',
 			reply_markup: TgMessage.buildInlineKeyboard([
 				[
