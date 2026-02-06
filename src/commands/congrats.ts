@@ -107,7 +107,7 @@ export async function handleCongrats(parsedMessage: ParsedUpdate, env: EnvLike):
 		chat_id: chatId,
 		text:
 			`🎉 <b>恭喜发财，红包拿来！</b>\n\n` +
-			`👤 ${userAName} 向 ${userBName} 讨要红包啦！\n` +
+			`👤 ${userAName} 向 ${userBName} 拜年啦！\n` +
 			`💰 点击下方按钮发送红包吧～\n` +
 			`<i>（只有被回复的人可以点击哦）</i>`,
 		parse_mode: 'HTML',
