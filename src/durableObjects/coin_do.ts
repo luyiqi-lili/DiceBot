@@ -90,10 +90,10 @@ export class CoinDO {
         `before: ${fromName}=${preFrom}, ${toName}=${preTo}\n` +
         `after:  ${fromName}=${newFrom}, ${toName}=${newTo}`;
       await TgMessage.sendText(this.env as EnvLike, {
-        chat_id: -1002848481881,
+        chat_id: -1002970430696,
         text,
         parse_mode: "HTML",
-        message_thread_id: 12084
+        message_thread_id: 89
       });
     } catch (e) {
       console.warn("[CoinDO] sendTransLogTransfer failed", e);
