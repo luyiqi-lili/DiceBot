@@ -93,7 +93,7 @@ export class CoinDO {
         chat_id: -1002970430696,
         text,
         parse_mode: "HTML",
-        message_thread_id: 89
+        message_thread_id: 413483
       });
     } catch (e) {
       console.warn("[CoinDO] sendTransLogTransfer failed", e);

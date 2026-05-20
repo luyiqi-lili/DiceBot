@@ -21,7 +21,7 @@ type CoinEnv = EnvLike & {
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
 
 // 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885, 6367789964];
+const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885, 6367789964,1039189463];
 const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
 const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
 const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
@@ -100,7 +100,7 @@ async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: stri
   if (senderBal < amount) return { ok: false, reason: "insufficient" };
 
   const targetBal = await getBalance(doNs, toId);
-  const rate = calcTransferFeeRate(targetBal);
+  const rate = calcTransferFeeRate(targetBal+amount);
   const fee = Math.floor(amount * rate);
 
   // if no fee -> single atomic transfer (from -> to amount)
