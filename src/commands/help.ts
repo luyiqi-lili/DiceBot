@@ -14,48 +14,55 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
   const botUsername = (env && (env as any).BOT_USERNAME);
 
   const text = `🤖 <b>可用命令：</b>
-<blockquote expandable> <code>/echo 某个内容 </code> - 让骰娘判断你说的对不对
+<blockquote expandable><b>🎲 掷骰</b>
+ <code>/roll</code> / <code>/r</code> / <code>/rdY</code> — 掷骰，支持 XdY / {选项} / 表达式
+ <code>/rh</code> — 隐藏掷骰，结果私聊发送
+ <code>/groll</code> — 发起群骰，多人加入一起 roll
+ <code>/21</code> — <a href="https://t.me/c/2742074355/345/196400">发起多人 21 点游戏</a>
 
- <code>/roll </code>- 掷一个 1~100 的随机数
- <code>/roll XdY </code>- 掷 X 个 Y 面骰子，例如 /roll 2d6
- <code>/roll {A B C} </code>- 从多个选项中抽取一个，例如 /roll {红 白 绿}
- <code>/roll Nd{A B C} </code>- 从多个选项中抽取 N 次，例如 /roll 3d{红 白 绿}
- <code>/roll 表达式 </code>- 支持加减法，例如 /roll 2d6+1d4+5 
- <code>/r </code>- 简写，等价于 /roll 1d100 
- <code>/rdY </code>- 简写，等价于 /roll 1dY    
- <code>/rXdY </code>- 简写，等价于 /roll XdY  
- <code>/rh </code>- 隐藏掷骰，结果仅发送到私聊  
+<b>💰 货币</b>
+ <code>/coin</code> — 查询余额
+ <code>/coin pray</code> — 今日祈祷领钱
+ <code>/coin send 50</code> — 回复消息转账
+ <code>/coin check</code> — （管理）查询国库
+ <code>/coin take 100</code> — （管理）国库取款
+ <code>/lottery</code> — 彩票系统
+ <code>/lottery buy</code> — 购买彩票
+ <code>/congrats</code> / <code>/恭喜发财</code> — 回复他人发红包
+ <code>/rose</code> — 回复某人查看好感度
+ <code>/rose send</code> — 回复某人送花 🌷
 
- <code>/duel 赌注内容 </code>- 回复某人消息发起一场赌注决斗！
+<b>🎣 娱乐</b>
+ <code>/fish X</code> — 花费 X 鱼饵钓鱼
+ <code>/fish check</code> — 查看今日钓鱼情况
+ <code>/fate</code> — 塔罗占卜（抽3张牌）
+ <code>/em</code> / <code>/me</code> / <code>/emote</code> — 动作指令，如 /em 开心地跳了起来
+ <code>/duel 赌注</code> — 回复某人发起赌注决斗
 
- <code>/groll </code>- 发起一个群骰，支持多人加入 
+<b>📦 物品 & 书签</b>
+ <code>/book</code> — 查看书签列表
+ <code>/book &lt;备注&gt;</code> — 回复消息添加书签
+ <code>/book del #序号</code> — 删除书签
+ <code>/item</code> — 查看物品列表
+ <code>/item create</code> — 回复消息创建物品
 
- <code>/book </code>- 查看自己的书签  
- <code>/book &lt;关键字&gt; </code>- 回复自己消息并带上备注，添加书签到个人列表  
- <code>/book del #序号 </code>- 删除指定序号的书签  
- <code>/book @用户名 </code>- 查看指定用户的书签   
+<b>📰 信息 & 翻译</b>
+ <code>/news</code> — 查看当日小道消息
+ <code>/news YYYYMMDD</code> — 查看指定日期消息
+ <code>/trans 日语</code> — 回复消息翻译（默认简体中文）
+ <code>/echo 内容</code> — 让骰娘评判你的话
+ <code>/like</code> — 查看召唤骰娘次数
+ <code>/like all</code> — 查看使用排行榜
+ <code>/whoami</code> — 查看用户信息（回复查看他人）
+ <code>/act start</code> — 开始记录会话
+ <code>/act end</code> — 结束记录并生成摘要
+ <code>/report</code> — AI 生成昨日群聊汇报
+ <code>/rule</code> — 查看/设置群组规则
 
- <code>/21 </code>- <a href="https://t.me/c/2742074355/345/196400">发起一局多人 21 点游戏 </a> 
-
- <code>/news </code>- 直接使用，查看当日爆料列表 ；回复消息时使用）将该条消息爆料进小道消息系统  
- <code>/news YYYYMMDD </code>- 查看指定日期的爆料  
-
- <code>/trans &lt;语言&gt; </code>- 回复消息并翻译到指定语言（默认中文），例如 /trans 日语 
-
- <code>/rose </code>- 回复某人的消息以查看你对他的好感度   \n
- <code>/rose send </code>- 回复某人的消息向他赠送一朵 🌷（每天首次免费，之后需支付 💰） 
- 
- <code>/fish X </code> - 花费价值X的鱼饵钓鱼 
- <code>/fish check </code> - 查看今日钓鱼整体情况
-  
- <code>/coin</code> 查询余额  
- <code>/coin pray</code> 今日祈祷 
- <code>/coin send 50</code> 回复消息给某人转账 50 💰  
- <code>/coin check</code> （管理员查询艾丽莎宝库/用户合计/回复某人查看其余额）
- <code>/coin take 100</code> （管理员从艾丽莎宝库取款）
- 
- <code>/fate </code>  直接使用，骰娘给你抽取3张塔罗牌 ；在骰娘抽取的塔罗牌消息上回复，花费5💰进行解析 
-
+<b>🎫 彩票（管理）</b>
+ <code>/lottery now</code> — 开奖
+ <code>/lottery clean</code> — 清空记录
+ <code>/lottery list</code> — 查看购买记录
 </blockquote>`;
 
   const reply_markup = {
