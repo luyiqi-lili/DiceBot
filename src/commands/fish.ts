@@ -302,88 +302,16 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 		return;
 	}
 
-	/* ---------------- 100..1000 区间：先决定目标 value（使用泊松分布），再从 fishList 中选鱼 ---------------- */
 
-	// 计算 score 在 100..1000 的归一化位置（0..1）
-	const norm = (score - 100) / (1000 - 100); // 0..1
-
-	// 连续的期望 value（min..max）
-	const meanValueContinuous = minValueAvailable + norm * (maxValueAvailable - minValueAvailable);
-
-	// 将 baitCost 用作控制散列程度的放大系数：
-	// baitMultiplier 越大，泊松 lambda 越大，获得更高 value 的概率越容易（即撒网更宽松）。
-	// 这里的 scaleFactor 可调：若想让 baitCost=1 很窄，baitCost=10 明显放宽，选择 3~6 是比较合适的权衡。
-	const SCALE_FACTOR = 3.0;
-	// lambda 基于 meanValueContinuous，但相对于最小 value 我们只对“偏离最小值”的部分做泊松建模
-	const lambdaBase = Math.max(0, meanValueContinuous - minValueAvailable);
-	const lambda = lambdaBase * (baitCost / SCALE_FACTOR);
-
-	// 泊松采样（Knuth 算法）
-	function samplePoisson(lambdaNum: number) {
-		if (lambdaNum <= 0) return 0;
-		const L = Math.exp(-lambdaNum);
-		let k = 0;
-		let p = 1.0;
-		while (p > L) {
-			k++;
-			p *= Math.random();
-			// 保守防止死循环：如果 k 已经很大，直接返回 k
-			if (k > 1e6) break;
-		}
-		return k - 1 >= 0 ? k - 1 : 0; // Knuth 返回的是 k-1
-	}
-
-	// 采样得到偏移量（相对于 minValueAvailable）
-	const sampledOffset = samplePoisson(lambda);
-	let targetValue = minValueAvailable + sampledOffset;
-
-	// 限制到可用范围
-	if (targetValue > maxValueAvailable) targetValue = maxValueAvailable;
-	if (targetValue < minValueAvailable) targetValue = minValueAvailable;
-
-	// 当 targetValue === 0（如果你的 fishList 中包含 value = 0），则判定为“没上鱼”
-	const isNoCatchValue = targetValue === 0;
-
-	// 选择 fishList 中 value === targetValue 的候选项；若没有，则选取离 targetValue 最近的 value 集合
-	let candidateFish = fishList.filter((f) => Number(f.value) === targetValue);
-	if (candidateFish.length === 0) {
-		// 找出与 targetValue 最近的 value（绝对差最小），然后取那些具有该 value 的鱼
-		let closestVal = values.reduce(
-			(acc, v) => {
-				if (acc === null) return v;
-				return Math.abs(v - targetValue) < Math.abs(acc - targetValue) ? v : acc;
-			},
-			null as number | null,
-		) as number;
-		candidateFish = fishList.filter((f) => Number(f.value) === closestVal);
-	}
-
-	// 从候选鱼中随机选择一条
-	// 决定是否“上鱼”（hooked）依旧由 chosen.hookRate + baitCost * jitter 决定
-	// 但如果 isNoCatchValue 为 true（value===0），我们强制判定未上鱼
-	let hooked = false;
-	let chosen: any = null;
-
-	if (isNoCatchValue) {
-		// 没有渔获（value==0），直接记录未钓中（或按你的业务需要另作显示）
-		hooked = false;
-	} else {
-		// 随机从候选池中挑一条鱼作为“目标鱼”（用于判断 hookRate）
-		chosen = candidateFish[Math.floor(Math.random() * candidateFish.length)];
-
-		// 微调抓上概率：沿用原逻辑用 baitCost 做 jitter 增益
-		const jitter = 0.1 * baitCost;
-		const finalHookProb = Math.max(0, Math.min(1, (Number(chosen.hookRate) || 0) + jitter));
-		hooked = Math.random() < finalHookProb;
-	}
+	const fishCoreResult = (await import("../lib/fishCore")).catchFish(score, baitCost);
 
 	// 记录与国库操作：
 	// - 发起者支付的 baitCost 在发起阶段已经扣除并加入国库（handleFish 已完成 addToTreasury）
 	// - 如果钓中鱼：从国库支付给用户（允许国库赤字）
 	let resultText = `${clickerName} 拉杆！\n`;
 
-	if (hooked && chosen) {
-		const payout = Number(chosen.value) || 0;
+	if (fishCoreResult.hooked) {
+		const payout = fishCoreResult.fishValue;
 		const newOwnerBal = currentBal + payout;
 		await takeFromTreasury(env, env.COIN_DO, ownerIdStr, payout, '渔获');
 
@@ -391,7 +319,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 		const today = nowDateYMD();
 		await addToPondPayout(env.FISHING_RECORD_KV, today, payout, true);
 
-		resultText += `🎉 成功钓上：<b>${chosen.name}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${payout} 💰渔获，最新余额 ${newOwnerBal}💰。\n`;
+		resultText += `🎉 成功钓上：<b>${fishCoreResult.fishName}</b>，本次花费 ${baitCost}💰鱼饵，获得 ${payout} 💰渔获，最新余额 ${newOwnerBal}💰。\n`;
 		//           + ` 调试信息 \n strength ${strength} \n seconds ${seconds}  \n score ${score}  \n norm ${norm}  \n meanValueContinuous ${meanValueContinuous}  \n lambdaBase ${lambdaBase}  \n lambda ${lambda}  \n sampledOffset ${sampledOffset} \n targetValue ${targetValue}  `;
 	} else {
 		// 未钓中（包括 targetValue==0 或 hook 判定失败）
@@ -406,7 +334,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	}
 
 	// 写入记录并回复
-	fishingRecord.results.push({ baitCost, hooked, fishValue: hooked && chosen ? chosen.name : 0, messageId });
+	fishingRecord.results.push({ baitCost, hooked: fishCoreResult.hooked, fishValue: fishCoreResult.hooked ? fishCoreResult.fishName : 0, messageId });
 	fishingRecord.count += 1;
 	await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
 

@@ -5,6 +5,7 @@ import FISH_HTML from './game.html';
 // 复用现有的钓鱼类型和函数
 import { fishList, getCastDesc } from "../../lib/liveConfig";
 import { escapeHtml, stripHtml } from "../../lib/util";
+import { catchFish } from "../../lib/fishCore";
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../../lib/coinService";
 
 // 最大钓鱼次数
@@ -275,21 +276,12 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
             // 分数太高，鱼跑了
             result.hooked = false;
         } else {
-            // 根据分数决定钓到什么鱼
-            const successChance = Math.min(0.8, 0.3 + (score / 1000) * 0.5);
-            const isSuccess = Math.random() < successChance;
-            
-            if (isSuccess) {
-                // 随机选择一种鱼
-                const availableFish = fishList.filter(f => Number(f.value) > 0);
-                const randomFish = availableFish[Math.floor(Math.random() * availableFish.length)];
-                
-                result.hooked = true;
-                result.fishName = stripHtml(randomFish.name).trim();
-                result.fishValue = Number(randomFish.value);
-                
-                // 发放奖励
-                await takeFromTreasury(env, env.COIN_DO, userIdStr, result.fishValue, "渔获（游戏）");
+            const fishResult = catchFish(score, baitCost);
+            result.hooked = fishResult.hooked;
+            result.fishName = stripHtml(fishResult.fishName).trim();
+            result.fishValue = fishResult.fishValue;
+            if (fishResult.hooked) {
+                await takeFromTreasury(env, env.COIN_DO, userIdStr, fishResult.fishValue, "渔获（游戏）");
             }
         }
         
