@@ -261,9 +261,20 @@
         }
         
         @media (max-width: 600px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+            body { padding: 10px; }
+            .game-container { padding: 15px; }
+            h1 { font-size: 1.6em; margin-bottom: 5px; }
+            .subtitle { font-size: 0.9em; }
+            .stats-panel { padding: 12px; }
+            .stat-item { padding: 10px; }
+            .stat-value { font-size: 1.3em; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .bait-control { padding: 12px; }
+            .cast-btn, .pull-btn { padding: 14px; font-size: 1.1em; }
+            .records-panel { max-height: 200px; padding: 12px; }
+            .result-panel { padding: 12px; }
+            .header { margin-bottom: 15px; }
+            .game-controls { gap: 12px; margin-bottom: 15px; }
         }
     </style>
 </head>

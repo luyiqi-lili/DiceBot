@@ -4,7 +4,7 @@ import FISH_HTML from './game.html';
 
 // 复用现有的钓鱼类型和函数
 import { fishList, getCastDesc } from "../../lib/liveConfig";
-import { escapeHtml } from "../../lib/util";
+import { escapeHtml, stripHtml } from "../../lib/util";
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../../lib/coinService";
 
 // 最大钓鱼次数
@@ -85,7 +85,7 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
                 remainingAttempts,
                 records: fishingRecord.results.slice(-10).reverse(), // 最近10条记录
                 fishList: fishList.map(fish => ({
-                    name: fish.name,
+                    name: stripHtml(fish.name).trim(),
                     value: fish.value,
                     description: fish.description || ''
                 }))
@@ -285,7 +285,7 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
                 const randomFish = availableFish[Math.floor(Math.random() * availableFish.length)];
                 
                 result.hooked = true;
-                result.fishName = randomFish.name;
+                result.fishName = stripHtml(randomFish.name).trim();
                 result.fishValue = Number(randomFish.value);
                 
                 // 发放奖励
