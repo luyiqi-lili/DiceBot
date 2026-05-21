@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from '../lib/tgMessage';
 import { escapeHtml } from '../lib/util';
 
 type Env = EnvLike & {

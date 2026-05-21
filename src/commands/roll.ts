@@ -10,7 +10,7 @@
  *   - /rh 隐藏掷骰（结果发私聊）
  */
 
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from "../lib/tgMessage";
 import {escapeHtml}  from "../lib/util";
 
 /**

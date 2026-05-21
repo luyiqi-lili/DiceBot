@@ -436,6 +436,26 @@ const TgMessage = {
 		return await TgMessage.send(env, 'sendChatAction', { chat_id, action });
 	},
 
+	/**
+	 * 发送带删除按钮的通知消息（便捷封装）
+	 * 自动附加 deleteMarkup，省去手动添加 reply_markup
+	 */
+	async sendNotice(
+		env: EnvLike,
+		opts: {
+			chat_id: number;
+			text: string;
+			parse_mode?: string;
+			message_thread_id?: number;
+		},
+	) {
+		const body: any = { chat_id: opts.chat_id, text: opts.text };
+		if (opts.parse_mode) body.parse_mode = opts.parse_mode;
+		if (typeof opts.message_thread_id !== 'undefined') body.message_thread_id = opts.message_thread_id;
+		body.reply_markup = { inline_keyboard: [[{ text: '删除消息', callback_data: JSON.stringify({ type: 'delete_message' }) }]] };
+		return await TgMessage.send(env, 'sendMessage', body);
+	},
+
 	// 构造一个常用的 inline keyboard 快速函数
 	buildInlineKeyboard(
 		buttons: Array<
@@ -655,6 +675,27 @@ const TgMessage = {
 		}
 	},
 };
+
+/**
+ * 从 ParsedUpdate 中提取命令处理上下文（chatId / threadId / from / args）。
+ * 消除 14+ 个 handler 中重复的提取样板代码。
+ */
+export function extractCmdContext(parsed: ParsedUpdate): {
+	chatId: number;
+	threadId: number | undefined;
+	from: any;
+	args: string[];
+} {
+	const chatId = parsed.chatId ?? parsed.message?.chat?.id ?? 0;
+	const threadId =
+		parsed.threadId ??
+		parsed.message?.message_thread_id ??
+		parsed.message?.reply_to_message?.message_thread_id ??
+		undefined;
+	const from = parsed.from ?? parsed.message?.from;
+	const args = Array.isArray(parsed.args) ? parsed.args.slice() : [];
+	return { chatId, threadId, from, args };
+}
 
 export default TgMessage;
 function getStatusDescription(status: any) {

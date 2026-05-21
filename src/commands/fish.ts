@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from '../lib/coinService';
 import { fishList, getCastDesc } from '../lib/liveConfig';
 import { escapeHtml, stripHtml } from '../lib/util';

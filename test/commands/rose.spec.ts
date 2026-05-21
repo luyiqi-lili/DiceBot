@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessage));
+vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 vi.mock('../../src/lib/coinService', () => import('../helpers/mocks').then(m => m.mockCoinService));
 import TgMessage from '../../src/lib/tgMessage';
 import { handleRose } from '../../src/commands/rose';

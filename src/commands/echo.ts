@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from "../lib/tgMessage";
 import { attitudeResponses } from "../lib/liveConfig";
 import {escapeHtml}  from "../lib/util";
 
@@ -7,32 +7,10 @@ const blacklist = [
   "example",
   // 在此添加更多用户名（小写匹配）
 ];
-
-// 特殊通配符模式列表及固定回应（使用 '*' 表示任意字符）
-const specialPatterns = [
-  "*骰娘*",
-  "*莉莉*",
-  // 在此添加更多通配符模式
-];
-const specialResponse = "...";
  
-/**
- * 重构后的 handleEcho
- * - 接收 parsedMessage
- * - 直接使用 TgMessage.sendText 发送回复
- */
 export async function handleEcho(parsedMessage: ParsedUpdate, env: EnvLike) {
-  const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
-  if (!chatId) {
-    console.error("[echo] 找不到 chatId，无法发送回复");
-    return;
-  }
-
-  const from = parsedMessage.from || parsedMessage.message?.from;
-  if (!from) {
-    console.error("[echo] 找不到用户信息 from");
-    return;
-  }
+  const { chatId, from } = extractCmdContext(parsedMessage);
+  if (!chatId || !from) { console.error("[echo] 找不到 chatId 或 from"); return; }
 
   // 优先使用 username（无 @），没有则使用 first_name
   const rawUserName = (from.username as string) || (from.first_name as string) || `ID${from.id}`;

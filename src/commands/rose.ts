@@ -8,7 +8,7 @@
  *   好感度存储于 AFFECTION_KV，以 sourceId → { targetId: { value, firstName } } 映射。
  */
 
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, extractCmdContext } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 
 import {
