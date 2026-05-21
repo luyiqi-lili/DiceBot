@@ -7,6 +7,25 @@
 
 import { fishList } from "./liveConfig";
 
+// ── 常量 ────────────────────────────────────────────────
+export const MAX_FISH_ATTEMPTS = 20;
+export const FISH_RECORD_PREFIX = "fish_rec:";
+
+// ── 类型 ────────────────────────────────────────────────
+export interface FishingRecord {
+	date: string;
+	count: number;
+	results: Array<{
+		baitCost: number;
+		hooked: boolean;
+		fishValue: string | number;
+		messageId?: any;
+		timestamp?: number;
+		score?: number;
+		fishName?: string;
+	}>;
+}
+
 export interface CatchResult {
 	hooked: boolean;
 	fishName: string;
@@ -64,4 +83,46 @@ export function catchFish(score: number, baitCost: number): CatchResult {
 		return { hooked: true, fishName: chosen.name, fishValue: Number(chosen.value) };
 	}
 	return { hooked: false, fishName: "", fishValue: 0 };
+}
+
+// ── 日期工具 ────────────────────────────────────────────
+export function nowDateYMD(): string {
+	return new Date().toISOString().split("T")[0];
+}
+
+// ── KV 记录操作（命令版和网页版共用）────────────────────
+// 统一 key = ${FISH_RECORD_PREFIX}${userId}
+
+export async function getFishingRecord(
+	kv: KVNamespace,
+	userId: string,
+): Promise<FishingRecord> {
+	const key = `${FISH_RECORD_PREFIX}${userId}`;
+	const raw = await kv.get(key);
+	const today = nowDateYMD();
+	if (!raw) return { date: today, count: 0, results: [] };
+	try {
+		const parsed = JSON.parse(raw) as FishingRecord;
+		if (parsed.date !== today) return { date: today, count: 0, results: [] };
+		return parsed;
+	} catch {
+		return { date: today, count: 0, results: [] };
+	}
+}
+
+export async function setFishingRecord(
+	kv: KVNamespace,
+	userId: string,
+	record: FishingRecord,
+): Promise<void> {
+	const key = `${FISH_RECORD_PREFIX}${userId}`;
+	await kv.put(key, JSON.stringify(record));
+}
+
+export function hasProcessedMessage(
+	record: FishingRecord,
+	messageId?: number | undefined,
+): boolean {
+	if (messageId === undefined) return false;
+	return record.results.some(r => r.messageId === messageId);
 }

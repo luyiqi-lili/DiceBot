@@ -2,8 +2,14 @@ import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from '../lib/coinService';
 import { fishList, getCastDesc } from '../lib/liveConfig';
 import { escapeHtml, stripHtml } from '../lib/util';
-
-const maxRecode = 20;
+import {
+	MAX_FISH_ATTEMPTS,
+	nowDateYMD,
+	getFishingRecord,
+	setFishingRecord,
+	hasProcessedMessage,
+	FishingRecord,
+} from '../lib/fishCore';
 
 /**
  * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
@@ -13,15 +19,6 @@ export type FishEnv = Env & {
 	COIN_DO: DurableObjectNamespace;
 	TOKEN: string;
 };
-
-function nowDateYMD(): string {
-	return new Date().toISOString().split('T')[0];
-}
-
-function hasProcessedMessage(record: FishingRecord, messageId?: number | undefined): boolean {
-	if (messageId === undefined) return false;
-	return record.results.some((r) => r.messageId === messageId);
-}
 
 /**
  * 池塘汇总记录，用同一个 KV（FISHING_RECORD_KV），key 前缀为 pond:YYYY-MM-DD
@@ -82,40 +79,6 @@ function showPondRecordHTML(rec: PondRecord): string {
 	);
 }
 
-/* ------------------------- 钓鱼记录 KV 操作 ------------------------- */
-type FishingRecord = {
-	date: string;
-	count: number;
-	results: Array<{
-		messageId: any;
-		baitCost: number;
-		hooked: boolean;
-		fishValue: string | number;
-	}>;
-};
-
-async function getFishingRecord(kv: KVNamespace, id: string): Promise<FishingRecord> {
-	const raw = await kv.get(id);
-	const today = nowDateYMD();
-	if (!raw) {
-		return { date: today, count: 0, results: [] };
-	}
-	try {
-		const parsed = JSON.parse(raw) as FishingRecord;
-		if (parsed.date !== today) {
-			return { date: today, count: 0, results: [] };
-		}
-		return parsed;
-	} catch (e) {
-		console.warn('[fish] 解析 fishing record 失败，重置', e);
-		return { date: today, count: 0, results: [] };
-	}
-}
-
-async function setFishingRecord(kv: KVNamespace, id: string, record: FishingRecord) {
-	await kv.put(id, JSON.stringify(record));
-}
-
 /* ------------------------- 展示钓鱼记录（HTML） ------------------------- */
 function showFishingRecord(record: FishingRecord): string {
 	const todayCount = record.count;
@@ -136,7 +99,7 @@ function showFishingRecord(record: FishingRecord): string {
 	} else {
 		resultText += `今天还没有任何渔获哦~\n`;
 	}
-	resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 ${maxRecode} 次）`;
+	resultText += `</blockquote>今日已钓次数：<b>${todayCount}</b>次（最多 ${MAX_FISH_ATTEMPTS} 次）`;
 	return resultText;
 }
 
@@ -195,11 +158,11 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	}
 
 	// 计次上限
-	if (fishingRecord.count >= maxRecode) {
+	if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
 		await TgMessage.editMessageText(env, {
 			chat_id: chatId,
 			message_id: messageId,
-			text: `❌ ${escapeHtml(String(callbackQuery.from?.first_name ?? '你'))}，今天已经钓了${maxRecode}次，不能再钓了。`,
+			text: `❌ ${escapeHtml(String(callbackQuery.from?.first_name ?? '你'))}，今天已经钓了${MAX_FISH_ATTEMPTS}次，不能再钓了。`,
 			parse_mode: 'HTML',
 			reply_markup: { inline_keyboard: [] },
 		});
@@ -435,10 +398,10 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
 	// 读取记录、检查次数
 	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
-	if (fishingRecord.count >= maxRecode) {
+	if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
 		await TgMessage.sendText(env, {
 			chat_id: chatId,
-			text: `❌ ${userName}，今天已经钓了${maxRecode}次，不能再钓了。`,
+			text: `❌ ${userName}，今天已经钓了${MAX_FISH_ATTEMPTS}次，不能再钓了。`,
 			parse_mode: 'HTML',
 			message_thread_id: threadId,
 		});

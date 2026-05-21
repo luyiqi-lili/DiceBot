@@ -5,27 +5,18 @@ import FISH_HTML from './game.html';
 // 复用现有的钓鱼类型和函数
 import { fishList, getCastDesc } from "../../lib/liveConfig";
 import { escapeHtml, stripHtml } from "../../lib/util";
-import { catchFish } from "../../lib/fishCore";
+import {
+	catchFish,
+	MAX_FISH_ATTEMPTS,
+	nowDateYMD,
+	getFishingRecord,
+	setFishingRecord,
+	FishingRecord,
+} from "../../lib/fishCore";
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../../lib/coinService";
 
-// 最大钓鱼次数
-const maxRecode = 20;
-
-// 钓鱼记录类型
-type FishingResult = {
-    timestamp: number;
-    baitCost: number;
-    hooked: boolean;
-    fishName?: string;
-    fishValue?: number;
-    score?: number; // 游戏分数
-};
-
-type FishingRecord = {
-    date: string;
-    count: number;
-    results: FishingResult[];
-};
+// 最大钓鱼次数 - 统一使用 fishCore 的常量
+// 记录类型 FishingRecord 由 fishCore 导出
 
 /**
  * 处理游戏页面请求
@@ -55,26 +46,11 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
         // 获取余额
         const balance = await coinGetBalance(env.COIN_DO, userId);
         
-        // 获取今日钓鱼记录（简化版，实际需要从KV获取）
-        const today = new Date().toISOString().split('T')[0];
-        const recordKey = `fish_record:${userId}:${today}`;
-        let fishingRecord: FishingRecord = {
-            date: today,
-            count: 0,
-            results: []
-        };
-        
-        try {
-            const rawRecord = await env.FISHING_RECORD_KV.get(recordKey);
-            if (rawRecord) {
-                fishingRecord = JSON.parse(rawRecord);
-            }
-        } catch (e) {
-            console.log('无钓鱼记录或解析失败，使用默认记录');
-        }
+        // 获取今日钓鱼记录（与 /fish 命令共用同一 KV key）
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userId);
 
         // 计算可用钓鱼次数
-        const remainingAttempts = maxRecode - fishingRecord.count;
+        const remainingAttempts = MAX_FISH_ATTEMPTS - fishingRecord.count;
 
         return jsonResponse({
             ok: true,
@@ -82,13 +58,13 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
                 userId,
                 balance,
                 todayCount: fishingRecord.count,
-                maxAttempts: maxRecode,
+                maxAttempts: MAX_FISH_ATTEMPTS,
                 remainingAttempts,
                 records: fishingRecord.results.slice(-10).reverse(), // 最近10条记录
                 fishList: fishList.map(fish => ({
                     name: stripHtml(fish.name).trim(),
                     value: fish.value,
-                    description: fish.description || ''
+                    description: (fish as any).description || ''
                 }))
             }
         });
@@ -108,7 +84,7 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
  */
 export async function handleFishCast(request: Request, env: Env): Promise<Response> {
     try {
-        const body = await request.json();
+        const body: any = await request.json();
         const { userId, baitCost = 1 } = body;
         
         if (!userId) {
@@ -128,29 +104,13 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
             }, 400);
         }
         
-        // 检查今日钓鱼次数
-        const today = new Date().toISOString().split('T')[0];
-        const recordKey = `fish_record:${userIdStr}:${today}`;
-        let fishingRecord: FishingRecord = {
-            date: today,
-            count: 0,
-            results: []
-        };
-        
-        try {
-            const rawRecord = await env.FISHING_RECORD_KV.get(recordKey);
-            if (rawRecord) {
-                fishingRecord = JSON.parse(rawRecord);
-            }
-        } catch (e) {
-            console.log('无钓鱼记录或解析失败');
-        }
-        
-        if (fishingRecord.count >= maxRecode) {
+        // 检查今日钓鱼次数（与 /fish 命令共用 KV）
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
+        if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             return jsonResponse({ 
                 ok: false, 
                 error: '今日钓鱼次数已达上限',
-                maxAttempts: maxRecode
+                maxAttempts: MAX_FISH_ATTEMPTS
             }, 400);
         }
         
@@ -169,7 +129,7 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
             strength,
             baitCost,
             startTime,
-            date: today
+            date: nowDateYMD()
         }), { expirationTtl: 300 }); // 5分钟过期
         
         return jsonResponse({
@@ -200,7 +160,7 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
  */
 export async function handleFishPull(request: Request, env: Env): Promise<Response> {
     try {
-        const body = await request.json();
+        const body: any = await request.json();
         const { userId, castId } = body;
         
         if (!userId || !castId) {
@@ -232,41 +192,23 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
         const rawScore = elapsedSeconds * strength;
         const score = Math.floor(rawScore);
         
-        // 获取今日钓鱼记录
-        const today = new Date().toISOString().split('T')[0];
-        const recordKey = `fish_record:${userIdStr}:${today}`;
-        let fishingRecord: FishingRecord = {
-            date: today,
-            count: 0,
-            results: []
-        };
-        
-        try {
-            const rawRecord = await env.FISHING_RECORD_KV.get(recordKey);
-            if (rawRecord) {
-                fishingRecord = JSON.parse(rawRecord);
-            }
-        } catch (e) {
-            console.log('无钓鱼记录或解析失败');
-        }
-        
-        // 检查是否超过最大次数
-        if (fishingRecord.count >= maxRecode) {
+        // 获取今日钓鱼记录（与 /fish 命令共用 KV）
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
+        if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             await env.FISHING_RECORD_KV.delete(castKey); // 清理抛竿记录
             return jsonResponse({ 
                 ok: false, 
                 error: '今日钓鱼次数已达上限',
-                maxAttempts: maxRecode
+                maxAttempts: MAX_FISH_ATTEMPTS
             }, 400);
         }
         
         // 钓鱼结果计算（简化版，实际应使用更复杂的算法）
-        let result: FishingResult = {
-            timestamp: now,
-            baitCost,
-            hooked: false,
-            score
-        };
+        const result: Record<string, any> = {};
+        result.timestamp = now;
+        result.baitCost = baitCost;
+        result.hooked = false;
+        result.score = score;
         
         // 简单的钓鱼算法
         if (score < 100) {
@@ -285,12 +227,10 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
             }
         }
         
-        // 更新钓鱼记录
-        fishingRecord.results.push(result);
+        // 更新钓鱼记录（与 /fish 命令共用 KV）
+        fishingRecord.results.push(result as any);
         fishingRecord.count += 1;
-        
-        // 保存记录
-        await env.FISHING_RECORD_KV.put(recordKey, JSON.stringify(fishingRecord));
+        await setFishingRecord(env.FISHING_RECORD_KV, userIdStr, fishingRecord);
         
         // 删除抛竿记录
         await env.FISHING_RECORD_KV.delete(castKey);
@@ -304,7 +244,7 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
                 result,
                 newBalance,
                 todayCount: fishingRecord.count,
-                remainingAttempts: maxRecode - fishingRecord.count,
+                remainingAttempts: MAX_FISH_ATTEMPTS - fishingRecord.count,
                 message: result.hooked 
                     ? `🎉 钓到了 ${result.fishName}！价值 ${result.fishValue}💰`
                     : score < 100 
