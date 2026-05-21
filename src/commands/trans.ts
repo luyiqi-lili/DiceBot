@@ -1,3 +1,11 @@
+/**
+ * @file commands/trans.ts
+ * @description 翻译命令处理器（/trans）。
+ *   通过回复一条消息并发送 /trans [目标语言] 来翻译文本。
+ *   使用 Cloudflare AI（@cf/openai/gpt-oss-120b）或 Gemini API 进行翻译。
+ *   支持自定义目标语言，默认为简体中文。
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
 import { escapeHtml } from '../lib/util';
 

@@ -1,3 +1,15 @@
+/**
+ * @file commands/roll.ts
+ * @description 掷骰命令处理器（/roll /r /rd /rh）。
+ *   支持多种骰子表达式格式：
+ *   - 默认 1d100
+ *   - NdS（如 2d6）
+ *   - Nd{选项} 多次抽取
+ *   - {选项} 单次抽取
+ *   - 表达式（如 2d6+1d4+5）
+ *   - /rh 隐藏掷骰（结果发私聊）
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import {escapeHtml}  from "../lib/util";
 

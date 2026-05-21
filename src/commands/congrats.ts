@@ -1,3 +1,10 @@
+/**
+ * @file commands/congrats.ts
+ * @description 恭喜发财/红包命令处理器（/congrats）。
+ *   通过回复消息发起红包请求，被回复者点击按钮确认发送指定金额（1/5/10 💰）。
+ *   只有被回复者本人可以点击按钮完成转账。
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
 import { deleteMarkup, escapeHtml } from '../lib/util';
 import { getBalance, transfer } from '../lib/coinService';

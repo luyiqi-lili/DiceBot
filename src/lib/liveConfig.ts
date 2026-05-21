@@ -1,6 +1,9 @@
-/*
-liveConfig.ts
-*/
+/**
+ * @file src/lib/liveConfig.ts
+ * @description 运行时配置与静态数据。
+ *   包含：群组白名单、塔罗牌数据、态度回应文本、好感度分级、钓鱼配置、付费配置等。
+ *   此文件无运行时副作用，仅导出常量/配置项供其他模块使用。
+ */
 export const ALLOWED_CHAT_IDS = new Set([
   -1002742074355,
   -1002848481881,

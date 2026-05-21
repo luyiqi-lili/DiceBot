@@ -1,4 +1,11 @@
-// commands/fate.ts
+/**
+ * @file commands/fate.ts
+ * @description 塔罗占卜命令处理器（/fate）。
+ *   功能：
+ *   - 抽牌：从大阿尔卡纳中随机抽取 3 张牌，对应昨天/今天/明天
+ *   - 解析：回复已抽牌的消息，调用 Gemini API 进行 AI 牌义解读（消耗 5 💰）
+ */
+
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { MAJOR_ARCANA } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";

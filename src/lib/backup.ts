@@ -1,4 +1,14 @@
-import { backupConfig, deleteUids } from './liveConfig';  // 假设 liveConfig 中已添加 deleteUids 配置
+/**
+ * @file src/lib/backup.ts
+ * @description 消息备份与转发模块。
+ *   核心功能：
+ *   - recordUserLastActive: 记录用户最后活跃时间到 D1
+ *   - recordMessageContent: 记录每条消息的文本/媒体内容到 message_history 表
+ *   - handleBackup: 备份入口，判断是否需要删除原始消息后执行备份
+ *   - backupMessage: 将消息转发到配置的目标群组/话题
+ */
+
+import { backupConfig, deleteUids } from './liveConfig';
 import TgMessage, { ParsedUpdate, EnvLike } from './tgMessage';
  
 // 备份配置类型定义（如果 liveConfig 中已有可不重复定义）

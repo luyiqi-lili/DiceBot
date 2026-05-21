@@ -1,4 +1,10 @@
-// commands/coin.ts
+/**
+ * @file commands/coin.ts
+ * @description 货币系统命令处理器（/coin）。
+ *   基于 Durable Object（CoinDO）实现原子转账、余额查询、祈祷、转账、管理员取款等操作。
+ *   支持费率计算（ease-in-out 曲线）、转账回滚等高级功能。
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { payConfigs } from "../lib/liveConfig";

@@ -7,6 +7,7 @@ import {
     handleFishScore 
 } from './index';
 
+/** 钓鱼游戏 Web 路由分发 — 匹配 /web/fish 下的各子路径 */
 export async function handleFishRoutes(
     request: Request,
     env: Env

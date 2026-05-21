@@ -1,3 +1,13 @@
+/**
+ * @file commands/rose.ts
+ * @description 好感度系统命令处理器（/rose）。
+ *   功能：
+ *   - /rose（回复某人）：查看你对对方的好感度
+ *   - /rose send（回复某人）：赠送一朵 🌷（每天首次免费）
+ *   - /rose check（回复某人）：查看他人对你的好感度排行榜
+ *   好感度存储于 AFFECTION_KV，以 sourceId → { targetId: { value, firstName } } 映射。
+ */
+
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 

@@ -1,3 +1,10 @@
+/**
+ * @file commands/like.ts
+ * @description 调用次数查询命令处理器（/like）。
+ *   统计每位用户调用机器人的总次数并显示友好提示文本。
+ *   同时导出 incrementUsageCount 供 index.ts 在每次用户交互时自增计数。
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { likeTextMapFriend } from "../lib/liveConfig";
 import {escapeHtml}  from "../lib/util";

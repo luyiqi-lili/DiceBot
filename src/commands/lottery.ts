@@ -1,3 +1,11 @@
+/**
+ * @file commands/lottery.ts
+ * @description 彩票系统命令处理器（/lottery）。
+ *   基于 Durable Object（LotteryDO）实现彩票购买、开奖、管理等功能。
+ *   每张彩票 10 💰，每人最多 5 张，支持自定义号码和随机号码。
+ *   开奖匹配精确号码（50%）和前两位（30%），剩余累积到下一期。
+ */
+
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { getBalance, transfer } from "../lib/coinService";

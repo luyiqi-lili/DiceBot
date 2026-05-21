@@ -3,6 +3,11 @@ import { handleHelloWeb } from './hello';
 import { handleScoreSubmit } from './score';
 import { handleFishRoutes } from './fish/router';
 
+/**
+ * Web 请求路由入口。
+ * 根据请求路径分发到对应的 Web 处理器（hello 游戏、fish 钓鱼游戏等）。
+ * 非 Web 路径返回 null 让主入口继续处理。
+ */
 export async function handleWebRequest(
   request: Request,
   env: Env

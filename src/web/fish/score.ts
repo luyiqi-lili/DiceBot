@@ -1,4 +1,9 @@
-// 复用 hello 游戏的分数处理逻辑
+/**
+ * @file src/web/fish/score.ts
+ * @description 钓鱼游戏分数提交处理器。
+ *   复用 hello 游戏的分数处理逻辑，将钓鱼游戏得分通过 Telegram setGameScore API 提交。
+ */
+
 import type { Env } from '../../index';
 import TgMessage,{callTelegramApi} from '../../lib/tgMessage';
 

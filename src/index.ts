@@ -1,4 +1,9 @@
-/* index.ts */
+/**
+ * @file src/index.ts
+ * @description Cloudflare Worker 主入口。处理 Telegram Webhook update、外部 API 请求和 Web 页面请求。
+ *   通过 switch-case 分发命令到各 command handler，处理 callback_query、inline_query、topic_edited 等事件类型。
+ *   同时导出 DurableObject 类以供 wrangler 绑定。
+ */
 
 import TgMessage from './lib/tgMessage';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
@@ -28,7 +33,11 @@ export type Env = {
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
 
-// 外部 API 处理函数
+/**
+ * 处理外部 API 请求（路径以 /api/ 开头）
+ * - 验证 API 密钥（通过 X-API-Key 头或 query 参数）
+ * - 路由到 Coin API、健康检查等端点
+ */
 async function handleExternalAPI(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const path = url.pathname;
@@ -61,7 +70,9 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 	});
 }
 
-// CoinDO API 处理
+/**
+ * CoinDO API 处理 — 将 /api/coin/... 请求转发到 Coin Durable Object 的单例 stub
+ */
 async function handleCoinAPI(request: Request, env: Env, path: string): Promise<Response> {
 	// 获取 CoinDO 的 stub（单例模式）
 	const id = env.COIN_DO.idFromName('coins');
@@ -81,11 +92,19 @@ async function handleCoinAPI(request: Request, env: Env, path: string): Promise<
 	return await stub.fetch(doRequest);
 }
 
+/** Worker 入口：Cron Trigger + HTTP Fetch */
 export default {
+	/**
+	 * 定时任务入口（Cron Trigger）：每日执行 Coin 余额检查并发送汇总
+	 */
 	async scheduled(controller, env, ctx) {
 		ctx.waitUntil(runCoinCheck(env));
 	},
 
+	/**
+	 * HTTP 请求入口（Webhook / API / Web页面）。
+	 * 流程：Web 页面 → 外部 API → POST 验证 → JSON 解析 → 白名单检查 → 事件分发
+	 */
 	async fetch(request, env) {
 		const url = new URL(request.url);
 
@@ -100,14 +119,14 @@ export default {
 			return handleExternalAPI(request, env);
 		}
 
-		//1. 日记记录原始请求
+		// 1. 记录原始请求
 		console.log('index: 收到请求', {
 			method: request.method,
 			url: request.url,
 			headers: Object.fromEntries(request.headers),
 		});
 
-		//2. 直接相应非post请求
+		// 2. 直接响应非 POST 请求（存活检查）
 		if (request.method !== 'POST') {
 			console.log('index: 非 POST 请求，返回存活内容');
 			return new Response('I am alive', { status: 200 });
