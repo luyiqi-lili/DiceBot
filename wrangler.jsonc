@@ -3,6 +3,11 @@
  * https://developers.cloudflare.com/workers/wrangler/configuration/
  */
 {
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"compatibility_date": "2025-06-28",
+	"compatibility_flags": [
+		"export_commonjs_default"
+	],
 	"env": {
 		"dev": {
 			"$schema": "node_modules/wrangler/config-schema.json",

@@ -527,11 +527,11 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    let targetUid;
-    let targetLabel;
-    targetUid = parseInt(args[2] || "", 10);
-    if (!isNaN(targetUid)) {
-      const userInfo = await TgMessage.fetchChatMember(env, chatId, targetUid);
+    let targetUid: string;
+    let targetLabel: string | undefined;
+    targetUid = String(parseInt(args[2] || "", 10));
+    if (!isNaN(Number(targetUid))) {
+      const userInfo = await TgMessage.fetchChatMember(env, chatId, Number(targetUid));
       targetLabel = userInfo.first_name;
 
     } else if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
@@ -688,7 +688,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       // 分页读取 DO 内所有 key
       while (true) {
         const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
-        const data = await res.json();
+        const data = await res.json() as { keys?: { name: string }[]; cursor?: string };
         const keys: { name: string }[] = data.keys || [];
         cursor = data.cursor || "";
 
@@ -784,7 +784,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
                   ).bind(uid).first();
 
                   if (result) {
-                    userLastActiveTimes[uid] = result.last_active_at;
+                    userLastActiveTimes[uid] = (result as any).last_active_at;
                   }
                 } catch (singleError) {
                   console.error(`[coin] 查询用户 ${uid} 最后发言时间失败:`, singleError);
@@ -816,7 +816,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
                 inTargetGroup = await TgMessage.isUserInChat(env, TARGET_CHAT_ID, Number(uid));
               } catch (e) {
                 // 如果获取用户信息失败，记录日志但继续处理
-                console.log(`[coin] 获取用户 ${uid} 信息失败:`, e.message);
+                console.log(`[coin] 获取用户 ${uid} 信息失败:`, (e as Error).message);
               }
             }
 
@@ -946,7 +946,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       // 分页读取 DO 内所有 key
       while (true) {
         const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
-        const data = await res.json();
+        const data = await res.json() as { keys?: { name: string }[]; cursor?: string };
         const keys: { name: string }[] = data.keys || [];
         cursor = data.cursor || "";
 
@@ -997,7 +997,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
               }
             } catch (error) {
               // 如果查询失败，也视为不在群组
-              console.log(`[coin] 检查用户 ${name} 状态失败:`, error.message);
+              console.log(`[coin] 检查用户 ${name} 状态失败:`, (error as Error).message);
               usersToClean.push({
                 uid: name,
                 bal,
@@ -1103,7 +1103,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       // 分页读取 DO 内所有 key
       while (true) {
         const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
-        const data = await res.json();
+        const data = await res.json() as { keys?: { name: string }[]; cursor?: string };
         const keys: { name: string }[] = data.keys || [];
         cursor = data.cursor || "";
 
