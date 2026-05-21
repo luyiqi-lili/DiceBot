@@ -8,6 +8,7 @@
 
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
+import { LOTTERY_ADMIN_UIDS } from "../lib/liveConfig";
 import { getBalance, transfer } from "../lib/coinService";
 
 type LotteryEnv = EnvLike & {
@@ -15,15 +16,6 @@ type LotteryEnv = EnvLike & {
     COIN_DO: DurableObjectNamespace;
     LOTTERY_DO: DurableObjectNamespace;
 };
-
-// 管理员UID列表（与coin.ts保持一致）
-const ADMIN_UIDS = [
-    8080375150,//拉斐尔
-    5621587953,//lich
-    7804622477,//玛丽
-    7476641553,//茜茜
-    1019896885//yolo
-];
 const TICKET_PRICE = 10;
 const MAX_TICKETS_PER_USER = 5; // 每人最多购买5张彩票
 
@@ -429,7 +421,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery list - 管理员查看购买记录
     if (sub === "list") {
         const callerNum = Number(userId);
-        if (!ADMIN_UIDS.includes(callerNum)) {
+        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限查看购买记录。`,
@@ -529,7 +521,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery now - 管理员开奖
     if (sub === "now") {
         const callerNum = Number(userId);
-        if (!ADMIN_UIDS.includes(callerNum)) {
+        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限开奖。`,
@@ -683,7 +675,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery clean - 管理员清空记录
     if (sub === "clean") {
         const callerNum = Number(userId);
-        if (!ADMIN_UIDS.includes(callerNum)) {
+        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限清空记录。`,

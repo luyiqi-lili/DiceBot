@@ -16,15 +16,13 @@ interface ScoreSubmitRequest {
 }
 
 /**
- * 处理游戏分数提交
- * 遵循Telegram官方要求：游戏页面 -> 中间服务器 -> Telegram API
+ * 处理游戏分数提交（通用版本）
+ * 被 hello 和 fish 两个路由共同调用
  */
-export async function handleScoreSubmit(request: Request, env: Env): Promise<Response> {
+export async function handleGameScore(request: Request, env: Env, gameName: string): Promise<Response> {
 	try {
-		// 1. 解析并验证请求
 		const body: ScoreSubmitRequest = await request.json();
-
-		const { score, user_id, inline_message_id, chat_id, message_id, game = 'hello' } = body;
+		const { score, user_id, inline_message_id, chat_id, message_id, game = gameName } = body;
 
 		// 2. 基础验证
 		if (score === undefined || score === null) {
@@ -132,6 +130,13 @@ export async function handleScoreSubmit(request: Request, env: Env): Promise<Res
 			500,
 		);
 	}
+}
+
+/**
+ * hello 游戏专用包装 — 保持向后兼容
+ */
+export function handleScoreSubmit(request: Request, env: Env): Promise<Response> {
+	return handleGameScore(request, env, 'hello');
 }
 
 /**

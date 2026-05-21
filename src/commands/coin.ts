@@ -7,7 +7,14 @@
 
 import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
-import { payConfigs } from "../lib/liveConfig";
+import { handleCoinList } from "./coinList";
+import {
+  payConfigs,
+  ADMIN_UIDS_CHECK,
+  ADMIN_UIDS_TAKE,
+  ADMIN_UIDS_CREATE,
+  ADMIN_UIDS_REMOVE,
+} from "../lib/liveConfig";
 import {
   getBalance,
   getTreasury,
@@ -18,19 +25,14 @@ import {
   transfer
 } from "../lib/coinService";
 
-type CoinEnv = EnvLike & {
+export type CoinEnv = EnvLike & {
   BOT_USERNAME?: string;
   COIN_DO: DurableObjectNamespace;
   DB: D1Database;
 };
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
-
-// 管理员白名单（可分权限）
-const ADMIN_UIDS_CHECK: number[] = [8080375150, 5621587953, 7804622477, 7476641553, 1019896885, 6367789964,1039189463];
-const ADMIN_UIDS_TAKE: number[] = [8080375150, 5621587953, 7804622477];
-const ADMIN_UIDS_CREATE: number[] = [8080375150, 5621587953];
-const ADMIN_UIDS_REMOVE: number[] = [8080375150, 5621587953, 7476641553, 1019896885];
+// ADMIN_UIDS_* 已迁移至 src/lib/liveConfig.ts
 
 /** 费率计算 */
 
@@ -662,7 +664,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   }
 
   // /coin list - 修改为分页发送并添加群组检查和最后发言时间
-  if (sub === "list") {
+  if (sub === "list" || sub === "repair" || sub === "confirm") {
+    await handleCoinList(sub, chatId, threadId, userId, userName, doNs, env);
+    return;
+  }
+  // list/repair/confirm removed (moved to coinList.ts)
+  if (false) {
     const callerNum = Number(userId);
     if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
       await TgMessage.sendText(env, {
