@@ -105,7 +105,7 @@ export default {
 	 * HTTP 请求入口（Webhook / API / Web页面）。
 	 * 流程：Web 页面 → 外部 API → POST 验证 → JSON 解析 → 白名单检查 → 事件分发
 	 */
-	async fetch(request, env) {
+	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
 
 		// 🌐 0. Web 页面处理（放最前）
@@ -361,7 +361,7 @@ export default {
 							console.log('index: 检测到 /lottery 命令，进入 lottery 逻辑');
 							const { handleLottery } = await import('./commands/lottery');
 							await handleLottery(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /lottery 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -369,7 +369,7 @@ export default {
 							console.log('index: 检测到 /act 命令，进入 act 逻辑');
 							const { handleAct } = await import('./commands/act');
 							await handleAct(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /act 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -377,7 +377,7 @@ export default {
 							console.log('index: 检测到 /report 命令，进入 report 逻辑');
 							const { handleReport } = await import('./commands/report');
 							await handleReport(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /report 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -385,7 +385,7 @@ export default {
 							console.log('index: 检测到 /book 命令，进入 book逻辑');
 							const { handleBook } = await import('./commands/book');
 							await handleBook(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /book 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -394,7 +394,7 @@ export default {
 							console.log('index: 检测到 / whoami 命令，进入 whoami 逻辑');
 							const { handleWhoami } = await import('./commands/whoami');
 							await handleWhoami(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: / whoami 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -403,7 +403,7 @@ export default {
 							console.log('index: 检测到 /fate 命令，进入 fate逻辑');
 							const { handleFate } = await import('./commands/fate');
 							await handleFate(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /fate 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -412,7 +412,7 @@ export default {
 							console.log('index: 检测到 / item 命令，进入 item 逻辑');
 							const { handleItem } = await import('./commands/item');
 							await handleItem(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /fate 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -422,7 +422,7 @@ export default {
 							console.log('index: 检测到 /rose 命令，进入 rose逻辑');
 							const { handleRose } = await import('./commands/rose');
 							await handleRose(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /rose 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -434,7 +434,7 @@ export default {
 							console.log('index: 检测到 /roll 命令，进入 roll逻辑');
 							const { handleRoll } = await import('./commands/roll');
 							await handleRoll(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /roll 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -446,7 +446,7 @@ export default {
 							console.log('index: 检测到 /emote 命令，进入 emote逻辑');
 							const { handleEmote } = await import('./commands/emote');
 							await handleEmote(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /emote 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -456,7 +456,7 @@ export default {
 							console.log('index: 检测到 /help 命令，进入 help逻辑');
 							const { handleHelp } = await import('./commands/help');
 							await handleHelp(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /help 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -465,7 +465,7 @@ export default {
 							console.log('index: 检测到 /fish 命令，进入 fish 逻辑');
 							const { handleFish } = await import('./commands/fish');
 							await handleFish(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /fish 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -474,7 +474,7 @@ export default {
 							console.log('index: 检测到 /coin 命令，进入 coin逻辑');
 							const { handleCoin } = await import('./commands/coin');
 							await handleCoin(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /coin 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -483,7 +483,7 @@ export default {
 							console.log('index: 检测到 /trans 命令，进入 trans逻辑');
 							const { handleTrans } = await import('./commands/trans');
 							await handleTrans(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /trans 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -492,7 +492,7 @@ export default {
 							console.log('index: 检测到 /echo 命令，进入 echo逻辑');
 							const { handleEcho } = await import('./commands/echo');
 							await handleEcho(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /echo 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -501,7 +501,7 @@ export default {
 							console.log('index: 检测到 /like 命令，进入 like 逻辑');
 							const { handleLike } = await import('./commands/like');
 							await handleLike(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /like 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -510,7 +510,7 @@ export default {
 							console.log('index: 检测到 /duel 命令，进入 duel 逻辑');
 							const { handleDuel } = await import('./commands/duel');
 							await handleDuel(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /duel 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -519,7 +519,7 @@ export default {
 							console.log('index: 检测到 /groll 命令，进入 groll 逻辑');
 							const { handleGroll } = await import('./commands/groll');
 							await handleGroll(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /groll 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -528,7 +528,7 @@ export default {
 							console.log('index: 检测到 /21点 命令，进入 21 逻辑');
 							const { handle21 } = await import('./commands/21');
 							await handle21(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: 21处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -537,7 +537,7 @@ export default {
 							console.log(`index: 检查到news命令`);
 							const { handleNews } = await import('./commands/news');
 							await handleNews(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: news处理完成`);
 							return new Response('OK', { status: 200 });
 						}
@@ -545,7 +545,7 @@ export default {
 							console.log('index: 检测到 /rule 命令，进入 rule 逻辑');
 							const { handleRule } = await import('./commands/rule');
 							await handleRule(parsedMessage, env);
-							await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
+							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							console.log(`index: /rule 处理完成`);
 							return new Response('OK', { status: 200 });
 						}

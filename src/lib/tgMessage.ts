@@ -431,6 +431,20 @@ const TgMessage = {
 		return await TgMessage.send(env, 'deleteMessage', { chat_id, message_id });
 	},
 
+	// 延迟删除消息（默认 3 秒后删除）
+	async deleteMessageWithDelay(env: EnvLike, chat_id: number, message_id: number, delayMs: number = 3000) {
+		return new Promise<void>((resolve) => {
+			setTimeout(async () => {
+				try {
+					await TgMessage.send(env, 'deleteMessage', { chat_id, message_id });
+				} catch (e) {
+					console.warn('延迟删除消息失败（可忽略）', e);
+				}
+				resolve();
+			}, delayMs);
+		});
+	},
+
 	// 发 chat action（typing、upload_photo 等）
 	async sendChatAction(env: EnvLike, chat_id: number, action: string) {
 		return await TgMessage.send(env, 'sendChatAction', { chat_id, action });
