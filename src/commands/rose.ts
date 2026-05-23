@@ -31,6 +31,7 @@ export type RoseEnv = Env & {
   AFFECTION_KV: KVNamespace;
   COIN_DO: DurableObjectNamespace;
   TOKEN: string;
+  DB: D1Database;
 };
 
 function scoreToEmoji(score: number): string {
@@ -199,13 +200,13 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       return;
 
     }
-    const ok = await addToTreasury(env, env.COIN_DO, String(fromId), amount, "送花消费");
-    if (!ok) {
+    const result = await addToTreasury(env, env.COIN_DO, String(fromId), amount, "送花消费");
+    if (!result.ok) {
       // 查询余额并提示
       const bal = await getBalance(env.COIN_DO, String(fromId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `❌ ${fromName} 今天已经送过花了。如需额外送花需支付 ${amount} 💰，但你的余额仅有 ${bal} 💰。`,
+        text: `❌ ${fromName} 扣费失败：${result.reason || "未知错误"}。如需额外送花需支付 ${amount} 💰，你当前余额 ${bal} 💰。`,
         parse_mode: "HTML",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
