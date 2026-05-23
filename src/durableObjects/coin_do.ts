@@ -132,6 +132,16 @@ export class CoinDO {
     if (from === to) {
       return { ok: true, fromNew: fromBal, toNew: toBal };
     }
+
+    // 余额检查：非国库账户不允许透支
+    if (from !== CoinDO.TREASURY_KEY && fromBal < amount) {
+      return { ok: false, reason: `insufficient balance: ${from} has ${fromBal}, need ${amount}` };
+    }
+
+    // 国库透支检查
+    if (from === CoinDO.TREASURY_KEY && fromBal < amount && !allowNegativeTreasury) {
+      return { ok: false, reason: `treasury insufficient: has ${fromBal}, need ${amount}` };
+    }
  
     const newFrom = fromBal - amount;
     const newTo = toBal + amount;

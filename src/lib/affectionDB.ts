@@ -280,7 +280,7 @@ export async function getRoseSendDate(
 
 /**
  * 记录用户免费送花日期。
- * 只写入数据库，不回写 KV。
+ * 同时写入 KV 和数据库：KV 作为即时可靠存储，DB 用于长期查询。
  */
 export async function setRoseSendDate(
   db: D1Database,
@@ -288,6 +288,13 @@ export async function setRoseSendDate(
   userId: number,
   date: string
 ): Promise<void> {
+  // 优先写 KV（即时可靠，作为回退保障）
+  const sendKey = `rose_send:${userId}`;
+  await kv.put(sendKey, date).catch((e) =>
+    console.error('[affectionDB] setRoseSendDate KV 写入失败', e)
+  );
+
+  // 同时写 DB
   try {
     await ensureDB(db);
     await db
