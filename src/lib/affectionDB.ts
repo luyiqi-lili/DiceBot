@@ -9,39 +9,8 @@
  *   - 排行榜：优先从数据库查询，数据库无数据则遍历 KV
  */
 
-// 数据库初始化（惰性，只执行一次）
-let dbInitPromise: Promise<void> | null = null;
-
-async function ensureDB(db: D1Database): Promise<void> {
-  if (!dbInitPromise) {
-    dbInitPromise = (async () => {
-      // 拆为两次独立 exec()，避免 D1 在多语句场景下出现 "incomplete input" 错误
-      await db.exec(
-        `CREATE TABLE IF NOT EXISTS affections (
-          source_id INTEGER NOT NULL,
-          target_id INTEGER NOT NULL,
-          first_name TEXT NOT NULL DEFAULT '',
-          value INTEGER NOT NULL DEFAULT 0,
-          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          PRIMARY KEY (source_id, target_id)
-        )`
-      );
-      await db.exec(
-        `CREATE TABLE IF NOT EXISTS rose_sends (
-          user_id INTEGER PRIMARY KEY,
-          send_date TEXT NOT NULL,
-          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-        )`
-      );
-    })().catch((e) => {
-      // 建表失败时重置 promise，允许下次重试
-      dbInitPromise = null;
-      console.error('[affectionDB] 建表失败', e);
-      throw e;
-    });
-  }
-  return dbInitPromise;
-}
+// 数据库表已在 D1 控制台手动创建，不再执行建表语句
+async function ensureDB(_db: D1Database): Promise<void> {}
 
 /* ---------- KV 辅助（用于回退） ---------- */
 
@@ -288,23 +257,15 @@ export async function getRoseSendDate(
 
 /**
  * 记录用户免费送花日期。
- * 同时写入 KV 和数据库：KV 作为即时可靠存储，DB 用于长期查询。
+ * 仅写入数据库，不再回写 KV。
  */
 export async function setRoseSendDate(
   db: D1Database,
-  kv: KVNamespace,
+  _kv: KVNamespace,
   userId: number,
   date: string
 ): Promise<void> {
-  // 优先写 KV（即时可靠，作为回退保障）
-  const sendKey = `rose_send:${userId}`;
-  await kv.put(sendKey, date).catch((e) =>
-    console.error('[affectionDB] setRoseSendDate KV 写入失败', e)
-  );
-
-  // 同时写 DB
   try {
-    await ensureDB(db);
     await db
       .prepare(
         `INSERT OR REPLACE INTO rose_sends (user_id, send_date, updated_at)
