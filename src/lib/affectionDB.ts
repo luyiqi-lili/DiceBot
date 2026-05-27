@@ -14,21 +14,26 @@ let dbInitPromise: Promise<void> | null = null;
 
 async function ensureDB(db: D1Database): Promise<void> {
   if (!dbInitPromise) {
-    dbInitPromise = db.exec(`
-      CREATE TABLE IF NOT EXISTS affections (
-        source_id INTEGER NOT NULL,
-        target_id INTEGER NOT NULL,
-        first_name TEXT NOT NULL DEFAULT '',
-        value INTEGER NOT NULL DEFAULT 0,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        PRIMARY KEY (source_id, target_id)
+    dbInitPromise = (async () => {
+      // 拆为两次独立 exec()，避免 D1 在多语句场景下出现 "incomplete input" 错误
+      await db.exec(
+        `CREATE TABLE IF NOT EXISTS affections (
+          source_id INTEGER NOT NULL,
+          target_id INTEGER NOT NULL,
+          first_name TEXT NOT NULL DEFAULT '',
+          value INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (source_id, target_id)
+        )`
       );
-      CREATE TABLE IF NOT EXISTS rose_sends (
-        user_id INTEGER PRIMARY KEY,
-        send_date TEXT NOT NULL,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      await db.exec(
+        `CREATE TABLE IF NOT EXISTS rose_sends (
+          user_id INTEGER PRIMARY KEY,
+          send_date TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )`
       );
-    `).catch((e) => {
+    })().catch((e) => {
       // 建表失败时重置 promise，允许下次重试
       dbInitPromise = null;
       console.error('[affectionDB] 建表失败', e);
@@ -133,19 +138,22 @@ export async function readAffectionMap(
 
 /**
  * 写入好感度 map。
- * 只写入数据库，不回写 KV。
+ * 只写入数据库，不回写 KV。失败时返回错误信息，由调用方决定如何处理。
  */
 export async function writeAffectionMap(
   db: D1Database,
   kv: KVNamespace,
   sourceId: number,
   map: Record<string, { firstName: string; value: number }>
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   try {
     await ensureDB(db);
     await writeMapToDB(db, sourceId, map);
+    return { ok: true };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error('[affectionDB] writeAffectionMap DB 写入失败', e);
+    return { ok: false, error: msg };
   }
 }
 

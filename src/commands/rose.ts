@@ -171,7 +171,17 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       // 首次免费送花
       score += 160;
       map[key] = { firstName: targetName, value: score };
-      await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+      const writeResult = await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+      if (!writeResult.ok) {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: `❌ 好感度记录失败，请稍后重试。`,
+          parse_mode: "HTML",
+          message_thread_id: threadId,
+          reply_markup: deleteMarkup,
+        });
+        return;
+      }
       // 记录已送花（当天）
       await setRoseSendDate(env.DB, env.AFFECTION_KV, fromId, todayUTC);
 
@@ -218,7 +228,18 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     // 记录好感度变化
     score += 160;
     map[key] = { firstName: targetName, value: score };
-    await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+    const writeResult = await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+    if (!writeResult.ok) {
+      // coin 已扣除，但好感度写入失败：提示用户联系管理员
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ 好感度记录失败，但已扣除 ${amount} 💰。请稍后重试或联系管理员。`,
+        parse_mode: "HTML",
+        message_thread_id: threadId,
+        reply_markup: deleteMarkup,
+      });
+      return;
+    }
 
     // 获取新的余额显示
     const newBal = await getBalance(env.COIN_DO, String(fromId));
