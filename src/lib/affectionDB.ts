@@ -6,7 +6,7 @@
  *   迁移策略：
  *   - 读操作：优先从数据库查询，没有数据则从 KV 读取并自动写入数据库
  *   - 写操作：只写入数据库，不回写 KV
- *   - 排行榜：优先从数据库查询，数据库无数据则遍历 KV
+ *   - 排行榜：合并 DB 和 KV 结果，KV 中未迁移的 source 也会被计入
  */
 
 // 数据库表已在 D1 控制台手动创建，不再执行建表语句
@@ -128,41 +128,47 @@ export async function writeAffectionMap(
 
 /**
  * 获取对某 target 的好感度排行榜。
- * 优先查询数据库，无数据则遍历 KV 并迁移。
+ * 合并 DB 和 KV 结果：DB 中已有的 source 不再从 KV 重复读取，
+ * KV 中尚未迁移的 source 会被补充进来并写入 DB。
  */
 export async function getAffectionRanking(
   db: D1Database | undefined,
   kv: KVNamespace,
   targetId: number
 ): Promise<Array<{ sourceId: number; firstName: string; value: number }>> {
+  const rows: Array<{ sourceId: number; firstName: string; value: number }> = [];
+  const dbSourceIds = new Set<number>(); // 已在 DB 中的 source，跳过 KV 读取
+
+  // 1. 查询 DB
   if (db) {
     try {
       await ensureDB(db);
       const { results } = await db
         .prepare(
-          'SELECT source_id, first_name, value FROM affections WHERE target_id = ? AND source_id != ? ORDER BY value DESC'
+          'SELECT source_id, first_name, value FROM affections WHERE target_id = ? AND source_id != ?'
         )
         .bind(targetId, targetId)
         .all<{ source_id: number; first_name: string; value: number }>();
 
-      if (results && results.length > 0) {
-        return results.map((row) => ({
-          sourceId: row.source_id,
-          firstName: row.first_name || '',
-          value: row.value || 0,
-        }));
+      if (results) {
+        for (const row of results) {
+          rows.push({
+            sourceId: row.source_id,
+            firstName: row.first_name || '',
+            value: row.value || 0,
+          });
+          dbSourceIds.add(row.source_id);
+        }
       }
     } catch (e) {
-      console.error('[affectionDB] getAffectionRanking DB 查询失败，回退到 KV', e);
+      console.error('[affectionDB] getAffectionRanking DB 查询失败，仅使用 KV', e);
     }
   }
 
-  // 回退到 KV：遍历所有 affection:* key
-  const rows: Array<{ sourceId: number; firstName: string; value: number }> = [];
+  // 2. 遍历 KV 补充未迁移的 source
   const migratedSources = new Set<number>();
-
-  let cursor: string | undefined;
   const targetKey = String(targetId);
+  let cursor: string | undefined;
 
   do {
     const list = await kv.list({ prefix: 'affection:', cursor });
@@ -173,6 +179,7 @@ export async function getAffectionRanking(
       if (parts.length < 2) continue;
       const sourceId = Number(parts[1]);
       if (Number.isNaN(sourceId) || sourceId === targetId) continue;
+      if (dbSourceIds.has(sourceId)) continue; // 已在 DB 中，跳过
 
       const raw = await kv.get(k.name);
       if (!raw) continue;
@@ -191,7 +198,7 @@ export async function getAffectionRanking(
     cursor = (list as any).cursor;
   } while (cursor);
 
-  // 如果 DB 可用且有 KV 数据，迁移到数据库
+  // 3. 将 KV 中发现的新 source 迁移到 DB
   if (db && migratedSources.size > 0) {
     for (const sid of migratedSources) {
       try {
@@ -205,6 +212,7 @@ export async function getAffectionRanking(
     }
   }
 
+  // 4. 排序返回
   rows.sort((a, b) => b.value - a.value);
   return rows;
 }
