@@ -111,16 +111,20 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     const lines: string[] = [];
     for (let i = 0; i < Math.min(rows.length, maxLines); i++) {
       const r = rows[i];
-      // 获取来源用户展示名
-      let sourceName = `用户${r.sourceId}`;
+      // 获取来源用户展示名：优先 fetchChatMember 取最新名字，回退到 DB/KV 中的记录
+      let sourceName = r.firstName || `用户${r.sourceId}`;
       try {
         const member = await TgMessage.fetchChatMember(env, chatId, Number(r.sourceId));
         sourceName = member.first_name ?? sourceName;
       } catch {
-        // 忽略 fetch 错误，保持占位名
+        // 忽略 fetch 错误，保持已有名字
       }
+      // 已经是 <a> 链接格式则直接使用，否则生成可点击的 tg://user 链接
+      const displayName = sourceName.startsWith('<a ')
+        ? sourceName
+        : `<a href="tg://user?id=${r.sourceId}">${escapeHtml(sourceName)}</a>`;
       const emoji = scoreToEmoji(r.value);
-      lines.push(`${i + 1}. ${escapeHtml(sourceName)} — ${emoji || String(r.value)}`);
+      lines.push(`${i + 1}. ${displayName} — ${emoji || String(r.value)}`);
     }
 
     let text = `${targetName} 的好感度排行榜：<blockquote expandable>` + lines.join("\n");
