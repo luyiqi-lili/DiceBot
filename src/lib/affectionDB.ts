@@ -95,9 +95,9 @@ export async function readAffectionMap(
   // 回退到 KV
   const map = await readAffectionMapFromKV(kv, sourceId);
 
-  // 如果有 DB，将 KV 数据迁移到数据库（不阻塞返回）
+  // 如果有 DB，将 KV 数据迁移到数据库
   if (db && Object.keys(map).length > 0) {
-    writeMapToDB(db, sourceId, map).catch((e) =>
+    await writeMapToDB(db, sourceId, map).catch((e) =>
       console.error('[affectionDB] 迁移 KV→DB 失败', e)
     );
   }
@@ -191,21 +191,18 @@ export async function getAffectionRanking(
     cursor = (list as any).cursor;
   } while (cursor);
 
-  // 如果 DB 可用且有 KV 数据，异步迁移到数据库
+  // 如果 DB 可用且有 KV 数据，迁移到数据库
   if (db && migratedSources.size > 0) {
-    (async () => {
+    for (const sid of migratedSources) {
       try {
-        await ensureDB(db);
-        for (const sid of migratedSources) {
-          const map = await readAffectionMapFromKV(kv, sid);
-          if (Object.keys(map).length > 0) {
-            await writeMapToDB(db, sid, map);
-          }
+        const map = await readAffectionMapFromKV(kv, sid);
+        if (Object.keys(map).length > 0) {
+          await writeMapToDB(db, sid, map);
         }
       } catch (e) {
         console.error('[affectionDB] 迁移排行数据到 DB 失败', e);
       }
-    })();
+    }
   }
 
   rows.sort((a, b) => b.value - a.value);
@@ -243,13 +240,16 @@ export async function getRoseSendDate(
 
   // 迁移到 DB
   if (db && date) {
-    db.prepare(
-      `INSERT OR REPLACE INTO rose_sends (user_id, send_date, updated_at)
-       VALUES (?, ?, datetime('now'))`
-    )
-      .bind(userId, date)
-      .run()
-      .catch((e) => console.error('[affectionDB] 迁移 rose_send 到 DB 失败', e));
+    try {
+      await db.prepare(
+        `INSERT OR REPLACE INTO rose_sends (user_id, send_date, updated_at)
+         VALUES (?, ?, datetime('now'))`
+      )
+        .bind(userId, date)
+        .run();
+    } catch (e) {
+      console.error('[affectionDB] 迁移 rose_send 到 DB 失败', e);
+    }
   }
 
   return date;
