@@ -36,23 +36,34 @@ import {
 // ── 格式化 ────────────────────────────────────────────────
 
 function fmtAttrsBlock(attrs: DndCharAttributes): string {
-  return ALL_ATTR_KEYS.map(k => {
+  const lines = ALL_ATTR_KEYS.map(k => {
     const val = attrs[k];
     const mod = fmtMod(val);
     const modStr = mod === '0' ? '±0' : mod;
-    return `${escapeHtml(attrKeyToName(k))} <b>${val}</b> (${modStr})`;
-  }).join(' | ');
+    return `  ${escapeHtml(attrKeyToName(k))}  <b>${val}</b>  (${modStr})`;
+  });
+  return lines.join('\n');
+}
+
+function fmtRaceBonusesText(bonuses: Record<string, number>): string {
+  if (!bonuses || Object.keys(bonuses).length === 0) return '';
+  return Object.entries(bonuses).map(([k, v]) => `${k}${v >= 0 ? '+' : ''}${v}`).join(', ');
 }
 
 function fmtCharSheet(
   charName: string, raceName: string, className: string,
   hpMax: number, attrs: DndCharAttributes, proficiencies: string[],
+  raceBonuses: Record<string, number>, classPrimaryAttr: string, classHitDie: number,
 ): string {
+  const raceLine = fmtRaceBonusesText(raceBonuses);
+
   return (
     `📜 <b>${escapeHtml(charName)}</b>\n` +
-    `🎭 ${escapeHtml(raceName)} | ${escapeHtml(className)} Lv.1\n` +
+    `🎭 ${escapeHtml(className)} | ${escapeHtml(raceName)}  Lv.1\n` +
     `❤️ HP: ${hpMax}/${hpMax}\n` +
-    `⭐ XP: 0\n\n` +
+    `⭐ XP: 0\n` +
+    (raceLine ? `🧬 种族加值: ${escapeHtml(raceLine)}\n` : '') +
+    `⚔️ 职业: 主属性 ${escapeHtml(classPrimaryAttr)} | 生命骰 d${classHitDie}\n\n` +
     `<b>📊 属性</b>\n` +
     fmtAttrsBlock(attrs) + '\n\n' +
     `<b>🏹 技能熟练</b>: ${proficiencies.length > 0 ? proficiencies.map(s => escapeHtml(s)).join('、') : '无'}`
@@ -63,7 +74,10 @@ function fmtCharSheet(
 
 async function rollAttrs(
   env: Env, chatId: number, raceName: string, className: string,
-): Promise<{ attrs: DndCharAttributes; hpMax: number; proficiencies: string[] } | null> {
+): Promise<{
+  attrs: DndCharAttributes; hpMax: number; proficiencies: string[];
+  raceBonuses: Record<string, number>; classPrimaryAttr: string; classHitDie: number;
+} | null> {
   const rolls = roll6x4d6k3();
   const shuffledKeys = shuffle([...ALL_ATTR_KEYS]);
   const attrs: DndCharAttributes = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
@@ -71,12 +85,10 @@ async function rollAttrs(
     attrs[shuffledKeys[i]] = rolls[i];
   }
 
-  const raceBonuses = await getRaceBonuses(env, chatId, raceName);
-  if (raceBonuses) {
-    for (const [name, val] of Object.entries(raceBonuses)) {
-      const key = attrNameToKey(name);
-      if (key) attrs[key] = (attrs[key] ?? 10) + val;
-    }
+  const raceBonuses = await getRaceBonuses(env, chatId, raceName) ?? {};
+  for (const [name, val] of Object.entries(raceBonuses)) {
+    const key = attrNameToKey(name);
+    if (key) attrs[key] = (attrs[key] ?? 10) + val;
   }
 
   const classInfo = await getClassInfo(env, chatId, className);
@@ -86,7 +98,7 @@ async function rollAttrs(
   const skills = await getSkillsForClass(env, chatId, className);
   const proficiencies = skills.map(s => s.skill_name);
 
-  return { attrs, hpMax, proficiencies };
+  return { attrs, hpMax, proficiencies, raceBonuses, classPrimaryAttr: classInfo?.primary_attr ?? '力量', classHitDie: hitDie };
 }
 
 // ── /new 主入口 ────────────────────────────────────────────
@@ -173,7 +185,7 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
   // 预览消息 — callback 只含 type（~15 字节）
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: `📋 <b>角色预览</b>\n\n${fmtCharSheet(charName, raceName, className, rolled.hpMax, rolled.attrs, rolled.proficiencies)}`,
+    text: `📋 <b>角色预览</b>\n\n${fmtCharSheet(charName, raceName, className, rolled.hpMax, rolled.attrs, rolled.proficiencies, rolled.raceBonuses, rolled.classPrimaryAttr, rolled.classHitDie)}`,
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: {
@@ -240,7 +252,7 @@ export async function handleDndRerollCallback(callbackQuery: any, callbackData: 
   if (msgId) {
     await TgMessage.editMessageText(env, {
       chat_id: chatId, message_id: msgId,
-      text: `🔄 已重骰属性！\n\n${fmtCharSheet(char.char_name, char.race, char.class, rolled.hpMax, rolled.attrs, rolled.proficiencies)}`,
+      text: `🔄 已重骰属性！\n\n${fmtCharSheet(char.char_name, char.race, char.class, rolled.hpMax, rolled.attrs, rolled.proficiencies, rolled.raceBonuses, rolled.classPrimaryAttr, rolled.classHitDie)}`,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [

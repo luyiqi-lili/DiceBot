@@ -1,6 +1,6 @@
 /**
  * @file src/commands/dndChar.ts
- * @description /char — 查看自己的完整角色卡。
+ * @description /char — 查看自己的完整角色卡（属性分行、种族加值、职业特性）。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -8,6 +8,8 @@ import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {
   getCharacter,
+  getRaceBonuses,
+  getClassInfo,
   parseAttributes,
   fmtMod,
   attrKeyToName,
@@ -15,7 +17,17 @@ import {
   type DndCharacterRow,
 } from '../lib/dndCore';
 
-function fmtCharSheetFull(char: DndCharacterRow): string {
+function fmtRaceBonusesText(bonuses: Record<string, number>): string {
+  if (!bonuses || Object.keys(bonuses).length === 0) return '';
+  return Object.entries(bonuses).map(([k, v]) => `${k}${v >= 0 ? '+' : ''}${v}`).join(', ');
+}
+
+function fmtCharSheetFull(
+  char: DndCharacterRow,
+  raceBonuses: Record<string, number>,
+  classPrimaryAttr: string,
+  classHitDie: number,
+): string {
   const attrs = parseAttributes(char.attributes);
   let profs: string[] = [];
   let equip: string[] = [];
@@ -26,16 +38,20 @@ function fmtCharSheetFull(char: DndCharacterRow): string {
     const val = attrs[k];
     const mod = fmtMod(val);
     const modStr = mod === '0' ? '±0' : mod;
-    return `${escapeHtml(attrKeyToName(k))} <b>${val}</b> (${modStr})`;
-  });
+    return `  ${escapeHtml(attrKeyToName(k))}  <b>${val}</b>  (${modStr})`;
+  }).join('\n');
+
+  const raceLine = fmtRaceBonusesText(raceBonuses);
 
   return (
     `📜 <b>${escapeHtml(char.char_name)}</b>\n` +
-    `🎭 ${escapeHtml(char.race)} | ${escapeHtml(char.class)} Lv.${char.level}\n` +
+    `🎭 ${escapeHtml(char.class)} | ${escapeHtml(char.race)}  Lv.${char.level}\n` +
     `❤️ HP: ${char.hp_current}/${char.hp_max}\n` +
-    `⭐ XP: ${char.xp}\n\n` +
+    `⭐ XP: ${char.xp}\n` +
+    (raceLine ? `🧬 种族加值: ${escapeHtml(raceLine)}\n` : '') +
+    `⚔️ 职业: 主属性 ${escapeHtml(classPrimaryAttr)} | 生命骰 d${classHitDie}\n\n` +
     `<b>📊 属性</b>\n` +
-    attrLines.join(' | ') + '\n\n' +
+    attrLines + '\n\n' +
     `<b>🏹 技能熟练</b>\n` +
     (profs.length > 0 ? profs.map(s => `  ✔ ${escapeHtml(s)}`).join('\n') : '  暂无') + '\n\n' +
     `<b>🎒 装备</b>\n` +
@@ -69,9 +85,15 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
     return;
   }
 
+  // 查询种族加值和职业信息
+  const [raceBonuses, classInfo] = await Promise.all([
+    getRaceBonuses(env, chatId, char.race),
+    getClassInfo(env, chatId, char.class),
+  ]);
+
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: fmtCharSheetFull(char),
+    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0),
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
