@@ -32,6 +32,16 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             wrangler deploy -e prod
+            echo "ENV=prod" >> $GITHUB_ENV
           else
             wrangler deploy -e dev
+            echo "ENV=dev" >> $GITHUB_ENV
           fi
+
+      - name: 发送部署通知到 Telegram
+        if: success()
+        run: |
+          bash scripts/notify-deploy.sh \
+            "${{ env.ENV }}" \
+            "${{ github.sha }}" \
+            "${{ github.event.head_commit.message }}"
