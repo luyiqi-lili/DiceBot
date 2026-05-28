@@ -33,20 +33,38 @@ async function findSkill(
 // ── 内部: AI RP 描述 ──────────────────────────────────────
 
 async function generateFlavor(
-  env: Env, skillName: string, result: number,
-  success: boolean | null, dcLabel: string,
+  env: Env,
+  skillName: string,
+  skillDesc: string,
+  charName: string,
+  charRace: string,
+  charClass: string,
+  result: number,
+  success: boolean | null,
+  dcLabel: string,
+  oppName?: string,
 ): Promise<string> {
   if (!env.AI) return '';
-  const outcome = success === null ? '无DC比较' : success ? '成功' : '失败';
+  const outcome = success === null ? '' : success ? '成功' : '失败';
+  const charInfo = `${charName}（${charRace}${charClass}）`;
+  const oppInfo = oppName ? `，对手是${oppName}` : '';
+  const scenePrompt = dcLabel !== '无DC' ? `，场景：${dcLabel}` : '';
+
   try {
     const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
       messages: [{
+        role: 'system',
+        content: '你是一个专精于龙与地下城（DND）跑团叙事的主持人。用简洁生动的文笔描述角色的行动，注重动作细节和环境氛围，像小说一样。输出1-2句中文，不要复读数值，不要以"你"开头，用第三人称叙述。',
+      },
+      {
         role: 'user',
-        content: `跑团主持人。写一句简短中文RP描述（15字内，骰娘风格）：技能=${skillName}，结果=${result}，${dcLabel}，${outcome}。只输出描述。`,
+        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n${skillName}（${skillDesc}）检定结果为${outcome}（掷点${result}）。\n\n请根据结果描述角色的动作情景：`,
       }],
-      max_tokens: 60,
+      max_tokens: 120,
     });
-    return ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
+    const text = ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
+    // 清理常见前缀
+    return text.replace(/^(描述[：:]|情景[：:]|\d+[\.、])\s*/i, '').trim();
   } catch { return ''; }
 }
 
@@ -174,7 +192,7 @@ export async function performSkillCheck(
   // RP 描述
   let flavorLine = '';
   if (env.AI) {
-    const flavor = await generateFlavor(env, skillName, myTotal, success, dcLabelForAI);
+    const flavor = await generateFlavor(env, skillName, skill.description || '', char.char_name, char.race, char.class, myTotal, success, dcLabelForAI, oppName || undefined);
     if (flavor) flavorLine = `\n📝 ${escapeHtml(flavor)}`;
   }
 
