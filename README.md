@@ -46,6 +46,8 @@
 
 **数据流**：Telegram webhook → `parseUpdate` 解析 → `loadCommand/loadCallback` 静态 import → handler 执行业务逻辑 → `TgMessage.sendText` 回复 → 备份到 D1
 
+**DND 子系统**：`/dnd /new /char /skill /skills /rest /gm` 命令 + `dnd_confirm/dnd_reroll/item_action` 回调 → D1 数据库（dnd_races/dnd_classes/dnd_skills/dnd_characters/dnd_gm/dnd_dc/dnd_item_templates/dnd_inventory）→ Cloudflare AI 生成技能叙事
+
 **存储层**：
 - **KV**（8 个 namespace）：配置、书签、新闻、好感度、钓鱼记录、话题标题、物品、货币缓存
 - **Durable Objects**（2 个）：CoinDO（原子转账 SQLite）、LotteryDO（彩票状态 SQLite）
@@ -103,6 +105,76 @@
 | `/rule` | 查看/设置群组规则 |
 | `/help` | 查看帮助 |
 
+### ⚔️ DND 跑团系统
+
+> 设计目的：在 Telegram 群聊中实现轻量级桌面角色扮演（TRPG），让群友可以创建自定义角色、进行技能对抗、装备物品，由 GM 主持冒险。所有数据按群组隔离，支持多群并行跑团。
+
+#### 🎭 角色系统
+
+| 命令 | 说明 |
+|------|------|
+| `/dnd` | 查看本群种族/职业/技能，快捷创建角色 |
+| `/new 种族 职业 角色名` | 创建角色（预览属性 → 确认/重骰），已有角色直接覆盖 |
+| `/char` | 查看完整角色卡（含种族加值、职业特性、装备加成） |
+
+**角色属性**：力量/敏捷/体质/智力/感知/魅力，4d6k3 × 6 随机分配 + 种族加值 + 装备加成 = 最终有效值。调整值 = (属性-10)/2。
+
+#### 🏹 技能检定
+
+| 命令 | 说明 |
+|------|------|
+| `/skill 技能名` | 技能检定（熟练 d20 / 非熟练 d10 + 属性 + 种族 + 装备） |
+| `*技能名` | 同上，快捷触发（非命令消息以 `*` 开头，排除 `**粗体**`） |
+| `/skills` | 列出本群所有技能及当前角色的调整值（✔ 熟练标记） |
+
+**对抗机制**：回复某人使用技能 → 双方各掷 d20 + 属性 + 种族加值进行 PVP 对抗，差距分档（碾压/轻松/险胜/持平/惜败/惨败）驱动 AI 叙事描写。
+
+**AI 叙事**：每次技能检定调用 Cloudflare AI（Llama 3 8B）生成 DND 小说风格的动作描写，融合技能描述、对抗差距，物理/魔法自动区分，失败不颠倒攻防。
+
+#### 💤 休息
+
+| 命令 | 说明 |
+|------|------|
+| `/rest short` | 短休 — 恢复 hit_die + 体质调整 HP（每日 2 次） |
+| `/rest long` | 长休 — 恢复满 HP（每日 1 次） |
+
+#### 📦 物品系统
+
+| 命令 | 说明 |
+|------|------|
+| `/item` | 按钮式背包 — 装备/卸下/使用一键点击，自动刷新 |
+| `/item send 名称 [数量]` | 回复某人赠送物品 |
+
+**物品类型**：装备（分配部位 head/body/hands/feet/weapon/offhand/accessory，同部位自动卸旧装新）+ 消耗品（有限次数自动消耗归零，无限次数永久保留）。
+
+**装备加成**：已装备物品的属性加值实时叠加到角色卡和技能检定中。
+
+#### 🛡️ GM 命令
+
+| 命令 | 说明 | 权限 |
+|------|------|------|
+| `/gm 种族加值 种族 +N属性 描述` | 幂等设置种族属性加值 | GM |
+| `/gm 职业 职业 主属性 [生命骰] 描述` | 幂等设置职业 | GM |
+| `/gm 技能 技能 种族+N 职业 属性 描述` | 幂等设置技能 | GM |
+| `/gm dc 数值 描述` | 设置场景 DC | GM |
+| `/gm addxp 数值` | 回复某人添加 XP | GM |
+| `/gm setgm` | 回复某人任命为 GM | 超管 8080375150 |
+| `/gm item create 名称 装备/消耗品 [部位] [+N属性] [次数] 描述` | 创建物品模板 | GM |
+| `/gm item list / delete / give` | 列出/删除/发放物品 | GM |
+
+**GM 权限**：按群组隔离，超管天然拥有所有群 GM 权限。
+
+#### 🔮 后续规划
+
+| 优先级 | 功能 | 说明 |
+|--------|------|------|
+| 🟡 P1 | 攻击系统 | 武器攻击检定、伤害计算（武器骰 + 力量/敏捷调整）、HP 扣减 |
+| 🟡 P1 | 魔法系统 | 法术位管理、法术列表（按职业/等级）、施法检定、法术效果 |
+| 🟢 P2 | 等级提升 | XP 达标自动升级、HP/属性成长、新技能解锁 |
+| 🟢 P2 | 怪物/NPC | GM 创建怪物模板、怪物属性、怪物技能 |
+| 🔵 P3 | 战斗回合 | 先攻掷骰、回合制战斗流程、行动顺序管理 |
+| 🔵 P3 | 存档/读档 | 跑团记录持久化、会话回放 |
+
 ---
 
 ## 📂 仓库结构
@@ -126,8 +198,15 @@
 │   │   ├── item.ts           # 物品 /item
 │   │   ├── act.ts            # 活动记录 /act
 │   │   ├── report.ts         # 群聊汇报 /report
-│   │   ├── rule.ts           # 群规则 /rule
-│   │   ├── trans.ts          # 翻译 /trans
+│ │   │   ├── rule.ts           # 群规则 /rule
+│ │   │   ├── dndHelp.ts        # DND 帮助 /dnd
+│ │   │   ├── dndNew.ts         # 角色创建 + 回调
+│ │   │   ├── dndChar.ts        # 角色卡 /char
+│ │   │   ├── dndSkill.ts       # 技能检定 /skill + *技能名
+│ │   │   ├── dndSkills.ts      # 技能列表 /skills
+│ │   │   ├── dndRest.ts        # 休息 /rest
+│ │   │   ├── dndGm.ts          # GM 命令 /gm
+│ │   │   ├── trans.ts          # 翻译 /trans
 │   │   ├── echo.ts           # 回声 /echo
 │   │   ├── emote.ts          # 动作指令 /em /me
 │   │   ├── like.ts           # 调用统计 /like
@@ -137,16 +216,19 @@
 │   │   ├── aiAssistInline.ts # AI 辅助 inline query
 │   │   ├── topicEditHandler.ts
 │   │   └── deleteMessage.ts
-│   ├── data/                  # 静态数据（按域拆分）
-│   │   ├── admin.ts           # 管理员权限白名单
+│ │   ├── data/                  # 静态数据（按域拆分）
+│ │   │   ├── admin.ts           # 管理员权限白名单
+│ │   │   ├── dndPresets.ts      # DND 预设种族/职业/技能
 │   │   ├── groups.ts          # 群组白名单
 │   │   ├── tarot.ts           # 塔罗牌大阿尔卡那
 │   │   ├── fish.ts            # 鱼种 + 抛竿描述
 │   │   ├── texts.ts           # 好感度/态度文本
 │   │   ├── payment.ts         # 付费场景配置
 │   │   └── backup.ts          # 消息备份映射
-│   ├── lib/                  # 公共库
-│   │   ├── tgMessage.ts      # Telegram API 封装 & 消息解析
+│ │   ├── lib/                  # 公共库
+│ │   │   ├── tgMessage.ts      # Telegram API 封装 & 消息解析
+│ │   │   ├── dndCore.ts        # DND 核心逻辑（掷骰/属性/D1 CRUD）
+│ │   │   ├── itemCore.ts       # 物品模板/背包/装备加成
 │   │   ├── coinService.ts    # Coin DO 服务层封装
 │   │   ├── liveConfig.ts     # 运行时配置（白名单、静态数据）
 │   │   ├── backup.ts         # 消息备份到 D1
