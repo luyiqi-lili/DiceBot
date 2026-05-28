@@ -1,0 +1,52 @@
+/**
+ * @file src/data/tarot.ts
+ * @description 塔罗牌大阿尔卡那数据（正位 + 逆位）。
+ */
+
+
+export const MAJOR_ARCANA = [
+  { name: "愚者", file: "https://luyiqi-lili.github.io/pic/0.jpg" },
+  { name: "魔术师", file: "https://luyiqi-lili.github.io/pic/1.jpg" },
+  { name: "女祭司", file: "https://luyiqi-lili.github.io/pic/2.jpg" },
+  { name: "皇后", file: "https://luyiqi-lili.github.io/pic/3.jpg" },
+  { name: "皇帝", file: "https://luyiqi-lili.github.io/pic/4.jpg" },
+  { name: "教皇", file: "https://luyiqi-lili.github.io/pic/5.jpg" },
+  { name: "恋人", file: "https://luyiqi-lili.github.io/pic/6.jpg" },
+  { name: "战车", file: "https://luyiqi-lili.github.io/pic/7.jpg" },
+  { name: "力量", file: "https://luyiqi-lili.github.io/pic/8.jpg" },
+  { name: "隐者", file: "https://luyiqi-lili.github.io/pic/9.jpg" },
+  { name: "命运之轮", file: "https://luyiqi-lili.github.io/pic/10.jpg" },
+  { name: "正义", file: "https://luyiqi-lili.github.io/pic/11.jpg" },
+  { name: "倒吊人", file: "https://luyiqi-lili.github.io/pic/12.jpg" },
+  { name: "死亡", file: "https://luyiqi-lili.github.io/pic/13.jpg" },
+  { name: "节制", file: "https://luyiqi-lili.github.io/pic/14.jpg" },
+  { name: "恶魔", file: "https://luyiqi-lili.github.io/pic/15.jpg" },
+  { name: "高塔", file: "https://luyiqi-lili.github.io/pic/16.jpg" },
+  { name: "星星", file: "https://luyiqi-lili.github.io/pic/17.jpg" },
+  { name: "月亮", file: "https://luyiqi-lili.github.io/pic/18.jpg" },
+  { name: "太阳", file: "https://luyiqi-lili.github.io/pic/19.jpg" },
+  { name: "审判", file: "https://luyiqi-lili.github.io/pic/20.jpg" },
+  { name: "世界", file: "https://luyiqi-lili.github.io/pic/21.jpg" },
+  { name: "逆愚者", file: "https://luyiqi-lili.github.io/pic/0d.jpg" },
+  { name: "逆魔术师", file: "https://luyiqi-lili.github.io/pic/1d.jpg" },
+  { name: "逆女祭司", file: "https://luyiqi-lili.github.io/pic/2d.jpg" },
+  { name: "逆皇后", file: "https://luyiqi-lili.github.io/pic/3d.jpg" },
+  { name: "逆皇帝", file: "https://luyiqi-lili.github.io/pic/4d.jpg" },
+  { name: "逆教皇", file: "https://luyiqi-lili.github.io/pic/5d.jpg" },
+  { name: "逆恋人", file: "https://luyiqi-lili.github.io/pic/6d.jpg" },
+  { name: "逆战车", file: "https://luyiqi-lili.github.io/pic/7d.jpg" },
+  { name: "逆力量", file: "https://luyiqi-lili.github.io/pic/8d.jpg" },
+  { name: "逆隐者", file: "https://luyiqi-lili.github.io/pic/9d.jpg" },
+  { name: "逆命运之轮", file: "https://luyiqi-lili.github.io/pic/10d.jpg" },
+  { name: "逆正义", file: "https://luyiqi-lili.github.io/pic/11d.jpg" },
+  { name: "逆倒吊人", file: "https://luyiqi-lili.github.io/pic/12d.jpg" },
+  { name: "逆死亡", file: "https://luyiqi-lili.github.io/pic/13d.jpg" },
+  { name: "逆节制", file: "https://luyiqi-lili.github.io/pic/14d.jpg" },
+  { name: "逆恶魔", file: "https://luyiqi-lili.github.io/pic/15d.jpg" },
+  { name: "逆高塔", file: "https://luyiqi-lili.github.io/pic/16d.jpg" },
+  { name: "逆星星", file: "https://luyiqi-lili.github.io/pic/17d.jpg" },
+  { name: "逆月亮", file: "https://luyiqi-lili.github.io/pic/18d.jpg" },
+  { name: "逆太阳", file: "https://luyiqi-lili.github.io/pic/19d.jpg" },
+  { name: "逆审判", file: "https://luyiqi-lili.github.io/pic/20d.jpg" },
+  { name: "逆世界", file: "https://luyiqi-lili.github.io/pic/21d.jpg" }
+];
