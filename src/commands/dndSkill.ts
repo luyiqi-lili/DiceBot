@@ -1,10 +1,7 @@
 /**
  * @file src/commands/dndSkill.ts
  * @description /skill <技能名> 和 *技能名 — 进行技能检定。
- *   自动附加属性调整与熟练加值（若该技能熟练），对比场景 DC，
- *   并调用 Cloudflare AI 生成 RP 描述。
- *
- *   导出 performSkillCheck() 供 index.ts 在检测到 *技能名 时直接调用。
+ *   支持回复目标进行 PVP 对抗检定，bot 回复挂在目标消息上，原始 *skill 消息删除。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -19,60 +16,60 @@ import {
   attrNameToKey,
   getDC,
   type DndSkillRow,
+  type DndCharacterRow,
 } from '../lib/dndCore';
 
 // ── 内部: 查询技能 ────────────────────────────────────────
 
 async function findSkill(
-  env: Env,
-  chatId: number,
-  skillName: string,
+  env: Env, chatId: number, skillName: string,
 ): Promise<DndSkillRow | null> {
   if (!env.DB) return null;
   return await env.DB.prepare(
     `SELECT * FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
-  )
-    .bind(String(chatId), skillName)
-    .first<DndSkillRow>() ?? null;
+  ).bind(String(chatId), skillName).first<DndSkillRow>() ?? null;
 }
 
-// ── 内部: 调用 AI 生成 RP 描述 ────────────────────────────
+// ── 内部: AI RP 描述 ──────────────────────────────────────
 
 async function generateFlavor(
-  env: Env,
-  skillName: string,
-  result: number,
-  success: boolean | null,
-  dcInfo: { dc_value: number; description: string } | null,
+  env: Env, skillName: string, result: number,
+  success: boolean | null, dcLabel: string,
 ): Promise<string> {
   if (!env.AI) return '';
-
-  const dcText = dcInfo
-    ? `DC=${dcInfo.dc_value}, ${dcInfo.description}`
-    : '无特定DC';
-
   const outcome = success === null ? '无DC比较' : success ? '成功' : '失败';
-  const prompt = `你是跑团主持人。为以下技能检定写一句简短生动的RP描述（15字以内，骰娘风格）：
-技能：${skillName}
-检定结果：${result}
-${dcText}
-结果：${outcome}
-
-只输出中文描述，不要前缀。`;
-
   try {
-    const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-      messages: [{ role: 'user', content: prompt }],
+    const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+      messages: [{
+        role: 'user',
+        content: `跑团主持人。写一句简短中文RP描述（15字内，骰娘风格）：技能=${skillName}，结果=${result}，${dcLabel}，${outcome}。只输出描述。`,
+      }],
       max_tokens: 60,
     });
-    const text = (response as any)?.response ?? (response as any)?.choices?.[0]?.message?.content ?? '';
-    return text.trim();
-  } catch {
-    return '';
-  }
+    return ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
+  } catch { return ''; }
 }
 
-// ── 公共检定函数（/skill 命令 和 *技能名 共用）─────────────
+// ── 内部: 计算角色对某技能的加成 ──────────────────────────
+
+async function calcCharBonus(
+  env: Env, chatId: number, char: DndCharacterRow, skill: DndSkillRow,
+): Promise<{ attrMod: number; raceBonus: number; attrName: string }> {
+  const attrs = parseAttributes(char.attributes);
+  const attrKey = attrNameToKey(skill.linked_attr);
+  const attrVal = attrKey ? attrs[attrKey] : 10;
+  const attrMod = calcMod(attrVal);
+
+  let raceBonus = 0;
+  try {
+    const rb: Record<string, number> = JSON.parse(skill.race_bonus);
+    if (rb[char.race]) raceBonus = rb[char.race];
+  } catch {}
+
+  return { attrMod, raceBonus, attrName: skill.linked_attr };
+}
+
+// ── 公共检定函数 ──────────────────────────────────────────
 
 export async function performSkillCheck(
   env: Env,
@@ -80,14 +77,18 @@ export async function performSkillCheck(
   threadId: number | undefined,
   userId: string,
   skillName: string,
+  opts?: {
+    replyToMessageId?: number;       // bot 消息回复挂载
+    targetUserId?: string;           // 被回复的目标用户 ID
+    targetName?: string;             // 目标显示名
+    deleteMsgId?: number;            // 删除原始 *skill 消息
+  },
 ): Promise<void> {
   if (!skillName) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: '⚠️ 用法：<code>/skill 技能名</code> 或 <code>*技能名</code>\n示例：<code>*扑倒</code>',
-      parse_mode: 'HTML',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
@@ -96,8 +97,7 @@ export async function performSkillCheck(
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: '⚠️ DND 系统需要 D1 数据库支持，当前环境未配置。',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
+      message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
@@ -106,10 +106,8 @@ export async function performSkillCheck(
   if (!char) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: '⚠️ 你还没有角色。使用 <code>/new 种族 职业 角色名</code> 创建。\n创建后执行 <code>/skill 技能名</code> 或 <code>*技能名</code> 进行检定。',
-      parse_mode: 'HTML',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
+      text: '⚠️ 你还没有角色。使用 <code>/new 种族 职业 角色名</code> 创建。',
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
@@ -119,71 +117,97 @@ export async function performSkillCheck(
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `⚠️ 技能「${escapeHtml(skillName)}」不存在。使用 /skills 查看可用技能。`,
-      parse_mode: 'HTML',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
 
-  const attrs = parseAttributes(char.attributes);
-
-  // 判断熟练
+  // 发起者加成
+  const my = await calcCharBonus(env, chatId, char, skill);
   const isProficient = char.class === skill.class_name;
   const baseRoll = isProficient ? rollD20() : rollD10();
   const dieLabel = isProficient ? 'd20' : 'd10';
+  const myTotal = baseRoll + my.attrMod + my.raceBonus;
 
-  // 属性调整值
-  const attrKey = attrNameToKey(skill.linked_attr);
-  const attrVal = attrKey ? attrs[attrKey] : 10;
-  const attrMod = calcMod(attrVal);
+  // 对手检定（如果有目标）—— 对抗掷骰
+  let oppLine = '';
+  let oppValue: number | null = null;
+  let oppName = '';
+  let targetChar: DndCharacterRow | null = null;
 
-  // 种族加值
-  let raceBonus = 0;
-  try {
-    const rb: Record<string, number> = JSON.parse(skill.race_bonus);
-    if (rb[char.race]) raceBonus = rb[char.race];
-  } catch {}
+  if (opts?.targetUserId) {
+    targetChar = await getCharacter(env, chatId, opts.targetUserId);
+    if (targetChar) {
+      const opp = await calcCharBonus(env, chatId, targetChar, skill);
+      const oppRoll = rollD20();
+      oppValue = oppRoll + opp.attrMod + opp.raceBonus;
+      oppName = opts.targetName || targetChar.char_name;
 
-  const total = baseRoll + attrMod + raceBonus;
-
-  // DC 比较
-  const dcInfo = await getDC(env, chatId);
-  let dcLine = '';
-  let success: boolean | null = null;
-  if (dcInfo && dcInfo.dc_value > 0) {
-    success = total >= dcInfo.dc_value;
-    dcLine = `\n📌 当前 DC：${dcInfo.dc_value} → ${success ? '✅ 成功！' : '❌ 失败'}`;
-    if (dcInfo.description) dcLine += ` — ${escapeHtml(dcInfo.description)}`;
+      const oppParts: string[] = [];
+      oppParts.push(`${escapeHtml(opp.attrName)}(${opp.attrMod >= 0 ? '+' : ''}${opp.attrMod})`);
+      if (opp.raceBonus) oppParts.push(`种族(+${opp.raceBonus})`);
+      oppLine = `\n🛡️ <b>${escapeHtml(oppName)}</b>：d20(${oppRoll}) + ${oppParts.join(' + ')} = <b>${oppValue}</b>`;
+    }
   }
 
-  // RP 描述（AI）
+  // DC / 胜负判断
+  let dcLine = '';
+  let success: boolean | null = null;
+  let dcLabelForAI = '无DC';
+
+  if (oppValue !== null) {
+    // PVP 对抗
+    success = myTotal > oppValue;
+    dcLine = `\n⚔️ ${myTotal} vs ${oppValue} → ${success ? '✅ 成功！' : '❌ 失败'}`;
+    dcLabelForAI = `对手=${oppName}, 对方${oppValue}`;
+  } else {
+    // 场景 DC
+    const dcInfo = await getDC(env, chatId);
+    if (dcInfo && dcInfo.dc_value > 0) {
+      success = myTotal >= dcInfo.dc_value;
+      dcLine = `\n📌 当前 DC：${dcInfo.dc_value} → ${success ? '✅ 成功！' : '❌ 失败'}`;
+      if (dcInfo.description) dcLine += ` — ${escapeHtml(dcInfo.description)}`;
+      dcLabelForAI = `DC=${dcInfo.dc_value}, ${dcInfo.description}`;
+    }
+  }
+
+  // RP 描述
   let flavorLine = '';
   if (env.AI) {
-    const flavor = await generateFlavor(env, skillName, total, success, dcInfo);
+    const flavor = await generateFlavor(env, skillName, myTotal, success, dcLabelForAI);
     if (flavor) flavorLine = `\n📝 ${escapeHtml(flavor)}`;
   }
 
-  // 组装输出
-  const parts: string[] = [];
-  if (isProficient) parts.push(`熟练(+${attrMod >= 0 ? '+' : ''}${attrMod})`);
-  else parts.push(`${escapeHtml(skill.linked_attr)}(${attrMod >= 0 ? '+' : ''}${attrMod})`);
-  if (raceBonus) parts.push(`种族(+${raceBonus})`);
-
-  const formulaStr = parts.length > 0 ? ` + ${parts.join(' + ')}` : '';
+  // 组装发起者检定行
+  const myParts: string[] = [];
+  if (isProficient) myParts.push(`熟练(+${my.attrMod >= 0 ? '+' : ''}${my.attrMod})`);
+  else myParts.push(`${escapeHtml(my.attrName)}(${my.attrMod >= 0 ? '+' : ''}${my.attrMod})`);
+  if (my.raceBonus) myParts.push(`种族(+${my.raceBonus})`);
+  const formulaStr = myParts.length > 0 ? ` + ${myParts.join(' + ')}` : '';
 
   const text =
-    `🎲 <b>${escapeHtml(skillName)}</b>检定：${dieLabel}(${baseRoll})${formulaStr} = <b>${total}</b>` +
+    `🎲 <b>${escapeHtml(skillName)}</b>检定：${dieLabel}(${baseRoll})${formulaStr} = <b>${myTotal}</b>` +
+    oppLine +
     dcLine +
     flavorLine;
 
-  await TgMessage.sendText(env, {
+  // 发送
+  const sendOpts: any = {
     chat_id: chatId,
     text,
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
-  });
+  };
+  if (opts?.replyToMessageId) {
+    sendOpts.reply_to_message_id = opts.replyToMessageId;
+  }
+  await TgMessage.sendText(env, sendOpts);
+
+  // 删除原始 *skill 消息
+  if (opts?.deleteMsgId) {
+    try { await TgMessage.deleteMessage(env, chatId, opts.deleteMsgId); } catch {}
+  }
 }
 
 // ── /skill 命令入口 ────────────────────────────────────────
@@ -193,6 +217,15 @@ export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<vo
   const threadId = parsed.threadId;
   const userId = String(parsed.from?.id ?? '');
   const args = parsed.args ?? [];
+  const skillName = args.join(' ').trim();
 
-  await performSkillCheck(env, chatId, threadId, userId, args.join(' ').trim());
+  const opts: NonNullable<Parameters<typeof performSkillCheck>[5]> = {};
+
+  if (parsed.isReply && parsed.replyToMessage?.from && !parsed.replyToMessage.from.is_bot) {
+    opts.replyToMessageId = parsed.replyToMessage.message_id;
+    opts.targetUserId = String(parsed.replyToMessage.from.id);
+    opts.targetName = parsed.replyToMessage.from.first_name || opts.targetUserId;
+  }
+
+  await performSkillCheck(env, chatId, threadId, userId, skillName, opts);
 }

@@ -330,7 +330,7 @@ export default {
 						return new Response('OK', { status: 200 });
 					}
 				} else {
-					// *技能名 → 等同于 /skill 技能名
+					// *技能名 → 等同于 /skill 技能名；支持回复目标
 					const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
 					if (rawText.startsWith('*') && !rawText.startsWith('**')) {
 						const skillName = rawText.slice(1).trim();
@@ -339,7 +339,14 @@ export default {
 							const chatId = parsedMessage.chatId!;
 							const threadId = parsedMessage.threadId;
 							const userId = String(parsedMessage.from?.id ?? '');
-							await performSkillCheck(env, chatId, threadId, userId, skillName);
+							const opts: any = {};
+							if (parsedMessage.isReply && parsedMessage.replyToMessage?.from && !parsedMessage.replyToMessage.from.is_bot) {
+								opts.replyToMessageId = parsedMessage.replyToMessage.message_id;
+								opts.targetUserId = String(parsedMessage.replyToMessage.from.id);
+								opts.targetName = parsedMessage.replyToMessage.from.first_name || opts.targetUserId;
+							}
+							opts.deleteMsgId = parsedMessage.message?.message_id;
+							await performSkillCheck(env, chatId, threadId, userId, skillName, opts);
 						}
 					}
 					await handleBackup(parsedMessage, env);
