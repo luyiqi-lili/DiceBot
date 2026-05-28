@@ -241,7 +241,7 @@ npm run cf-typegen   # 生成 Worker 类型定义
 | 🔴 P0 | API Key 从 wrangler.jsonc 迁移到 `wrangler secret` | ⬜ |
 | 🔴 P0 | 配置 `EXTERNAL_API_KEY` 或关闭 `/api/*` 路由 | ⬜ |
 | 🟡 P1 | 拆分 `liveConfig.ts`（1178 行 → admin / groups / tarot / fish / texts） | ✅ 完成 |
-| 🟡 P1 | 统一 `Env` 类型定义（消除 `any` 和分散的类型） | ⬜ |
+| 🟡 P1 | 统一 `Env` 类型定义（消除 `any` 和分散的类型） | ✅ 完成 |
 | 🟡 P1 | 消除 handler 中重复的 `chatId/threadId/from` 提取 | ⬜ |
 | 🟡 P1 | 删除死代码：`incrementUsageCount` import、空 `deleteUids` 数组 | ⬜ |
 | 🟢 P2 | DRY wrangler.jsonc 配置（顶层 + env override） | ⬜ |
