@@ -14,9 +14,15 @@ import { handleBackup } from './lib/backup';
 import { COMMAND_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
 
+/**
+ * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
+ * 包含 dev 和 prod 环境的所有 KV / Durable Object / D1 / API 绑定。
+ * 在 dev 环境中不存在的绑定标记为 ?，handler 中使用前需判空。
+ */
 export type Env = {
 	TOKEN: string;
 	BOT_USERNAME: string;
+	// KV 命名空间
 	NEWS_STORE: KVNamespace;
 	TOPIC_KV: KVNamespace;
 	BOOK_STORE: KVNamespace;
@@ -24,12 +30,18 @@ export type Env = {
 	TGBOTCOUNT: KVNamespace;
 	AFFECTION_KV: KVNamespace;
 	ITEM_STORE: KVNamespace;
-	COIN_DO: any;
 	COIN_KV: KVNamespace;
+	// Durable Objects
+	COIN_DO: DurableObjectNamespace;
 	LOTTERY_DO: DurableObjectNamespace;
-	DB: D1Database;
+	// D1 数据库（仅 prod）
+	DB?: D1Database;
+	// 外部 API
 	EXTERNAL_API_KEY?: string;
-	AI: any;
+	GOOGLE_API_KEYS?: string[];
+	SILICONFLOW_API_KEY?: string;
+	// Cloudflare AI 绑定
+	AI?: any;
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';

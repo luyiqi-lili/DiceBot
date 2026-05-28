@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { escapeHtml } from "../lib/util";
 
 /**
@@ -6,9 +6,7 @@ import { escapeHtml } from "../lib/util";
  * 支持：/act start, /act end, /act list, /act show <id> [page]
  */
 
-type Env = EnvLike & {
-  DB?: any; // D1Database
-};
+import type { Env } from '../index';
 
 function log(prefix: string, ...args: any[]) {
   console.log(`🔔 [act] ${prefix}`, ...args);
@@ -37,6 +35,7 @@ function paginateText(text: string, pageSize = 3000) {
 }
 
 async function doStart(parsed: ParsedUpdate, env: Env) {
+  if (!env.DB) { console.warn("[act] DB 不可用，跳过"); return; }
   const chatId = parsed.chatId || parsed.message?.chat?.id;
   const threadId = parsed.threadId ?? parsed.message?.message_thread_id ?? null;
   const msgId = parsed.message?.message_id ?? null;
@@ -47,7 +46,7 @@ async function doStart(parsed: ParsedUpdate, env: Env) {
 
   try {
     // 检查是否已有 pending
-    const sel = await env.DB.prepare(
+    const sel = await env.DB!.prepare(
       `SELECT start_time FROM act_pending WHERE chat_id = ? AND thread_id IS ?`
     ).bind(chatId, threadId).all();
 
@@ -61,7 +60,7 @@ async function doStart(parsed: ParsedUpdate, env: Env) {
     }
 
     const now = new Date().toISOString();
-    await env.DB.prepare(
+    await env.DB!.prepare(
       `INSERT INTO act_pending (chat_id, thread_id, start_message_id, start_time) VALUES (?, ?, ?, ?)`
     ).bind(chatId, threadId, msgId, now).run();
 
@@ -92,7 +91,7 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
 
   try {
     // 1) 查询 pending
-    const pendRes: any = await env.DB.prepare(
+    const pendRes: any = await env.DB!.prepare(
       `SELECT start_message_id, start_time FROM act_pending WHERE chat_id = ? AND thread_id IS ?`
     ).bind(chatId, threadId).all();
 
@@ -114,7 +113,7 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
     let rowsRes: any = null;
     const limit = 2000; // 安全上限
     if (startMsgId && endMsgId) {
-      rowsRes = await env.DB.prepare(
+      rowsRes = await env.DB!.prepare(
         `SELECT user_id, username, first_name, last_name, text_content, message_id, created_at
          FROM message_history
          WHERE chat_id = ? AND thread_id IS ?
@@ -124,7 +123,7 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
          LIMIT ?`
       ).bind(chatId, threadId, startMsgId, endMsgId, limit).all();
     } else if (startTime) {
-      rowsRes = await env.DB.prepare(
+      rowsRes = await env.DB!.prepare(
         `SELECT user_id, username, first_name, last_name, text_content, message_id, created_at
          FROM message_history
          WHERE chat_id = ? AND thread_id IS ?
@@ -135,7 +134,7 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
       ).bind(chatId, threadId, startTime, endTime, limit).all();
     } else {
       // 全体时间范围回退（非常少见）
-      rowsRes = await env.DB.prepare(
+      rowsRes = await env.DB!.prepare(
         `SELECT user_id, username, first_name, last_name, text_content, message_id, created_at
          FROM message_history
          WHERE chat_id = ? AND thread_id IS ?
@@ -149,13 +148,13 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
     if (!rows || rows.length === 0) {
       // 仍然写入 act_sessions（空内容）并清理 pending
       const id = genActId(new Date());
-      await env.DB.prepare(
+      await env.DB!.prepare(
         `INSERT INTO act_sessions
          (id, chat_id, thread_id, topic_name, start_message_id, start_time, end_message_id, end_time, content, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(id, chatId, threadId, null, startMsgId, startTime, endMsgId, endTime, "", new Date().toISOString()).run();
 
-      await env.DB.prepare(`DELETE FROM act_pending WHERE chat_id = ? AND thread_id IS ?`).bind(chatId, threadId).run();
+      await env.DB!.prepare(`DELETE FROM act_pending WHERE chat_id = ? AND thread_id IS ?`).bind(chatId, threadId).run();
 
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -188,14 +187,14 @@ async function doEnd(parsed: ParsedUpdate, env: Env) {
     const createdAt = new Date().toISOString();
 
     // 4) 插入 act_sessions
-    await env.DB.prepare(
+    await env.DB!.prepare(
       `INSERT INTO act_sessions
        (id, chat_id, thread_id, topic_name, start_message_id, start_time, end_message_id, end_time, content, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(id, chatId, threadId, null, startMsgId, startTime, endMsgId, endTime, joined, createdAt).run();
 
     // 5) 清理 pending
-    await env.DB.prepare(`DELETE FROM act_pending WHERE chat_id = ? AND thread_id IS ?`).bind(chatId, threadId).run();
+    await env.DB!.prepare(`DELETE FROM act_pending WHERE chat_id = ? AND thread_id IS ?`).bind(chatId, threadId).run();
 
     // 6) 回复用户并给出查看方式
     const snippet = joined.length > 400 ? joined.slice(0, 400) + "…[truncated]" : joined;
@@ -226,7 +225,7 @@ async function doList(parsed: ParsedUpdate, env: Env) {
   }
 
   try {
-    const q = await env.DB.prepare(
+    const q = await env.DB!.prepare(
       `SELECT id, start_time, end_time, substr(content,1,200) as snippet
        FROM act_sessions
        WHERE chat_id = ? AND thread_id IS ?
@@ -285,7 +284,7 @@ async function doShow(parsed: ParsedUpdate, env: Env, idArg?: string, pageArg?: 
   }
 
   try {
-    const q = await env.DB.prepare(
+    const q = await env.DB!.prepare(
       `SELECT id, content FROM act_sessions WHERE id = ? AND chat_id = ? AND thread_id IS ?`
     ).bind(idArg, chatId, threadId).all();
 
@@ -375,6 +374,7 @@ async function doShow(parsed: ParsedUpdate, env: Env, idArg?: string, pageArg?: 
  */
 export async function handleAct(parsed: ParsedUpdate, env: Env) {
   log("incoming act command", { text: parsed.text, chatId: parsed.chatId });
+  if (!env.DB) { log("DB 不可用，跳过"); return; }
 
   const originalText = parsed.text || parsed.message?.text || "";
   const botUsername = (env as any).BOT_USERNAME || "";

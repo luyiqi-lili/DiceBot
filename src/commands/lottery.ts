@@ -6,16 +6,13 @@
  *   开奖匹配精确号码（50%）和前两位（30%），剩余累积到下一期。
  */
 
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import { Env } from '../index';
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { LOTTERY_ADMIN_UIDS } from "../lib/liveConfig";
 import { getBalance, transfer } from "../lib/coinService";
 
-type LotteryEnv = EnvLike & {
-    BOT_USERNAME?: string;
-    COIN_DO: DurableObjectNamespace;
-    LOTTERY_DO: DurableObjectNamespace;
-};
+type LotteryEnv = Env;
 const TICKET_PRICE = 10;
 const MAX_TICKETS_PER_USER = 5; // 每人最多购买5张彩票
 

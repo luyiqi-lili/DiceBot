@@ -5,13 +5,9 @@
  *   使用 Cloudflare AI（@cf/openai/gpt-oss-120b）或 Gemini API 进行翻译。
  *   支持自定义目标语言，默认为简体中文。
  */
-
-import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml } from '../lib/util';
-
-type Env = EnvLike & {
-	AI: any; // Cloudflare AI 绑定
-};
+import type { Env } from '../index';
 
 export async function handleTrans(parsedMessage: ParsedUpdate, env: Env) {
 	console.log('[Trans] 🔍 进入 handleTrans (parsed)');

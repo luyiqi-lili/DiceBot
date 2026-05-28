@@ -1,16 +1,9 @@
 // commands/topicEditHandler.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import type { Env } from '../index';
 import {escapeHtml}  from "../lib/util";
 
-/**
- * Env 扩展类型 (Worker bindings)
- * - TOPIC_KV: KVNamespace
- * - TOKEN: string (保留以兼容外部使用，但内部不直接 fetch)
- */
-export type TopicEnv = EnvLike & {
-  TOPIC_KV: KVNamespace;
-  TOKEN?: string;
-};
+type TopicEnv = Env;
 
 /**
  * 处理论坛话题标题编辑事件（forum_topic_edited）

@@ -13,12 +13,10 @@
  * 注：风格、日志与 book.ts 保持一致，方便调试。
  */
 
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { deleteMarkup } from "../lib/util";
 
-export type Env = EnvLike & {
-  ITEM_STORE: KVNamespace;
-};
+import type { Env } from '../index';
 
 function getUserKey(userId: number): string {
   return `item:user:${userId}`;

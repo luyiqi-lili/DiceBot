@@ -13,7 +13,8 @@ import {
   TREASURY_KEY,
   sumAllUserBalances,
 } from "../lib/coinService";
-import type { CoinEnv } from "./coin";
+import type { Env } from "../index";
+type CoinEnv = Env;
 
 export async function handleCoinList(
   sub: string,

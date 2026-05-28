@@ -8,7 +8,8 @@
  *   好感度存储于 D1 数据库（affections 表）+ AFFECTION_KV 回退/备份。
  */
 
-import TgMessage, { ParsedUpdate, extractCmdContext } from "../lib/tgMessage";
+import { Env } from '../index';
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 
 import {
@@ -24,15 +25,7 @@ import {
   setRoseSendDate,
 } from "../lib/affectionDB";
 
-/**
- * 环境类型：在 CoinEnv 基础上要求 AFFECTION_KV
- */
-export type RoseEnv = Env & {
-  AFFECTION_KV: KVNamespace;
-  COIN_DO: DurableObjectNamespace;
-  TOKEN: string;
-  DB: D1Database;
-};
+type RoseEnv = Env;
 
 function scoreToEmoji(score: number): string {
   if (score < 10) return "";
@@ -92,7 +85,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     }
 
     // 从数据库（或 KV 回退）获取排行榜
-    const rows = await getAffectionRanking(env.DB, env.AFFECTION_KV, targetId);
+    const rows = await getAffectionRanking(env.DB!, env.AFFECTION_KV, targetId);
 
     if (rows.length === 0) {
       await TgMessage.sendText(env, {
@@ -161,7 +154,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   const targetName = (await TgMessage.fetchChatMember(env, chatId, target.id)).first_name
 
   // 读取当前好感地图（优先数据库，回退 KV）
-  const map = await readAffectionMap(env.DB, env.AFFECTION_KV, fromId);
+  const map = await readAffectionMap(env.DB!, env.AFFECTION_KV, fromId);
   const key = String(targetId);
   const rec = map[key] ?? { firstName: targetName, value: 0 };
   let score = Number(rec.value || 0);
@@ -175,7 +168,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       // 首次免费送花
       score += 160;
       map[key] = { firstName: targetName, value: score };
-      const writeResult = await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+      const writeResult = await writeAffectionMap(env.DB!, env.AFFECTION_KV, fromId, map);
       if (!writeResult.ok) {
         await TgMessage.sendText(env, {
           chat_id: chatId,
@@ -187,7 +180,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
         return;
       }
       // 记录已送花（当天）
-      await setRoseSendDate(env.DB, env.AFFECTION_KV, fromId, todayUTC);
+      await setRoseSendDate(env.DB!, env.AFFECTION_KV, fromId, todayUTC);
 
       const emoji = scoreToEmoji(score);
       await TgMessage.sendText(env, {
@@ -232,7 +225,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     // 记录好感度变化
     score += 160;
     map[key] = { firstName: targetName, value: score };
-    const writeResult = await writeAffectionMap(env.DB, env.AFFECTION_KV, fromId, map);
+    const writeResult = await writeAffectionMap(env.DB!, env.AFFECTION_KV, fromId, map);
     if (!writeResult.ok) {
       // coin 已扣除，但好感度写入失败：提示用户联系管理员
       await TgMessage.sendText(env, {

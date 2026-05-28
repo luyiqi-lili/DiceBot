@@ -6,15 +6,11 @@
 
 */
 
-import TgMessage, { EnvLike } from "../lib/tgMessage";
+import TgMessage from "../lib/tgMessage";
+import type { Env } from "../index";
 import { getTreasury,sumAllUserBalances } from "../lib/coinService";
  
-// 扩展 env 类型
-type CronEnv = EnvLike & {
-   BOT_USERNAME?: string;
-   COIN_DO:DurableObjectNamespace
-   TOKEN: string;
-};
+type CronEnv = Env;
 
 // 简单 logger
 function log(...args: any[]) {

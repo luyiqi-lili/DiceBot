@@ -2,11 +2,7 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import {escapeHtml}  from "../lib/util";
 
-type Env = {
-  TOKEN: string;
-  BOT_USERNAME: string;
-  NEWS_STORE: KVNamespace;
-};
+import type { Env } from '../index';
 
 
 function getDateStr(date = new Date()) {

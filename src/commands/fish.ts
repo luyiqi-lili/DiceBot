@@ -1,3 +1,4 @@
+import { Env } from '../index';
 import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from '../lib/coinService';
 import { fishList, getCastDesc } from '../lib/liveConfig';
@@ -11,14 +12,7 @@ import {
 	FishingRecord,
 } from '../lib/fishCore';
 
-/**
- * 扩展 env：在 CoinEnv 基础上需要 FISHING_RECORD_KV
- */
-export type FishEnv = Env & {
-	FISHING_RECORD_KV: KVNamespace;
-	COIN_DO: DurableObjectNamespace;
-	TOKEN: string;
-};
+type FishEnv = Env;
 
 /**
  * 池塘汇总记录，用同一个 KV（FISHING_RECORD_KV），key 前缀为 pond:YYYY-MM-DD

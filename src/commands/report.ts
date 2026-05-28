@@ -1,10 +1,7 @@
-import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
 import { escapeHtml } from '../lib/util';
 
-type Env = EnvLike & {
-	GOOGLE_API_KEYS?: string[]; // 与 trans.ts 一致
-	DB?: any; // D1Database 类型可替换为你的定义
-};
+import type { Env } from '../index';
 
 type GeminiResponse = {
 	candidates?: Array<{
@@ -47,7 +44,7 @@ async function updateLongTermMemory(env: Env, chatId: string, threadId: string |
           updated_at = datetime('now')
       `;
 
-			await env.DB.prepare(sql).bind(chatId, cleanedMemory).run();
+			await env.DB!.prepare(sql).bind(chatId, cleanedMemory).run();
 		} else {
 			// 对于有 thread_id 的情况
 			const sql = `
@@ -59,7 +56,7 @@ async function updateLongTermMemory(env: Env, chatId: string, threadId: string |
           updated_at = datetime('now')
       `;
 
-			await env.DB.prepare(sql).bind(chatId, threadId, cleanedMemory).run();
+			await env.DB!.prepare(sql).bind(chatId, threadId, cleanedMemory).run();
 		}
 
 		console.log('[Report] ✅ 长期记忆已更新');
@@ -79,7 +76,7 @@ async function fallbackUpdateLongTermMemory(env: Env, chatId: string, threadId: 
 		const cleanedMemory = memoryText.length > 10000 ? memoryText.substring(0, 10000) + '...[已截断]' : memoryText;
 
 		// 开始事务
-		await env.DB.exec('BEGIN TRANSACTION');
+		await env.DB!.exec('BEGIN TRANSACTION');
 
 		let updateSql: string;
 		let binds: any[];
@@ -102,7 +99,7 @@ async function fallbackUpdateLongTermMemory(env: Env, chatId: string, threadId: 
 			binds = [cleanedMemory, chatId, threadId];
 		}
 
-		const result = await env.DB.prepare(updateSql)
+		const result = await env.DB!.prepare(updateSql)
 			.bind(...binds)
 			.run();
 
@@ -113,20 +110,20 @@ async function fallbackUpdateLongTermMemory(env: Env, chatId: string, threadId: 
           INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
           VALUES (?, NULL, ?, datetime('now'), datetime('now'))
         `;
-				await env.DB.prepare(insertSql).bind(chatId, cleanedMemory).run();
+				await env.DB!.prepare(insertSql).bind(chatId, cleanedMemory).run();
 			} else {
 				const insertSql = `
           INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
           VALUES (?, ?, ?, datetime('now'), datetime('now'))
         `;
-				await env.DB.prepare(insertSql).bind(chatId, threadId, cleanedMemory).run();
+				await env.DB!.prepare(insertSql).bind(chatId, threadId, cleanedMemory).run();
 			}
 		}
 
-		await env.DB.exec('COMMIT');
+		await env.DB!.exec('COMMIT');
 		console.log('[Report] ✅ 长期记忆已通过回退方法更新');
 	} catch (error) {
-		await env.DB.exec('ROLLBACK');
+		await env.DB!.exec('ROLLBACK');
 		console.error('[Report] ❌ 回退方法更新长期记忆失败:', error);
 	}
 }
@@ -146,7 +143,7 @@ async function getLongTermMemory(env: Env, chatId: string, threadId: string | nu
 			binds.push(threadId);
 		}
 
-		const result = await env.DB.prepare(sql)
+		const result = await env.DB!.prepare(sql)
 			.bind(...binds)
 			.first();
 		return result?.memory_text || '';
@@ -179,7 +176,7 @@ async function getLongTermMemoryWithDetails(
 			binds.push(threadId);
 		}
 
-		const result = await env.DB.prepare(sql)
+		const result = await env.DB!.prepare(sql)
 			.bind(...binds)
 			.first();
 		return result || null;
@@ -197,6 +194,7 @@ async function getLongTermMemoryWithDetails(
  */
 export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 	console.log('[Report] 🔍 进入 handleReport');
+	if (!env.DB) { console.warn('[Report] DB 不可用，跳过'); return; }
 
 	const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
 	const threadId = parsedMessage.threadId ?? parsedMessage.message?.message_thread_id ?? null;
@@ -300,7 +298,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 
 		console.log('[Report] 📥 执行 SQL 查询 message_history', { chatId, threadId, since, limit });
 
-		const qRes: any = await env.DB.prepare(sql)
+		const qRes: any = await env.DB!.prepare(sql)
 			.bind(...binds)
 			.all();
 		const rows: any[] = (qRes && qRes.results) || qRes || [];

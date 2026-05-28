@@ -1,9 +1,5 @@
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
-
-type Env = EnvLike & {
-  GOOGLE_API_KEYS?: string[];
-  DB?: any; // D1Database
-};
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import type { Env } from '../index';
 
 type GeminiResponse = {
   candidates?: Array<{
@@ -91,6 +87,7 @@ async function getRecentUserContext(env: Env, userId: number): Promise<{
   threadId: number | null;
   topicName: string;
 } | null> {
+  if (!env.DB) { console.warn("[AI Assist] DB 不可用"); return null; }
   try {
     const sql = `
       SELECT chat_id, thread_id, topic_name, created_at
@@ -128,11 +125,12 @@ async function getRecentChatHistory(
   chatId: number, 
   threadId: number | null, 
   limit: number
-): Promise<any[]> {
-  try {
-    let sql = `
-      SELECT user_id, username, first_name, text_content, created_at
-      FROM message_history
+  ): Promise<any[]> {
+    if (!env.DB) { console.warn("[AI Assist] DB 不可用"); return []; }
+    try {
+      let sql = `
+        SELECT user_id, username, first_name, text_content, created_at
+        FROM message_history
       WHERE chat_id = ?
         AND text_content IS NOT NULL
         AND text_content != ''

@@ -27,7 +27,7 @@ export interface UserInfo {
  * 记录用户最后一次活跃时间
  */
 async function recordUserLastActive(
-  env: EnvLike & { DB: D1Database }, 
+  env: EnvLike & { DB?: D1Database }, 
   parsed: ParsedUpdate
 ): Promise<void> {
   try {
@@ -180,7 +180,7 @@ async function sendSenderLabel(env: EnvLike, dest: BackupTarget, senderLabel: st
  * 记录每条消息的文本内容、时间、房间(topic)等到 message_history 表
  */
 async function recordMessageContent(
-  env: EnvLike & { DB: D1Database },
+  env: EnvLike & { DB?: D1Database },
   parsed: ParsedUpdate
 ): Promise<void> {
   try {
@@ -298,7 +298,7 @@ async function deleteOriginalMessageIfNeeded(parsed: ParsedUpdate, env: EnvLike)
  * - 如果需要删除，则不进行备份
  * - 否则继续原有的备份逻辑
  */
-export async function handleBackup(parsed: ParsedUpdate, env: EnvLike & { DB: D1Database }) {
+export async function handleBackup(parsed: ParsedUpdate, env: EnvLike & { DB?: D1Database }) {
   try {
     if (!parsed) {
       log('未提供 parsed 参数，跳过备份');

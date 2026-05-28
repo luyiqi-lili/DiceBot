@@ -5,7 +5,8 @@
  *   支持费率计算（ease-in-out 曲线）、转账回滚等高级功能。
  */
 
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import type { Env } from "../index";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { handleCoinList } from "./coinList";
 import {
@@ -25,11 +26,7 @@ import {
   transfer
 } from "../lib/coinService";
 
-export type CoinEnv = EnvLike & {
-  BOT_USERNAME?: string;
-  COIN_DO: DurableObjectNamespace;
-  DB: D1Database;
-};
+type CoinEnv = Env; // 统一类型，从 ../index 导入
 
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
 // ADMIN_UIDS_* 已迁移至 src/lib/liveConfig.ts

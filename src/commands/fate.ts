@@ -13,12 +13,7 @@ import { escapeHtml } from "../lib/util";
 // 从 coin 模块复用 KV 操作函数
 import { getBalance, addToTreasury } from "../lib/coinService";
  
-type Env = {
-    TOKEN: string;
-    BOT_USERNAME?: string;
-    GOOGLE_API_KEYS?: string[];
-    COIN_DO: DurableObjectNamespace;
-};
+import type { Env } from '../index';
 
 
 export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> {
