@@ -137,6 +137,14 @@
 │   │   ├── aiAssistInline.ts # AI 辅助 inline query
 │   │   ├── topicEditHandler.ts
 │   │   └── deleteMessage.ts
+│   ├── data/                  # 静态数据（按域拆分）
+│   │   ├── admin.ts           # 管理员权限白名单
+│   │   ├── groups.ts          # 群组白名单
+│   │   ├── tarot.ts           # 塔罗牌大阿尔卡那
+│   │   ├── fish.ts            # 鱼种 + 抛竿描述
+│   │   ├── texts.ts           # 好感度/态度文本
+│   │   ├── payment.ts         # 付费场景配置
+│   │   └── backup.ts          # 消息备份映射
 │   ├── lib/                  # 公共库
 │   │   ├── tgMessage.ts      # Telegram API 封装 & 消息解析
 │   │   ├── coinService.ts    # Coin DO 服务层封装
@@ -232,7 +240,7 @@ npm run cf-typegen   # 生成 Worker 类型定义
 |--------|------|------|
 | 🔴 P0 | API Key 从 wrangler.jsonc 迁移到 `wrangler secret` | ⬜ |
 | 🔴 P0 | 配置 `EXTERNAL_API_KEY` 或关闭 `/api/*` 路由 | ⬜ |
-| 🟡 P1 | 拆分 `liveConfig.ts`（1178 行 → admin / groups / tarot / fish / texts） | ⬜ |
+| 🟡 P1 | 拆分 `liveConfig.ts`（1178 行 → admin / groups / tarot / fish / texts） | ✅ 完成 |
 | 🟡 P1 | 统一 `Env` 类型定义（消除 `any` 和分散的类型） | ⬜ |
 | 🟡 P1 | 消除 handler 中重复的 `chatId/threadId/from` 提取 | ⬜ |
 | 🟡 P1 | 删除死代码：`incrementUsageCount` import、空 `deleteUids` 数组 | ⬜ |
