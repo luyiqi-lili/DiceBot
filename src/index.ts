@@ -1,7 +1,7 @@
 /**
  * @file src/index.ts
  * @description Cloudflare Worker 主入口。处理 Telegram Webhook update、外部 API 请求和 Web 页面请求。
- *   通过 switch-case 分发命令到各 command handler，处理 callback_query、inline_query、topic_edited 等事件类型。
+ *   通过 src/routes.ts 路由表分发命令到各 command handler，处理 callback_query、inline_query、topic_edited 等事件类型。
  *   同时导出 DurableObject 类以供 wrangler 绑定。
  */
 
@@ -11,6 +11,7 @@ import { incrementUsageCount } from './commands/like';
 import { runCoinCheck } from './cron/cron';
 import { handleBackup } from './lib/backup';
 
+import { COMMAND_ROUTES, CALLBACK_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
 
 export type Env = {
@@ -246,80 +247,33 @@ export default {
 						}
 					}
 				}
-				// 处理回调命令
-				// TODO 回调都改成json格式
-				// ✅ 新逻辑：JSON 格式 callback
+				// 处理回调命令 — 路由表分发
 				if (typeof callbackData === 'object' && callbackData.type) {
-					console.log('index:parsedMessage.callbackData.type', callbackData.type);
-					switch (callbackData.type) {
-						// 在index.ts的callback_query处理部分添加
-						case 'congrats': {
-							console.log('➡️ 处理恭喜发财回调', callbackData);
-							const { handleCongratsCallback } = await import('./commands/congrats');
-							await handleCongratsCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-						case '21': {
-							// callbackQuery 为 parsedMessage.callbackQuery
-							// callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
-							console.log('➡️ 处理 21 点回调', callbackData);
-							// 引入新的 handler
-							const { handle21Callback } = await import('./commands/21');
-							await handle21Callback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-						case 'duel': {
-							// callbackQuery 为 parsedMessage.callbackQuery
-							// callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
-							console.log('➡️ 处理 duel 点回调', callbackData);
-							// 引入新的 handler
-							const { handleDuelCallback } = await import('./commands/duel');
-							await handleDuelCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-						case 'fish': {
-							// callbackQuery 为 parsedMessage.callbackQuery
-							// callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
-							console.log('➡️ 处理 fish 点回调', callbackData);
-							// 引入新的 handler
-							const { handleFishCallback } = await import('./commands/fish');
-							await handleFishCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-						case 'groll': {
-							// callbackQuery 为 parsedMessage.callbackQuery
-							// callbackData 为 解析后的对象，例如 { type: "21", action: "draw" }
-							console.log('➡️ 处理 groll回调', callbackData);
-							// 引入新的 handler
-							const { handleGrollCallback } = await import('./commands/groll');
-							await handleGrollCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
-						case 'lottery': {
-							console.log('➡️ 处理 lottery 回调', callbackData);
-							const { handleLotteryCallback } = await import('./commands/lottery');
-							await handleLotteryCallback(parsedMessage.callbackQuery, callbackData, env);
-							return new Response('OK', { status: 200 });
-						}
+					const cbType = callbackData.type;
+					console.log('index: callbackData.type', cbType);
 
-						case 'delete_message': {
-							const chat_id = callbackQuery.message.chat.id;
-							const message_id = callbackQuery.message.message_id;
-
-							await TgMessage.deleteMessage(env, chat_id, message_id);
-							await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
-								text: '消息已删除',
-								show_alert: true,
-							});
-
-							// 已处理完成，直接返回
-							return new Response('OK', { status: 200 });
-						}
-
-						default:
-							console.log('ℹ️ 未知 callback type，忽略', callbackData);
-							return new Response('OK', { status: 200 });
+					// delete_message 内联处理（逻辑特殊、仅 3 行）
+					if (cbType === 'delete_message') {
+						const chat_id = callbackQuery.message.chat.id;
+						const message_id = callbackQuery.message.message_id;
+						await TgMessage.deleteMessage(env, chat_id, message_id);
+						await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
+							text: '消息已删除',
+							show_alert: true,
+						});
+						return new Response('OK', { status: 200 });
 					}
+
+					const route = CALLBACK_ROUTES[cbType];
+					if (route) {
+						console.log(`➡️ 处理 ${cbType} 回调`);
+						const mod = await import(route.module);
+						await (mod as any)[route.handler](parsedMessage.callbackQuery, callbackData, env);
+						return new Response('OK', { status: 200 });
+					}
+
+					console.log('ℹ️ 未知 callback type，忽略', callbackData);
+					return new Response('OK', { status: 200 });
 				}
 			}
 
@@ -331,237 +285,25 @@ export default {
 					console.log('main:command', parsedMessage.command);
 					//await incrementUsageCount(parsedMessage, env);
 
-					switch (parsedMessage.command) {
-						//书签
-
-						/*    case "migrate": {
-                  console.log("index: 检测到 /book 命令，进入 book逻辑");
-                  const { handleMigrate } = await import("./commands/migrate");
-                  await handleMigrate(parsedMessage, env);
-                  await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
-                  console.log(`index: /migrate 处理完成`);
-                  return new Response("OK", { status: 200 });
-                }
-                  */
-						// 在index.ts的message命令处理switch中添加
-						case '恭喜发财':
-						case '恭喜發財':
-						case '爸爸':
-						case '恭喜發財':
-						case '媽媽':
-						case '妈妈': {
-							console.log('index: 检测到 /恭喜发财，红包拿来 或 /妈妈 命令');
-							const { handleCongrats } = await import('./commands/congrats');
-							await handleCongrats(parsedMessage, env);
-							//await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
-							console.log(`index: /恭喜发财，红包拿来 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						case 'lottery': {
-							console.log('index: 检测到 /lottery 命令，进入 lottery 逻辑');
-							const { handleLottery } = await import('./commands/lottery');
-							await handleLottery(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /lottery 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						case 'act': {
-							console.log('index: 检测到 /act 命令，进入 act 逻辑');
-							const { handleAct } = await import('./commands/act');
-							await handleAct(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /act 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						case 'report': {
-							console.log('index: 检测到 /report 命令，进入 report 逻辑');
-							const { handleReport } = await import('./commands/report');
-							await handleReport(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /report 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						case 'book': {
-							console.log('index: 检测到 /book 命令，进入 book逻辑');
-							const { handleBook } = await import('./commands/book');
-							await handleBook(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /book 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//UID查询
-						case 'whoami': {
-							console.log('index: 检测到 / whoami 命令，进入 whoami 逻辑');
-							const { handleWhoami } = await import('./commands/whoami');
-							await handleWhoami(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: / whoami 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//抽卡
-						case 'fate': {
-							console.log('index: 检测到 /fate 命令，进入 fate逻辑');
-							const { handleFate } = await import('./commands/fate');
-							await handleFate(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /fate 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-
-						case 'item': {
-							console.log('index: 检测到 / item 命令，进入 item 逻辑');
-							const { handleItem } = await import('./commands/item');
-							await handleItem(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /fate 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-
-						//送花
-						case 'rose': {
-							console.log('index: 检测到 /rose 命令，进入 rose逻辑');
-							const { handleRose } = await import('./commands/rose');
-							await handleRose(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /rose 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//骰点
-						case 'roll':
-						case 'r':
-						case 'rd':
-						case 'rh': {
-							console.log('index: 检测到 /roll 命令，进入 roll逻辑');
-							const { handleRoll } = await import('./commands/roll');
-							await handleRoll(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /roll 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-
-						//骰点
-						case 'em':
-						case 'me':
-						case 'emote': {
-							console.log('index: 检测到 /emote 命令，进入 emote逻辑');
-							const { handleEmote } = await import('./commands/emote');
-							await handleEmote(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /emote 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-
-						//帮助
-						case 'help': {
-							console.log('index: 检测到 /help 命令，进入 help逻辑');
-							const { handleHelp } = await import('./commands/help');
-							await handleHelp(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /help 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//钓鱼
-						case 'fish': {
-							console.log('index: 检测到 /fish 命令，进入 fish 逻辑');
-							const { handleFish } = await import('./commands/fish');
-							await handleFish(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /fish 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//货币
-						case 'coin': {
-							console.log('index: 检测到 /coin 命令，进入 coin逻辑');
-							const { handleCoin } = await import('./commands/coin');
-							await handleCoin(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /coin 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//翻译
-						case 'trans': {
-							console.log('index: 检测到 /trans 命令，进入 trans逻辑');
-							const { handleTrans } = await import('./commands/trans');
-							await handleTrans(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /trans 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//回声
-						case 'echo': {
-							console.log('index: 检测到 /echo 命令，进入 echo逻辑');
-							const { handleEcho } = await import('./commands/echo');
-							await handleEcho(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /echo 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//调用次数查询
-						case 'like': {
-							console.log('index: 检测到 /like 命令，进入 like 逻辑');
-							const { handleLike } = await import('./commands/like');
-							await handleLike(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /like 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						//决斗
-						case 'duel': {
-							console.log('index: 检测到 /duel 命令，进入 duel 逻辑');
-							const { handleDuel } = await import('./commands/duel');
-							await handleDuel(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /duel 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						// groll
-						case 'groll': {
-							console.log('index: 检测到 /groll 命令，进入 groll 逻辑');
-							const { handleGroll } = await import('./commands/groll');
-							await handleGroll(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /groll 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						// 21点游戏
-						case '21': {
-							console.log('index: 检测到 /21点 命令，进入 21 逻辑');
-							const { handle21 } = await import('./commands/21');
-							await handle21(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: 21处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						// 新闻
-						case 'news': {
-							console.log(`index: 检查到news命令`);
-							const { handleNews } = await import('./commands/news');
-							await handleNews(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: news处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						case 'rule': {
-							console.log('index: 检测到 /rule 命令，进入 rule 逻辑');
-							const { handleRule } = await import('./commands/rule');
-							await handleRule(parsedMessage, env);
-							ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							console.log(`index: /rule 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-						// 默认提示
-						default: {
-							console.log('index: 未知命令，发送默认帮助提示');
-							const { handleDefaultHelp } = await import('./commands/help');
-							await handleDefaultHelp(parsedMessage, env);
-							try {
-								//               await TgMessage.deleteMessage(env, parsedMessage.message.chat.id, parsedMessage.message.message_id);
-							} catch (e) {
-								console.warn('index: 删除触发命令消息失败（可忽略）', e);
+					const cmd = parsedMessage.command;
+					if (cmd) {
+						const route = COMMAND_ROUTES[cmd];
+						if (route) {
+							console.log(`index: 检测到 /${cmd} 命令，进入 ${route.handler} 逻辑`);
+							const mod = await import(route.module);
+							await (mod as any)[route.handler](parsedMessage, env);
+							if (route.deleteMsg !== false) {
+								ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
 							}
-
+							console.log(`index: /${cmd} 处理完成`);
 							return new Response('OK', { status: 200 });
 						}
+
+						// 未知命令 → 默认帮助
+						console.log('index: 未知命令，发送默认帮助提示');
+						const { handleDefaultHelp } = await import('./commands/help');
+						await handleDefaultHelp(parsedMessage, env);
+						return new Response('OK', { status: 200 });
 					}
 				} else {
 					await handleBackup(parsedMessage, env);

@@ -7,11 +7,58 @@
 ### 📂 仓库结构
 
 ```
-├── src/                # 源代码目录
-├── wrangler.jsonc      # Wrangler 配置
-├── README.md           # 项目说明文档
-└── .github/workflows/  # GitHub Actions 流水线配置
-    └── deploy.yml      # 自动部署工作流
+├── src/
+│   ├── index.ts              # Worker 入口 — webhook 路由、API 分发
+│   ├── routes.ts             # 命令/回调路由注册表（数据驱动分发）
+│   ├── commands/             # 命令处理器（22 个命令模块）
+│   │   ├── roll.ts           # 掷骰 /roll /r /rd /rh
+│   │   ├── coin.ts           # 货币系统 /coin
+│   │   ├── lottery.ts        # 彩票系统 /lottery
+│   │   ├── fish.ts           # 钓鱼 /fish
+│   │   ├── rose.ts           # 好感度 /rose
+│   │   ├── duel.ts           # 决斗 /duel
+│   │   ├── groll.ts          # 群骰 /groll
+│   │   ├── 21.ts             # 21点 /21
+│   │   ├── fate.ts           # 塔罗占卜 /fate
+│   │   ├── news.ts           # 新闻爆料 /news
+│   │   ├── book.ts           # 书签 /book
+│   │   ├── item.ts           # 物品 /item
+│   │   ├── act.ts            # 活动记录 /act
+│   │   ├── report.ts         # 群聊汇报 /report
+│   │   ├── rule.ts           # 群规则 /rule
+│   │   ├── trans.ts          # 翻译 /trans
+│   │   ├── echo.ts           # 回声 /echo
+│   │   ├── emote.ts          # 动作指令 /em /me
+│   │   ├── like.ts           # 调用统计 /like
+│   │   ├── whoami.ts         # 用户信息 /whoami
+│   │   ├── help.ts           # 帮助 /help
+│   │   ├── congrats.ts       # 红包 /恭喜发财
+│   │   ├── aiAssistInline.ts # AI 辅助 inline query
+│   │   ├── topicEditHandler.ts
+│   │   └── deleteMessage.ts
+│   ├── lib/                  # 公共库
+│   │   ├── tgMessage.ts      # Telegram API 封装 & 消息解析
+│   │   ├── coinService.ts    # Coin DO 服务层封装
+│   │   ├── liveConfig.ts     # 运行时配置（白名单、静态数据）
+│   │   ├── backup.ts         # 消息备份到 D1
+│   │   ├── affectionDB.ts    # 好感度 DB/KV 双写存储
+│   │   ├── fishCore.ts       # 钓鱼核心算法
+│   │   └── util.ts           # 工具函数（HTML 转义等）
+│   ├── durableObjects/       # Durable Objects
+│   │   ├── coin_do.ts        # CoinDO — 原子转账
+│   │   └── lottery_do.ts     # LotteryDO — 彩票状态
+│   ├── cron/                 # 定时任务
+│   │   └── cron.ts           # Coin 余额每日检查
+│   └── web/                  # Web 页面
+│       ├── router.ts         # Web 路由
+│       ├── hello.ts/html     # Hello 游戏
+│       └── fish/             # 钓鱼 Web 游戏
+├── test/                     # 测试（22 个测试文件，111 个用例）
+├── wrangler.jsonc            # Wrangler 配置（dev / prod 环境）
+├── tsconfig.json
+├── vitest.config.mts
+└── .github/workflows/
+    └── deploy.yml            # CI/CD 自动部署
 ```
 
 ---
