@@ -97,7 +97,6 @@ async function handleCoinAPI(request: Request, env: Env, path: string): Promise<
 	return await stub.fetch(doRequest);
 }
 
-// ── 静态 import 映射 ──────────────────────────────────────
 // Cloudflare Workers 要求 import() 参数必须是静态字符串字面量，
 // 否则构建工具无法静态分析依赖，不会将对应模块打包进 Worker。
 // 以下两个函数用 switch-case 显式列出所有模块的静态 import 路径，
@@ -299,6 +298,7 @@ export default {
 				console.log('main:isCommand', parsedMessage.isCommand);
 				if (parsedMessage.isCommand) {
 					console.log('main:command', parsedMessage.command);
+					ctx.waitUntil(incrementUsageCount(parsedMessage, env));
 
 					const cmd = parsedMessage.command;
 					if (cmd) {
