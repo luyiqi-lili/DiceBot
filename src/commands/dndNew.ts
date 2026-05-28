@@ -2,8 +2,10 @@
  * @file src/commands/dndNew.ts
  * @description /new — DND 角色创建，预览即写入 DB。
  *   1. /new → 校验、掷属性、写入 dnd_characters、显示预览 + [确认] [重骰]
- *   2. 确认 → 编辑消息显示"创建成功"
+ *   2. 确认 → 编辑消息去掉按钮
  *   3. 重骰 → 重新掷属性、UPDATE DB、更新预览
+ *
+ *   callback_data 极小化（~15字节），避免超 64 字节限制。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -23,19 +25,13 @@ import {
   getClassInfo,
   getSkillsForClass,
   initPresetsToDB,
+  getCharacter,
   type DndCharAttributes,
 } from '../lib/dndCore';
 
-// ── 回调类型 ──────────────────────────────────────────────
-
-interface DndActionCb {
-  type: 'dnd_confirm' | 'dnd_reroll';
-  c: string;  // chatId
-  u: string;  // userId
-  r: string;  // raceName
-  cl: string; // className
-  n: string;  // charName
-}
+// ── 回调类型（极小化，控制在 64 字节内）───────────────────
+// {"type":"dnd_confirm"}  ~25字节
+// {"type":"dnd_reroll"}   ~23字节
 
 // ── 格式化 ────────────────────────────────────────────────
 
@@ -174,10 +170,7 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
     attributes: rolled.attrs, proficiencies: rolled.proficiencies,
   });
 
-  // 预览消息
-  const confirmCb: DndActionCb = { type: 'dnd_confirm', c: String(chatId), u: userId, r: raceName, cl: className, n: charName };
-  const rerollCb: DndActionCb = { ...confirmCb, type: 'dnd_reroll' };
-
+  // 预览消息 — callback 只含 type（~15 字节）
   await TgMessage.sendText(env, {
     chat_id: chatId,
     text: `📋 <b>角色预览</b>\n\n${fmtCharSheet(charName, raceName, className, rolled.hpMax, rolled.attrs, rolled.proficiencies)}`,
@@ -186,8 +179,8 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '✅ 确认创建', callback_data: JSON.stringify(confirmCb) },
-          { text: '🔄 重骰属性', callback_data: JSON.stringify(rerollCb) },
+          { text: '✅ 确认创建', callback_data: JSON.stringify({ type: 'dnd_confirm' }) },
+          { text: '🔄 重骰属性', callback_data: JSON.stringify({ type: 'dnd_reroll' }) },
         ],
       ],
     },
@@ -197,20 +190,15 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
 // ── 确认创建回调 ──────────────────────────────────────────
 
 export async function handleDndConfirmCallback(callbackQuery: any, callbackData: any, env: Env): Promise<void> {
+  if (!callbackData || callbackData.type !== 'dnd_confirm') return;
+
   const cq = callbackQuery;
-  const cd = callbackData as DndActionCb;
-  if (!cd || cd.type !== 'dnd_confirm') return;
-
-  if (String(cq.from?.id) !== cd.u) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: '只有角色创建者才能确认。', show_alert: true });
-    return;
-  }
-
-  // 角色已在预览时写入 DB，编辑消息去掉按钮
   const msgId = cq.message?.message_id;
-  if (msgId) {
+  const chatId = cq.message?.chat?.id;
+
+  if (msgId && chatId) {
     await TgMessage.send(env, 'editMessageReplyMarkup', {
-      chat_id: parseInt(cd.c, 10), message_id: msgId,
+      chat_id: chatId, message_id: msgId,
       reply_markup: { inline_keyboard: [[{ text: '删除消息', callback_data: JSON.stringify({ type: 'delete_message' }) }]] },
     });
   }
@@ -221,46 +209,44 @@ export async function handleDndConfirmCallback(callbackQuery: any, callbackData:
 // ── 重骰属性回调 ──────────────────────────────────────────
 
 export async function handleDndRerollCallback(callbackQuery: any, callbackData: any, env: Env): Promise<void> {
-  const cq = callbackQuery;
-  const cd = callbackData as DndActionCb;
-  if (!cd || cd.type !== 'dnd_reroll') return;
+  if (!callbackData || callbackData.type !== 'dnd_reroll') return;
 
-  if (String(cq.from?.id) !== cd.u) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: '只有角色创建者才能重骰。', show_alert: true });
+  const cq = callbackQuery;
+  const chatId = cq.message?.chat?.id;
+  const userId = String(cq.from?.id);
+  const msgId = cq.message?.message_id;
+
+  if (!env.DB || !chatId) return;
+
+  const char = await getCharacter(env, chatId, userId);
+  if (!char) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: '角色数据丢失，请重新 /new。', show_alert: true });
     return;
   }
 
-  if (!env.DB) return;
-
-  const chatId = parseInt(cd.c, 10);
-
   // 重新掷属性
-  const rolled = await rollAttrs(env, chatId, cd.r, cd.cl);
+  const rolled = await rollAttrs(env, chatId, char.race, char.class);
   if (!rolled) return;
 
   // 更新 DB
   await saveCharacter(env, {
-    chat_id: String(chatId), user_id: cd.u,
-    char_name: cd.n, race: cd.r, class: cd.cl,
+    chat_id: String(chatId), user_id: userId,
+    char_name: char.char_name, race: char.race, class: char.class,
     hp_max: rolled.hpMax, hp_current: rolled.hpMax,
     attributes: rolled.attrs, proficiencies: rolled.proficiencies,
   });
 
   // 更新消息
-  const msgId = cq.message?.message_id;
   if (msgId) {
-    const confirmCb: DndActionCb = { type: 'dnd_confirm', c: cd.c, u: cd.u, r: cd.r, cl: cd.cl, n: cd.n };
-    const rerollCb: DndActionCb = { ...confirmCb, type: 'dnd_reroll' };
-
     await TgMessage.editMessageText(env, {
       chat_id: chatId, message_id: msgId,
-      text: `🔄 已重骰属性！\n\n${fmtCharSheet(cd.n, cd.r, cd.cl, rolled.hpMax, rolled.attrs, rolled.proficiencies)}`,
+      text: `🔄 已重骰属性！\n\n${fmtCharSheet(char.char_name, char.race, char.class, rolled.hpMax, rolled.attrs, rolled.proficiencies)}`,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '✅ 确认创建', callback_data: JSON.stringify(confirmCb) },
-            { text: '🔄 重骰属性', callback_data: JSON.stringify(rerollCb) },
+            { text: '✅ 确认创建', callback_data: JSON.stringify({ type: 'dnd_confirm' }) },
+            { text: '🔄 重骰属性', callback_data: JSON.stringify({ type: 'dnd_reroll' }) },
           ],
         ],
       },
