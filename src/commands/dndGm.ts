@@ -108,7 +108,7 @@ async function sendHelp(env: Env, chatId: number, threadId?: number) {
       `<code>/gm 种族</code> — 列出所有种族\n` +
       `<code>/gm 种族加值 种族 +1属性 描述</code> — 幂等设置种族加值\n` +
       `<code>/gm 职业</code> — 列出所有职业\n` +
-      `<code>/gm 职业 职业名 主属性 描述</code> — 幂等设置职业\n` +
+      `<code>/gm 职业 职业名 主属性 [生命骰] 描述</code> — 幂等设置职业\n` +
       `<code>/gm 技能</code> — 列出所有技能\n` +
       `<code>/gm 技能 技能名 种族+N 职业 属性 描述</code> — 幂等设置技能\n` +
       `<code>/gm dc 数值 描述</code> — 设置场景 DC\n` +
@@ -279,7 +279,7 @@ async function handleClassSet(
   if (args.length < 2) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: '⚠️ 格式：<code>/gm 职业 职业名 主属性 描述</code>',
+      text: '⚠️ 格式：<code>/gm 职业 职业名 主属性 [生命骰] 描述</code>\n示例：<code>/gm 职业 战士 力量 10 战士们锻炼通过力量使用各种武器</code>',
       parse_mode: 'HTML',
       message_thread_id: threadId,
     });
@@ -288,7 +288,6 @@ async function handleClassSet(
 
   const className = args[0];
   const primaryAttr = args[1];
-  const description = args.slice(2).join(' ');
 
   const validAttrs = ['力量', '敏捷', '体质', '智力', '感知', '魅力'];
   if (!validAttrs.includes(primaryAttr)) {
@@ -301,10 +300,20 @@ async function handleClassSet(
     return;
   }
 
-  // 默认 hit_die: 战士类 d10，法师类 d6，其余 d8
+  // args[2] 可选生命骰面数（纯数字），否则归入描述
   let hitDie = 8;
-  if (['法师', '术士', '巫师'].includes(className)) hitDie = 6;
-  if (['战士', '野蛮人', '圣武士'].includes(className)) hitDie = 10;
+  let descStart = 2;
+  if (args.length > 2 && /^\d+$/.test(args[2])) {
+    const parsed = parseInt(args[2], 10);
+    if (parsed >= 2 && parsed <= 20) { hitDie = parsed; descStart = 3; }
+  }
+  const description = args.slice(descStart).join(' ');
+  if (!args[2] || !/^\d+$/.test(args[2])) {
+    // 未指定生命骰时按职业名推算
+    hitDie = 8;
+    if (['法师', '术士', '巫师'].includes(className)) hitDie = 6;
+    if (['战士', '野蛮人', '圣武士'].includes(className)) hitDie = 10;
+  }
 
   const existing = await env.DB!.prepare(
     `SELECT 1 FROM dnd_classes WHERE chat_id = ? AND class_name = ?`
@@ -314,10 +323,10 @@ async function handleClassSet(
 
   if (existing) {
     await env.DB!.prepare(
-      `UPDATE dnd_classes SET primary_attr = ?, description = ?, updated_at = datetime('now')
+      `UPDATE dnd_classes SET primary_attr = ?, hit_die = ?, description = ?, updated_at = datetime('now')
        WHERE chat_id = ? AND class_name = ?`
     )
-      .bind(primaryAttr, description, String(chatId), className)
+      .bind(primaryAttr, hitDie, description, String(chatId), className)
       .run();
   } else {
     await env.DB!.prepare(
