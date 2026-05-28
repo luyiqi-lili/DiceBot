@@ -60,7 +60,7 @@ async function generateFlavor(
         role: 'user',
         content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n技能「${skillName}」：${skillDesc}\n检定结果：${outcome}\n\n请围绕「${skillDesc}」来描写角色这次${skillName}的动作情景，纯中文：`,
       }],
-      max_tokens: 120,
+      max_tokens: 200,
     });
     const text = ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
     // 清理常见前缀
