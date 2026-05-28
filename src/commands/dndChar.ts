@@ -29,6 +29,7 @@ function fmtCharSheetFull(
   classPrimaryAttr: string,
   classHitDie: number,
   equipped: Array<{ name: string; slot: string; bonus: string }>,
+  equipAttrBonus: Record<string, number>,
 ): string {
   const attrs = parseAttributes(char.attributes);
   let profs: string[] = [];
@@ -37,10 +38,13 @@ function fmtCharSheetFull(
   try { equip = JSON.parse(char.equipment); } catch {}
 
   const attrLines = ALL_ATTR_KEYS.map(k => {
-    const val = attrs[k];
-    const mod = fmtMod(val);
+    const baseVal = attrs[k];
+    const equipVal = equipAttrBonus[attrKeyToName(k)] ?? 0;
+    const finalVal = baseVal + equipVal;
+    const mod = fmtMod(finalVal);
     const modStr = mod === '0' ? '±0' : mod;
-    return `  ${escapeHtml(attrKeyToName(k))}  <b>${val}</b>  (${modStr})`;
+    const equipNote = equipVal !== 0 ? ` <i>[${equipVal >= 0 ? '+' : ''}${equipVal}装备]</i>` : '';
+    return `  ${escapeHtml(attrKeyToName(k))}  <b>${finalVal}</b>  (${modStr})${equipNote}`;
   }).join('\n');
 
   const raceLine = fmtRaceBonusesText(raceBonuses);
@@ -90,11 +94,12 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
     return;
   }
 
-  // 查询种族加值、职业信息和装备
-  const [raceBonuses, classInfo, inventory] = await Promise.all([
+  // 查询种族加值、职业信息、装备加成
+  const [raceBonuses, classInfo, inventory, equipAttrBonus] = await Promise.all([
     getRaceBonuses(env, chatId, char.race),
     getClassInfo(env, chatId, char.class),
     getUserInventory(env, String(chatId), userId),
+    getEquippedBonuses(env, String(chatId), userId),
   ]);
 
   const equipped = inventory
@@ -111,7 +116,7 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0, equipped),
+    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0, equipped, equipAttrBonus),
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
