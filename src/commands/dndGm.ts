@@ -23,6 +23,11 @@ import {
   type DndClassRow,
   type DndSkillRow,
 } from '../lib/dndCore';
+import {
+  createTemplate, getAllTemplates, deleteTemplate,
+  getTemplate, addToInventory,
+  EQUIP_SLOTS, SLOT_NAMES, type EquipSlot,
+} from '../lib/itemCore';
 
 // ── GM 命令子路由 ─────────────────────────────────────────
 
@@ -91,6 +96,24 @@ export async function handleDndGm(parsed: ParsedUpdate, env: Env): Promise<void>
 
     case 'setgm':
       await handleSetGm(env, parsed, chatId, threadId, userId);
+      break;
+
+    case 'item':
+      if (rest.length === 0 || rest[0] === 'list') {
+        await handleItemList(env, chatId, threadId);
+      } else if (rest[0] === 'create') {
+        await handleItemCreate(env, chatId, threadId, userId, rest.slice(1));
+      } else if (rest[0] === 'delete') {
+        await handleItemDelete(env, chatId, threadId, userId, rest.slice(1));
+      } else if (rest[0] === 'give') {
+        await handleItemGive(env, parsed, chatId, threadId, userId, rest.slice(1));
+      } else {
+        await TgMessage.sendText(env, {
+          chat_id: chatId, message_thread_id: threadId,
+          text: '⚠️ 未知 item 子命令。可用：create / list / delete / give',
+          reply_markup: deleteMarkup,
+        });
+      }
       break;
 
     default:
@@ -640,5 +663,158 @@ async function handleSetGm(
     text: `✅ ${targetName} 已被任命为本群 GM。`,
     parse_mode: 'HTML',
     message_thread_id: threadId,
+  });
+}
+
+// ── 物品管理 ──────────────────────────────────────────────
+
+async function handleItemList(env: Env, chatId: number, threadId?: number) {
+  const items = await getAllTemplates(env, String(chatId));
+  if (items.length === 0) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId, text: '暂无物品模板。使用 /gm item create 创建。',
+      message_thread_id: threadId,
+    });
+    return;
+  }
+  let text = '📦 <b>物品模板</b>\n\n';
+  for (const item of items) {
+    const typeLabel = item.item_type === '装备' ? '⚔️' : '💊';
+    const slotLabel = item.slot ? ` [${item.slot}]` : '';
+    text += `${typeLabel} <b>${escapeHtml(item.name)}</b>${slotLabel} — ${escapeHtml(item.description || '')}\n`;
+  }
+  await TgMessage.sendText(env, {
+    chat_id: chatId, text, parse_mode: 'HTML', message_thread_id: threadId,
+  });
+}
+
+async function handleItemCreate(
+  env: Env, chatId: number, threadId: number | undefined, userId: string, args: string[],
+) {
+  const gmErr = await requireGM(env, chatId, userId);
+  if (gmErr) { await TgMessage.sendText(env, { chat_id: chatId, text: gmErr, message_thread_id: threadId }); return; }
+
+  if (args.length < 3) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: '⚠️ 格式：<code>/gm item create 名称 装备/消耗品 [部位] [+N属性] [次数] 描述</code>\n' +
+        '示例：<code>/gm item create 铁头盔 装备 head +1体质 坚固的头盔</code>\n' +
+        '示例：<code>/gm item create 治疗药水 消耗品 3 恢复体力</code>',
+      parse_mode: 'HTML', message_thread_id: threadId,
+    });
+    return;
+  }
+
+  const name = args[0];
+  const itemType = args[1] as '装备' | '消耗品';
+  if (itemType !== '装备' && itemType !== '消耗品') {
+    await TgMessage.sendText(env, {
+      chat_id: chatId, text: '⚠️ 类型必须是「装备」或「消耗品」。', message_thread_id: threadId,
+    });
+    return;
+  }
+
+  let slot = '';
+  let attrBonus: Record<string, number> = {};
+  let uses = 0;
+  let descStart = 2;
+
+  if (itemType === '装备') {
+    // 解析部位: args[2] 可能是有效部位
+    if (EQUIP_SLOTS.includes(args[2] as any)) {
+      slot = args[2];
+      descStart = 3;
+    }
+    // 解析属性: 下一个参数可能是 +N属性
+    if (args.length > descStart && /^[+-]\d/.test(args[descStart])) {
+      attrBonus = parseAttrBonus(args[descStart]);
+      descStart++;
+    }
+  } else {
+    // 消耗品: 下一个参数可能是次数
+    if (/^\d+$/.test(args[2])) {
+      uses = parseInt(args[2], 10);
+      descStart = 3;
+    }
+  }
+
+  const description = args.slice(descStart).join(' ');
+
+  await createTemplate(env, String(chatId), name, itemType, slot, attrBonus, uses, description);
+
+  const bonusStr = Object.keys(attrBonus).length > 0
+    ? ` | ${fmtAttrBonuses(attrBonus)}`
+    : '';
+  const usesStr = itemType === '消耗品' ? ` | ×${uses || '∞'}` : '';
+
+  await TgMessage.sendText(env, {
+    chat_id: chatId,
+    text: `✅ 物品「${escapeHtml(name)}」已创建：${itemType}${slot ? ' [' + slot + ']' : ''}${bonusStr}${usesStr} — ${escapeHtml(description)}`,
+    parse_mode: 'HTML', message_thread_id: threadId,
+  });
+}
+
+async function handleItemDelete(
+  env: Env, chatId: number, threadId: number | undefined, userId: string, args: string[],
+) {
+  const gmErr = await requireGM(env, chatId, userId);
+  if (gmErr) { await TgMessage.sendText(env, { chat_id: chatId, text: gmErr, message_thread_id: threadId }); return; }
+
+  const name = args.join(' ').trim();
+  if (!name) {
+    await TgMessage.sendText(env, { chat_id: chatId, text: '⚠️ 请指定物品名称。', message_thread_id: threadId });
+    return;
+  }
+
+  const ok = await deleteTemplate(env, String(chatId), name);
+  await TgMessage.sendText(env, {
+    chat_id: chatId,
+    text: ok ? `✅ 物品模板「${escapeHtml(name)}」已删除。` : `⚠️ 物品「${escapeHtml(name)}」不存在。`,
+    parse_mode: 'HTML', message_thread_id: threadId,
+  });
+}
+
+async function handleItemGive(
+  env: Env, parsed: ParsedUpdate, chatId: number, threadId: number | undefined,
+  userId: string, args: string[],
+) {
+  const gmErr = await requireGM(env, chatId, userId);
+  if (gmErr) { await TgMessage.sendText(env, { chat_id: chatId, text: gmErr, message_thread_id: threadId }); return; }
+
+  if (!parsed.isReply || !parsed.replyToMessage?.from) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId, text: '⚠️ 请回复目标用户的消息来发放物品。', message_thread_id: threadId,
+    });
+    return;
+  }
+
+  const targetId = String(parsed.replyToMessage.from.id);
+  const targetName = parsed.replyToMessage.from.first_name || targetId;
+
+  const itemName = args.join(' ').replace(/\s+\d+$/, '').trim();
+  const qtyMatch = args.join(' ').match(/(\d+)$/);
+  const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+  if (!itemName) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId, text: '⚠️ 用法：<code>/gm item give 名称 [数量]</code>', parse_mode: 'HTML', message_thread_id: threadId,
+    });
+    return;
+  }
+
+  const tpl = await getTemplate(env, String(chatId), itemName);
+  if (!tpl) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId, text: `⚠️ 物品模板「${escapeHtml(itemName)}」不存在。`, parse_mode: 'HTML', message_thread_id: threadId,
+    });
+    return;
+  }
+
+  await addToInventory(env, String(chatId), targetId, tpl.id, qty);
+
+  await TgMessage.sendText(env, {
+    chat_id: chatId,
+    text: `✅ 已向 ${escapeHtml(targetName)} 发放 ${escapeHtml(itemName)} ×${qty}`,
+    parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
   });
 }

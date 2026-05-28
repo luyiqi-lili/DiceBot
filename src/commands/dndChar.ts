@@ -16,6 +16,7 @@ import {
   ALL_ATTR_KEYS,
   type DndCharacterRow,
 } from '../lib/dndCore';
+import { getEquippedBonuses, getUserInventory, SLOT_NAMES, type EquipSlot } from '../lib/itemCore';
 
 function fmtRaceBonusesText(bonuses: Record<string, number>): string {
   if (!bonuses || Object.keys(bonuses).length === 0) return '';
@@ -27,6 +28,7 @@ function fmtCharSheetFull(
   raceBonuses: Record<string, number>,
   classPrimaryAttr: string,
   classHitDie: number,
+  equipped: Array<{ name: string; slot: string; bonus: string }>,
 ): string {
   const attrs = parseAttributes(char.attributes);
   let profs: string[] = [];
@@ -52,6 +54,9 @@ function fmtCharSheetFull(
     `⚔️ 职业: 主属性 ${escapeHtml(classPrimaryAttr)} | 生命骰 d${classHitDie}\n\n` +
     `<b>📊 属性</b>\n` +
     attrLines + '\n\n' +
+    (equipped.length > 0
+      ? `<b>🛡️ 装备加成</b>\n` + equipped.map(e => `  ${escapeHtml(e.slot)} ${escapeHtml(e.name)} (${escapeHtml(e.bonus)})`).join('\n') + '\n\n'
+      : '') +
     `<b>🏹 技能熟练</b>\n` +
     (profs.length > 0 ? profs.map(s => `  ✔ ${escapeHtml(s)}`).join('\n') : '  暂无') + '\n\n' +
     `<b>🎒 装备</b>\n` +
@@ -85,15 +90,28 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
     return;
   }
 
-  // 查询种族加值和职业信息
-  const [raceBonuses, classInfo] = await Promise.all([
+  // 查询种族加值、职业信息和装备
+  const [raceBonuses, classInfo, inventory] = await Promise.all([
     getRaceBonuses(env, chatId, char.race),
     getClassInfo(env, chatId, char.class),
+    getUserInventory(env, String(chatId), userId),
   ]);
+
+  const equipped = inventory
+    .filter(i => i.equipped)
+    .map(i => {
+      let bonus = '';
+      try {
+        const b: Record<string, number> = JSON.parse(i.attr_bonus);
+        bonus = Object.entries(b).map(([k, v]) => `${k}${v >= 0 ? '+' : ''}${v}`).join(',');
+      } catch {}
+      const slotName = i.slot ? (SLOT_NAMES[i.slot as EquipSlot] ?? i.slot) : '';
+      return { name: i.name, slot: slotName, bonus };
+    });
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0),
+    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0, equipped),
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,

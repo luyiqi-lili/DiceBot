@@ -154,6 +154,7 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 		case 'lottery':  { const { handleLotteryCallback } = await import('./commands/lottery'); return handleLotteryCallback; }
 		case 'dnd_reroll':  { const { handleDndRerollCallback } = await import('./commands/dndNew'); return handleDndRerollCallback; }
 		case 'dnd_confirm': { const { handleDndConfirmCallback } = await import('./commands/dndNew'); return handleDndConfirmCallback; }
+		case 'item_action':{ const { handleItemCallback } = await import('./commands/item'); return handleItemCallback; }
 		default: return null;
 	}
 }

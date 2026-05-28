@@ -1,316 +1,239 @@
-// commands/item.ts
 /**
- * item 命令处理器
- *
- * 支持：
- *  - item create    (回复一条消息并发送该命令，创建物品)
- *  - item list      (直接发送：查看自己的物品；回复某人消息发送：查看该人的物品)
- *  - item use 1     (使用并消费自己的第 1 个物品；支持 #1 格式)
- *  - item send 1    (回复某人消息并发送该命令：把自己的第 1 个物品送给对方)
- *
- * 存储：使用 env.NEWS_STORE，key = item:user:<uid>
- *
- * 注：风格、日志与 book.ts 保持一致，方便调试。
+ * @file src/commands/item.ts
+ * @description /item — 按钮式背包查看、装备、使用、赠送。
+ *   - /item → 查看背包（inline keyboard 按钮）
+ *   - /item send <名> [数量] → 回复某人赠送
+ *   - 回调 handleItemCallback 处理 装备/卸下/使用
  */
 
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { deleteMarkup } from "../lib/util";
-
+import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
+import {
+  getUserInventory, getInventoryItem,
+  equipItem, unequipItem, useConsumable, sendItem,
+  getTemplate, addToInventory,
+  SLOT_NAMES,
+  type InventoryItem, type EquipSlot,
+} from '../lib/itemCore';
 
-function getUserKey(userId: number): string {
-  return `item:user:${userId}`;
+// ── 回调类型（~25 字节）───────────────────────────────────
+
+interface ItemCb {
+  type: 'item_action';
+  a: 'eq' | 'un' | 'use'; // equip / unequip / use
+  id: number;
 }
 
-function makeMessageLink(chatId: number, messageId: number): string {
-  // 与 book.ts 一致，处理 -100 前缀的私有 chat 链接
-  const abs = String(chatId).startsWith("-100")
-    ? String(chatId).slice(4)
-    : String(Math.abs(chatId));
-  return `https://t.me/c/${abs}/${messageId}`;
+// ── 格式化 ────────────────────────────────────────────────
+
+function fmtBonus(attrBonus: string): string {
+  try {
+    const b: Record<string, number> = JSON.parse(attrBonus);
+    return Object.entries(b).map(([k, v]) => `${k}${v >= 0 ? '+' : ''}${v}`).join(',');
+  } catch { return ''; }
 }
 
-async function loadList(env: Env, uid: number) {
-  const raw = await env.ITEM_STORE.get(getUserKey(uid));
-  const list = raw ? (JSON.parse(raw) as Array<any>) : [];
-  console.log(`[Item] loadList ${uid}, count=${list.length}`);
-  return list;
-}
-async function saveList(env: Env, uid: number, list: any[]) {
-  await env.ITEM_STORE.put(getUserKey(uid), JSON.stringify(list));
-  console.log(`[Item] saveList ${uid}, new count=${list.length}`);
+function buildInventoryText(items: InventoryItem[]): string {
+  const equipped = items.filter(i => i.equipped && i.item_type === '装备');
+  const unequipped = items.filter(i => !i.equipped && i.item_type === '装备');
+  const consumables = items.filter(i => i.item_type === '消耗品');
+
+  let text = '🎒 <b>背包</b>\n\n';
+
+  if (equipped.length > 0) {
+    text += '🛡️ <b>已装备</b>\n';
+    for (const e of equipped) {
+      const bonus = fmtBonus(e.attr_bonus);
+      const slotName = e.slot ? SLOT_NAMES[e.slot as EquipSlot] ?? e.slot : '';
+      text += `  ${slotName}: <b>${escapeHtml(e.name)}</b>${bonus ? ` (${escapeHtml(bonus)})` : ''}\n`;
+    }
+    text += '\n';
+  }
+
+  if (consumables.length > 0) {
+    text += '💊 <b>消耗品</b>\n';
+    for (const c of consumables) {
+      const uses = c.uses > 0 ? ` ×${c.quantity}` : ' ∞';
+      text += `  ${escapeHtml(c.name)}${uses} — ${escapeHtml(c.description || '')}\n`;
+    }
+    text += '\n';
+  }
+
+  if (unequipped.length > 0) {
+    text += '📦 <b>未装备</b>\n';
+    for (const u of unequipped) {
+      const bonus = fmtBonus(u.attr_bonus);
+      text += `  ${escapeHtml(u.name)}${bonus ? ` (${escapeHtml(bonus)})` : ''}${u.quantity > 1 ? ` ×${u.quantity}` : ''}\n`;
+    }
+    text += '\n';
+  }
+
+  if (items.length === 0) {
+    text += '  空空如也～\n';
+  }
+
+  return text;
 }
 
-/**
- * 解析序号参数：接受 "1" 或 "#1" 或 "use#1" 等形式，返回 1-based 索引的数字或 null
- */
-function parseIndexToken(token: string | undefined): number | null {
-  if (!token) return null;
-  const m = token.match(/#?(\d+)/);
-  if (!m) return null;
-  const idx = parseInt(m[1], 10);
-  if (Number.isNaN(idx) || idx < 1) return null;
-  return idx;
+function buildButtons(items: InventoryItem[]): any[][] {
+  const rows: any[][] = [];
+
+  // 已装备 → [卸下]
+  for (const e of items.filter(i => i.equipped)) {
+    rows.push([{ text: `🔓 卸下 ${e.name}`, callback_data: JSON.stringify({ type: 'item_action', a: 'un', id: e.id } as ItemCb) }]);
+  }
+
+  // 未装备装备 → [装备]
+  for (const u of items.filter(i => !i.equipped && i.item_type === '装备')) {
+    rows.push([{ text: `⚔️ 装备 ${u.name}`, callback_data: JSON.stringify({ type: 'item_action', a: 'eq', id: u.id } as ItemCb) }]);
+  }
+
+  // 消耗品 → [使用]
+  for (const c of items.filter(i => i.item_type === '消耗品')) {
+    const label = c.uses > 0 ? `🧪 使用 ${c.name} (${c.quantity})` : `🧪 使用 ${c.name} (∞)`;
+    rows.push([{ text: label, callback_data: JSON.stringify({ type: 'item_action', a: 'use', id: c.id } as ItemCb) }]);
+  }
+
+  rows.push([{ text: '删除消息', callback_data: JSON.stringify({ type: 'delete_message' }) }]);
+  return rows;
 }
 
-/**
- * handleItem 主入口
- */
-export async function handleItem(parsed: ParsedUpdate, env: Env) {
-  console.log("[Item] handleItem invoked, command:", parsed.command, "args:", parsed.args, "isReply:", parsed.isReply);
+// ── /item 主入口 ──────────────────────────────────────────
 
+export async function handleItem(parsed: ParsedUpdate, env: Env): Promise<void> {
   const chatId = parsed.chatId!;
   const threadId = parsed.threadId;
-  const fromId = parsed.from?.id;
-  const fromName = parsed.from?.first_name || `用户${fromId}`;
-  const reply = parsed.replyToMessage;
+  const userId = String(parsed.from?.id ?? '');
+  const args = parsed.args ?? [];
+  const sub = args[0] ?? '';
 
-  // 参数解析： parsed.args 的第一个为子命令（create/list/use/send），其余为参数
-  const sub = (parsed.args && parsed.args.length > 0) ? parsed.args[0] : "";
-  const rest = (parsed.args && parsed.args.length > 1) ? parsed.args.slice(1) : [];
-  console.log("[Item] subcommand:", sub, "rest:", rest);
-
-  // 1) item create —— 必须回复一条消息（最好是自己的消息，按需求这里要求回复自己的消息）
-  if (sub === "create") {
-    console.log("[Item] create invoked, isReply:", parsed.isReply);
-
-    if (!parsed.isReply || !reply) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 请以回复的方式对一条消息发送 /item create 来创建物品（只能回复自己的消息）。`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    // 要求回复的是自己的消息（reply.from.id === fromId）
-    if (reply.from?.id !== fromId) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 创建物品需要回复你自己的消息以作为物品内容。`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    // 取内容：优先 text -> caption -> 来自媒体的简单标记
-    let content = reply.text ?? reply.caption ??rest[0] ??"";
-    if (!content) {
-      // 简单媒体描述
-      if (reply.photo) content = "[图片]";
-      else if (reply.video) content = "[视频]";
-      else if (reply.document) content = `[文件 ${reply.document.file_name || ""}]`;
-      else content = "[未识别内容]";
-    }
-
-    const remark = rest.join(" ").trim() || "物品";
-    const link = makeMessageLink(chatId, reply.message_id);
-    const list = await loadList(env, fromId);
-    // 限制每人最多 200 件物品，超出则删除最早一条
-    if (list.length >= 200) {
-      list.shift();
-      console.log("[Item] 达到上限，删除最旧条目");
-    }
-    list.push({ remark, content, link, timestamp: new Date().toISOString() });
-    await saveList(env, fromId, list);
-
+  if (!env.DB) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✅ 已创建物品：<a href="${link}">${remark}</a>（共 ${list.length} 件）`,
-      parse_mode: "HTML",
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup
+      text: '⚠️ 物品系统需要 D1 数据库支持，当前环境未配置。',
+      message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
 
-  // 2) item list —— 直接查看自己的；回复某人则查看该人的物品
-  if (sub === "list" || sub === "") {
-    // If user only typed "/item" or "/item list" both handled here.
-    // If user replied to someone,查看被回复人的物品；否则查看自己的物品
-    let targetId = fromId;
-    let viewingName = fromName;
-    if (parsed.isReply && reply && reply.from && reply.from.id) {
-      targetId = reply.from.id;
-      viewingName = reply.from.first_name || `用户${targetId}`;
-    }
+  // /item send <名> [数量] → 回复某人赠送
+  if (sub === 'send') {
+    await handleSend(parsed, env, args.slice(1));
+    return;
+  }
 
-    console.log(`[Item] list for user ${targetId} (viewer: ${fromId})`);
-    const list = await loadList(env, targetId);
-    if (list.length === 0) {
-      const text = (targetId === fromId)
-        ? `📭 ${fromName}，你还没有任何物品，回复一条消息并发送 /item create 即可创建物品～`
-        : `📭 ${viewingName} 暂无物品`;
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
+  // 默认：查看背包
+  const items = await getUserInventory(env, String(chatId), userId);
+  const text = buildInventoryText(items);
+  const buttons = buildButtons(items);
 
-    let body = "";
-    list.forEach((e, i) => {
-      const remark = e.remark || "物品";
-      body += `${i + 1}. <a href="${e.link}">${remark}</a>\n`;
-    });
+  await TgMessage.sendText(env, {
+    chat_id: chatId, text, parse_mode: 'HTML',
+    message_thread_id: threadId,
+    reply_markup: { inline_keyboard: buttons },
+  });
+}
 
-    const text = (targetId === fromId)
-      ? `🎒 ${fromName} 的物品：<blockquote expandable>${body}</blockquote>`
-      : `🎁 ${viewingName} 的物品：<blockquote expandable>${body}</blockquote>`;
+// ── 赠送 ──────────────────────────────────────────────────
 
+async function handleSend(parsed: ParsedUpdate, env: Env, rest: string[]): Promise<void> {
+  const chatId = parsed.chatId!;
+  const threadId = parsed.threadId;
+  const userId = String(parsed.from?.id ?? '');
+  const fromName = parsed.from?.first_name || userId;
+
+  if (!parsed.isReply || !parsed.replyToMessage?.from) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup
+      text: '⚠️ 请回复目标用户的消息来赠送物品。\n用法：<code>/item send 物品名 [数量]</code>',
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
 
-  // 3) item use <idx> 或 item use#<idx>
-  if (sub === "use" || /^use#?\d+$/i.test(sub)) {
-    // 可能形式：
-    // /item use 1
-    // /item use #1
-    // /item use#1 （当 parse 将全部当作一个 token 时）
-    // /item use  （缺参数）
-    let idx = null;
-    if (/^use#?\d+$/i.test(sub)) {
-      // sub itself 包含序号
-      idx = parseIndexToken(sub.replace(/^use/i, ""));
-    } else {
-      idx = parseIndexToken(rest[0]);
-    }
-    if (!idx) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 请指定要使用的物品序号，例如：/item use 1 或 /item use #1`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    const list = await loadList(env, fromId);
-    if (idx < 1 || idx > list.length) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 无效序号：${idx}（当前共 ${list.length} 件）`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    const item = list.splice(idx - 1, 1)[0];
-    await saveList(env, fromId, list);
-
-    // 使用效果：在当前线程发送该物品的内容，并注明来源
-    const useText = `✅ ${fromName} 使用了物品：<a href="${item.link}">${item.remark || "物品"}</a>\n\n${item.content}`;
+  const targetId = String(parsed.replyToMessage.from.id);
+  const targetName = parsed.replyToMessage.from.first_name || targetId;
+  if (targetId === userId) {
     await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: useText,
-      parse_mode: "HTML",
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup
+      chat_id: chatId, text: '⚠️ 不能送给自己。',
+      message_thread_id: threadId, reply_markup: deleteMarkup,
     });
     return;
   }
 
-  // 4) item send <idx> —— 必须回复要送达的目标用户的消息
-  if (sub === "send" || /^send#?\d+$/i.test(sub)) {
-    if (!parsed.isReply || !reply || !reply.from || !reply.from.id) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 请以回复目标用户的消息的方式发送 /item send <序号> 来赠送物品。`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
+  const itemName = rest.join(' ').replace(/\s+\d+$/, '').trim();
+  const qtyMatch = rest.join(' ').match(/(\d+)$/);
+  const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
 
-    // parse index
-    let idx = null;
-    if (/^send#?\d+$/i.test(sub)) {
-      idx = parseIndexToken(sub.replace(/^send/i, ""));
-    } else {
-      idx = parseIndexToken(rest[0]);
-    }
-    if (!idx) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 请指定要赠送的物品序号，例如：/item send 1 或 /item send #1`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    const targetId = reply.from.id;
-    const targetName = reply.from.first_name || `用户${targetId}`;
-
-    // 不能把物品送给自己（建议）
-    if (targetId === fromId) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 无需将物品赠送给自己，直接使用 /item use ${idx} 即可。`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    const list = await loadList(env, fromId);
-    if (idx < 1 || idx > list.length) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `⚠️ 无效序号：${idx}（你当前共 ${list.length} 件）`,
-        message_thread_id: threadId,
-        reply_markup: deleteMarkup
-      });
-      return;
-    }
-
-    const item = list.splice(idx - 1, 1)[0];
-    await saveList(env, fromId, list);
-
-    // 将物品加入目标用户列表（append）
-    const targetList = await loadList(env, targetId);
-    if (targetList.length >= 200) targetList.shift();
-    targetList.push(item);
-    await saveList(env, targetId, targetList);
-
-    // 通知群组：赠送成功
-    const text = `🎁 ${fromName} 已将物品 <a href="${item.link}">${item.remark || "物品"}</a> 赠送给 ${targetName}（${targetList.length} 件）`;
+  if (!itemName) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup
+      text: '⚠️ 请指定物品名称。\n用法：<code>/item send 物品名 [数量]</code>',
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
     });
-
     return;
   }
 
-  // 未知子命令，返回帮助提示
-  const helpText = [
-    `物品命令用法：`,
-    `/item create （回复自己的消息） - 将被回复消息保存为物品；可附带备注，如 /item create 备用`,
-    `/item list - 查看自己的物品；回复某人消息并发送 /item list 则查看该人的物品`,
-    `/item use <序号> - 使用并消费自己的某个物品，例如 /item use 1`,
-    `/item send <序号> （回复目标用户的消息）- 把自己的物品送给对方，例如 /item send 1`
-  ].join("\n");
+  const items = await getUserInventory(env, String(chatId), userId);
+  const match = items.find(i => i.name === itemName && !i.equipped);
+  if (!match) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: `⚠️ 你没有名为「${escapeHtml(itemName)}」的可赠送物品。`,
+      parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
+    });
+    return;
+  }
+
+  const err = await sendItem(env, String(chatId), userId, targetId, match.id, qty);
+  if (err) {
+    await TgMessage.sendText(env, { chat_id: chatId, text: `⚠️ ${err}`, message_thread_id: threadId });
+    return;
+  }
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: helpText,
-    message_thread_id: threadId,
-    reply_markup: deleteMarkup
+    text: `🎁 ${escapeHtml(fromName)} 将 ${escapeHtml(itemName)} ×${qty} 赠送给了 ${escapeHtml(targetName)}`,
+    parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup,
   });
+}
+
+// ── 按钮回调 ──────────────────────────────────────────────
+
+export async function handleItemCallback(callbackQuery: any, callbackData: any, env: Env): Promise<void> {
+  const cd = callbackData as ItemCb;
+  if (!cd || cd.type !== 'item_action') return;
+
+  const cq = callbackQuery;
+  const chatId = cq.message?.chat?.id;
+  const userId = String(cq.from?.id);
+  const msgId = cq.message?.message_id;
+
+  if (!env.DB || !chatId) return;
+
+  let actionText = '';
+
+  if (cd.a === 'eq') {
+    const err = await equipItem(env, String(chatId), userId, cd.id);
+    actionText = err ?? '已装备';
+  } else if (cd.a === 'un') {
+    const err = await unequipItem(env, String(chatId), cd.id);
+    actionText = err ?? '已卸下';
+  } else if (cd.a === 'use') {
+    const err = await useConsumable(env, String(chatId), cd.id);
+    actionText = err ?? '已使用';
+  }
+
+  await TgMessage.answerCallbackQuery(env, cq.id, { text: actionText });
+
+  // 刷新背包视图
+  if (msgId) {
+    const items = await getUserInventory(env, String(chatId), userId);
+    await TgMessage.editMessageText(env, {
+      chat_id: chatId, message_id: msgId,
+      text: buildInventoryText(items), parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buildButtons(items) },
+    });
+  }
 }
