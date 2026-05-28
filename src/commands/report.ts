@@ -264,7 +264,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 	}
 
 	// 检查 API keys
-	const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
+	const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
 	if (!apiKeys.length) {
 		const failText = `❌ 抱歉，当前无法生成汇报（缺少 API Key）。`;
 		await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: 'HTML', message_thread_id: threadId });

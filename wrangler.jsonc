@@ -86,14 +86,7 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DevDiceBot",
-				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh",
-				"GOOGLE_API_KEY": "AIzaSyBKvbHbPJYvqknAgymfuz3AK5I06BXtQmo",
-				"GOOGLE_API_KEYS": [
-					"AIzaSyAt7JyPdc_Cn4x_ygrcsY48TVorTW61Pn8",
-					"AIzaSyCUGTDtxUiEO6uHJ_6-9X0kWsfTE6Obwzc",
-					"AIzaSyDdKQQNWz3Zhk6bnkrBXI7nJ4PoVQsNdvM"
-				]
+				"BOT_USERNAME": "lili_DevDiceBot"
 			}
 		},
 		"prod": {
@@ -183,14 +176,7 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DiceBot",
-				"SILICONFLOW_API_KEY": "sk-pajlazjtrzoyhspbdffdprhtzdujxviogxwydcqhdnbnibgh",
-				"GOOGLE_API_KEY": "AIzaSyBKvbHbPJYvqknAgymfuz3AK5I06BXtQmo",
-				"GOOGLE_API_KEYS": [
-					"AIzaSyAt7JyPdc_Cn4x_ygrcsY48TVorTW61Pn8",
-					"AIzaSyCUGTDtxUiEO6uHJ_6-9X0kWsfTE6Obwzc",
-					"AIzaSyDdKQQNWz3Zhk6bnkrBXI7nJ4PoVQsNdvM"
-				]
+				"BOT_USERNAME": "lili_DiceBot"
 			}
 		}
 	}

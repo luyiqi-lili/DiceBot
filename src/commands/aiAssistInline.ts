@@ -35,7 +35,7 @@ export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
   }
   
   // 检查 API keys
-  const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
+  const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
   if (!apiKeys.length) {
     console.error("[AI Assist] ⛔️ 缺少 Gemini API Keys");
     await answerWithError(env, inlineQueryId, "抱歉，AI 服务暂时不可用。");

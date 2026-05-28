@@ -38,7 +38,7 @@ export type Env = {
 	DB?: D1Database;
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
-	GOOGLE_API_KEYS?: string[];
+	GOOGLE_API_KEYS?: string; // wrangler secret 存储为 JSON 字符串，使用前需 JSON.parse
 	SILICONFLOW_API_KEY?: string;
 	// Cloudflare AI 绑定
 	AI?: any;

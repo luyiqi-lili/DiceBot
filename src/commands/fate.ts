@@ -90,7 +90,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
         };
 
-        const apiKeys: string[] = (env.GOOGLE_API_KEYS as any) || [];
+        const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
         if (!apiKeys.length) {
             const failText = `❌ 抱歉，当前无法进行牌义解析（缺少 API Key）。`;
             if (processingMsgId) {
