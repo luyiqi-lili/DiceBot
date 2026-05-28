@@ -103,6 +103,9 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 
 	/* ── 规则 ── */
 	rule:     { module: './commands/rule', handler: 'handleRule' },
+
+	/* ── DND GM（不自动删除命令消息）── */
+	gm:       { module: './commands/dndGm', handler: 'handleDndGm', deleteMsg: false },
 };
 
 // ── Callback 注册表 ───────────────────────────────────────

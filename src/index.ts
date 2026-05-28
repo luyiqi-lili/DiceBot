@@ -133,6 +133,13 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case '21':      { const { handle21 } = await import('./commands/21'); return handle21; }
 		case 'news':    { const { handleNews } = await import('./commands/news'); return handleNews; }
 		case 'rule':    { const { handleRule } = await import('./commands/rule'); return handleRule; }
+		case 'dnd':     { const { handleDndHelp } = await import('./commands/dndHelp'); return handleDndHelp; }
+		case 'new':     { const { handleDndNew } = await import('./commands/dndNew'); return handleDndNew; }
+		case 'char':    { const { handleDndChar } = await import('./commands/dndChar'); return handleDndChar; }
+		case 'skill':   { const { handleDndSkill } = await import('./commands/dndSkill'); return handleDndSkill; }
+		case 'skills':  { const { handleDndSkills } = await import('./commands/dndSkills'); return handleDndSkills; }
+		case 'rest':    { const { handleDndRest } = await import('./commands/dndRest'); return handleDndRest; }
+		case 'gm':      { const { handleDndGm } = await import('./commands/dndGm'); return handleDndGm; }
 		default: return null;
 	}
 }
@@ -145,6 +152,7 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 		case 'fish':     { const { handleFishCallback } = await import('./commands/fish'); return handleFishCallback; }
 		case 'groll':    { const { handleGrollCallback } = await import('./commands/groll'); return handleGrollCallback; }
 		case 'lottery':  { const { handleLotteryCallback } = await import('./commands/lottery'); return handleLotteryCallback; }
+		case 'dnd_reroll': { const { handleDndRerollCallback } = await import('./commands/dndNew'); return handleDndRerollCallback; }
 		default: return null;
 	}
 }
