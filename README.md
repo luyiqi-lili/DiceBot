@@ -49,9 +49,9 @@
 **DND 子系统**：`/dnd /new /char /skill /skills /rest /gm` 命令 + `dnd_confirm/dnd_reroll/item_action` 回调 → D1 数据库（dnd_races/dnd_classes/dnd_skills/dnd_characters/dnd_gm/dnd_dc/dnd_item_templates/dnd_inventory）→ Cloudflare AI 生成技能叙事
 
 **存储层**：
-- **KV**（8 个 namespace）：配置、书签、新闻、好感度、钓鱼记录、话题标题、物品、货币缓存
+- **KV**（8 个 namespace）：配置、书签、新闻、钓鱼记录、话题标题、物品（旧版兼容）、货币缓存
 - **Durable Objects**（2 个）：CoinDO（原子转账 SQLite）、LotteryDO（彩票状态 SQLite）
-- **D1**：用户活跃、消息历史、好感度主存储、长期记忆
+- **D1**：DND 全部数据（12 张表）、物品模板与背包、好感度主存储 + 回退兼容、用户活跃、消息历史
 
 **核心设计原则**：
 - `tgMessage.ts` 将所有 Telegram update 归一化为 `ParsedUpdate`，下游 handler 无需关心原始 JSON
@@ -84,8 +84,8 @@
 ### 🎣 娱乐
 | 命令 | 说明 |
 |------|------|
-| `/fish X` | 花费 X 鱼饵钓鱼 |
-| `/fate` | 塔罗占卜（抽 3 张牌） |
+| `/fish X` | 花费 X 鱼饵钓鱼（KV 存储） |
+| `/fish check` | 查看今日钓鱼情况（KV 存储） |
 | `/em` `/me` `/emote` | 动作指令 |
 | `/duel 赌注` | 回复某人发起赌注决斗 |
 | `/rose` | 回复某人查看好感度 |

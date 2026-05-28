@@ -149,6 +149,45 @@ CREATE TABLE IF NOT EXISTS dnd_dc (
 
 每个群组仅一行，INSERT OR REPLACE 更新。
 
+### 2.7 `dnd_item_templates` — 物品模板
+
+```sql
+CREATE TABLE IF NOT EXISTS dnd_item_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  item_type TEXT NOT NULL CHECK(item_type IN ('装备','消耗品')),
+  slot TEXT DEFAULT '',
+  attr_bonus TEXT NOT NULL DEFAULT '{}',
+  uses INTEGER NOT NULL DEFAULT 0,
+  description TEXT DEFAULT '',
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(chat_id, name)
+);
+```
+
+- `item_type`: `装备` — 可装备到部位 / `消耗品` — 有使用次数
+- `slot`: 部位 — head/body/hands/feet/weapon/offhand/accessory
+- `attr_bonus`: JSON，如 `{"力量":2,"敏捷":-1}`
+- `uses`: 消耗品次数（0=无限）
+
+### 2.8 `dnd_inventory` — 玩家背包
+
+```sql
+CREATE TABLE IF NOT EXISTS dnd_inventory (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  template_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  equipped INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (template_id) REFERENCES dnd_item_templates(id)
+);
+CREATE INDEX IF NOT EXISTS idx_inv_user ON dnd_inventory(chat_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_inv_equip ON dnd_inventory(chat_id, user_id, equipped);
+```
+
 ---
 
 ## 三、预设数据
@@ -224,6 +263,8 @@ CREATE TABLE IF NOT EXISTS dnd_dc (
 | `dc` | `<值> <描述>` | GM |
 | `addxp` | 回复 + `<数值>` | GM |
 | `setgm` | 回复某人 | 仅超管 8080375150 |
+| `item create` | `<名> 装备/消耗品 [部位] [+N属性] [次数] <描述>` | GM |
+| `item list / delete / give` | 列出/删除/发放 | GM |
 
 ---
 
@@ -260,13 +301,17 @@ CREATE TABLE IF NOT EXISTS dnd_dc (
 | `src/commands/dndSkills.ts` | `/skills` 列表 |
 | `src/commands/dndRest.ts` | `/rest` 休息 |
 | `src/commands/dndGm.ts` | `/gm` 全部子命令 |
+| `src/lib/itemCore.ts` | 物品模板/背包 CRUD、装备加成计算 |
 | `test/commands/dndNew.spec.ts` | 测试 |
 | `test/commands/dndSkill.spec.ts` | 测试 |
 | `test/commands/dndGm.spec.ts` | 测试 |
 
 ### 修改文件
-- `src/index.ts` — `loadCommand()` 添加 7 个 case；`loadCallback()` 添加 `dnd_reroll`
+- `src/index.ts` — `loadCommand()` 添加 8 个 case；`loadCallback()` 添加 `dnd_reroll`/`dnd_confirm`/`item_action`
 - `src/routes.ts` — `COMMAND_ROUTES` 添加 `/gm`（deleteMsg: false）
+- `src/commands/item.ts` — `handleItemCallback` 按钮背包回调
+- `src/commands/dndChar.ts` — 装备加成显示
+- `src/commands/dndSkill.ts` — 技能检定 AI 叙事 + PVP 对抗 + 装备加成
 
 ---
 
