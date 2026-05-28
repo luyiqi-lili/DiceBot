@@ -87,7 +87,6 @@ async function getRecentUserContext(env: Env, userId: number): Promise<{
   threadId: number | null;
   topicName: string;
 } | null> {
-  if (!env.DB) { console.warn("[AI Assist] DB 不可用"); return null; }
   try {
     const sql = `
       SELECT chat_id, thread_id, topic_name, created_at
@@ -99,7 +98,7 @@ async function getRecentUserContext(env: Env, userId: number): Promise<{
       LIMIT 1
     `;
     
-    const result = await env.DB.prepare(sql).bind(userId).all();
+    const result = await env.DB!.prepare(sql).bind(userId).all();
     const row = result.results?.[0];
     
     if (!row) {
@@ -126,7 +125,6 @@ async function getRecentChatHistory(
   threadId: number | null, 
   limit: number
   ): Promise<any[]> {
-    if (!env.DB) { console.warn("[AI Assist] DB 不可用"); return []; }
     try {
       let sql = `
         SELECT user_id, username, first_name, text_content, created_at
@@ -146,7 +144,7 @@ async function getRecentChatHistory(
     sql += ` ORDER BY created_at DESC LIMIT ?`;
     binds.push(limit);
     
-    const result = await env.DB.prepare(sql).bind(...binds).all();
+    const result = await env.DB!.prepare(sql).bind(...binds).all();
     return result.results || [];
   } catch (err) {
     console.error("[AI Assist] ❌ 获取聊天记录失败", err);

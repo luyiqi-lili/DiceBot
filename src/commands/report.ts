@@ -194,7 +194,6 @@ async function getLongTermMemoryWithDetails(
  */
 export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 	console.log('[Report] 🔍 进入 handleReport');
-	if (!env.DB) { console.warn('[Report] DB 不可用，跳过'); return; }
 
 	const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
 	const threadId = parsedMessage.threadId ?? parsedMessage.message?.message_thread_id ?? null;

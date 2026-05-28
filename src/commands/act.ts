@@ -35,7 +35,6 @@ function paginateText(text: string, pageSize = 3000) {
 }
 
 async function doStart(parsed: ParsedUpdate, env: Env) {
-  if (!env.DB) { console.warn("[act] DB 不可用，跳过"); return; }
   const chatId = parsed.chatId || parsed.message?.chat?.id;
   const threadId = parsed.threadId ?? parsed.message?.message_thread_id ?? null;
   const msgId = parsed.message?.message_id ?? null;
@@ -374,7 +373,6 @@ async function doShow(parsed: ParsedUpdate, env: Env, idArg?: string, pageArg?: 
  */
 export async function handleAct(parsed: ParsedUpdate, env: Env) {
   log("incoming act command", { text: parsed.text, chatId: parsed.chatId });
-  if (!env.DB) { log("DB 不可用，跳过"); return; }
 
   const originalText = parsed.text || parsed.message?.text || "";
   const botUsername = (env as any).BOT_USERNAME || "";
