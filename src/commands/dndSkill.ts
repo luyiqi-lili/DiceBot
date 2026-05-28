@@ -58,7 +58,7 @@ async function generateFlavor(
       },
       {
         role: 'user',
-        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n技能「${skillName}」：${skillDesc}\n检定结果：${outcome}\n\n请围绕「${skillDesc}」来描写角色这次${skillName}的动作情景，纯中文：`,
+        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n技能「${skillName}」：${skillDesc}\n掷点：${result}，结果：${outcome}\n\n关键规则：掷点越高动作越精彩利落，掷点越低动作越笨拙狼狈。请围绕「${skillDesc}」写出与掷点${result}程度匹配的动作描写，纯中文：`,
       }],
       max_tokens: 200,
     });
