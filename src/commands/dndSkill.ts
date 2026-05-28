@@ -39,31 +39,36 @@ async function generateFlavor(
   charName: string,
   charRace: string,
   charClass: string,
-  result: number,
+  myResult: number,
+  gap: number,
   success: boolean | null,
-  dcLabel: string,
   oppName?: string,
 ): Promise<string> {
   if (!env.AI) return '';
-  const outcome = success === null ? '' : success ? '成功' : '失败';
   const charInfo = `${charName}（${charRace}${charClass}）`;
   const oppInfo = oppName ? `，对手是${oppName}` : '';
-  const scenePrompt = dcLabel !== '无DC' ? `，场景：${dcLabel}` : '';
+
+  let gapDesc = '';
+  if (gap > 10) gapDesc = `以巨大优势（超出${gap}点）碾压成功`;
+  else if (gap > 5) gapDesc = `轻松取胜（超出${gap}点）`;
+  else if (gap > 0) gapDesc = `险胜，仅差${gap}点，非常接近`;
+  else if (gap === 0) gapDesc = `刚好持平，惊险万分`;
+  else if (gap > -5) gapDesc = `惜败，只差${Math.abs(gap)}点，功亏一篑`;
+  else gapDesc = `惨败，差距${Math.abs(gap)}点，完全被压制`;
 
   try {
     const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
       messages: [{
         role: 'system',
-        content: '你是跑团叙事主持人。根据技能的描述来创作角色动作，注重细节和氛围，像奇幻小说一样。输出1-2句纯中文，不要复读数值，不要出现英文，用第三人称叙述。',
+        content: '你是跑团叙事主持人。根据对抗结果来创作角色动作，注重细节和氛围，像奇幻小说一样。输出1-2句纯中文，不要复读数值，不要出现英文，用第三人称叙述。',
       },
       {
         role: 'user',
-        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n技能「${skillName}」：${skillDesc}\n掷点：${result}，结果：${outcome}\n\n关键规则：掷点越高动作越精彩利落，掷点越低动作越笨拙狼狈。请围绕「${skillDesc}」写出与掷点${result}程度匹配的动作描写，纯中文：`,
+        content: `角色${charInfo}${oppInfo}\n\n技能「${skillName}」：${skillDesc}\n掷点${myResult}，${gapDesc}\n\n请写出与这个对抗程度匹配的动作描写，纯中文：`,
       }],
       max_tokens: 200,
     });
     const text = ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
-    // 清理常见前缀
     return text.replace(/^(描述[：:]|情景[：:]|\d+[\.、])\s*/i, '').trim();
   } catch { return ''; }
 }
@@ -171,28 +176,27 @@ export async function performSkillCheck(
   // DC / 胜负判断
   let dcLine = '';
   let success: boolean | null = null;
-  let dcLabelForAI = '无DC';
+  let dcInfo: { dc_value: number; description: string } | null = null;
 
   if (oppValue !== null) {
-    // PVP 对抗
     success = myTotal > oppValue;
     dcLine = `\n⚔️ ${myTotal} vs ${oppValue} → ${success ? '✅ 成功！' : '❌ 失败'}`;
-    dcLabelForAI = `对手=${oppName}, 对方${oppValue}`;
   } else {
-    // 场景 DC
-    const dcInfo = await getDC(env, chatId);
+    dcInfo = await getDC(env, chatId);
     if (dcInfo && dcInfo.dc_value > 0) {
       success = myTotal >= dcInfo.dc_value;
       dcLine = `\n📌 当前 DC：${dcInfo.dc_value} → ${success ? '✅ 成功！' : '❌ 失败'}`;
       if (dcInfo.description) dcLine += ` — ${escapeHtml(dcInfo.description)}`;
-      dcLabelForAI = `DC=${dcInfo.dc_value}, ${dcInfo.description}`;
     }
   }
 
   // RP 描述
   let flavorLine = '';
   if (env.AI) {
-    const flavor = await generateFlavor(env, skillName, skill.description || '', char.char_name, char.race, char.class, myTotal, success, dcLabelForAI, oppName || undefined);
+    const gap = oppValue !== null ? myTotal - oppValue
+      : (dcInfo?.dc_value ?? 0) > 0 ? myTotal - (dcInfo?.dc_value ?? 0)
+      : 0;
+    const flavor = await generateFlavor(env, skillName, skill.description || '', char.char_name, char.race, char.class, myTotal, gap, success, oppName || undefined);
     if (flavor) flavorLine = `\n📝 ${escapeHtml(flavor)}`;
   }
 
