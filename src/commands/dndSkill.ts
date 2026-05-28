@@ -45,8 +45,6 @@ async function generateFlavor(
   oppName?: string,
 ): Promise<string> {
   if (!env.AI) return '';
-  const charInfo = `${charName}（${charRace}${charClass}）`;
-  const oppInfo = oppName ? `，对手是${oppName}` : '';
 
   let gapDesc = '';
   if (gap > 10) gapDesc = `以巨大优势（超出${gap}点）碾压成功`;
@@ -60,11 +58,11 @@ async function generateFlavor(
     const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
       messages: [{
         role: 'system',
-        content: '你是跑团叙事主持人。根据对抗结果来创作角色动作，注重细节和氛围，像奇幻小说一样。输出1-2句纯中文，不要复读数值，不要出现英文，用第三人称叙述。',
+        content: '你是跑团叙事主持人。攻击方主动施展技能，成功则对手中招，失败则攻击方自己失误或被闪避——永远不要描述成攻击方被对方反击。角色的种族职业只是标签，不要据此添加森林、魔法塔等环境设定。注重动作细节，像奇幻小说。输出1-2句纯中文第三人称。',
       },
       {
         role: 'user',
-        content: `角色${charInfo}${oppInfo}\n\n技能「${skillName}」：${skillDesc}\n掷点${myResult}，${gapDesc}\n\n请写出与这个对抗程度匹配的动作描写，纯中文：`,
+        content: `${charName}是攻击方，${oppName || '目标'}是防守方。\n\n技能「${skillName}」：${skillDesc}\n攻击方掷点${myResult}，${gapDesc}\n\n请写出攻击方${charName}施展${skillName}的动作，纯中文：`,
       }],
       max_tokens: 200,
     });
