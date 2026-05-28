@@ -1,8 +1,10 @@
 /**
  * @file src/commands/dndSkill.ts
- * @description /skill <技能名> — 进行技能检定。
+ * @description /skill <技能名> 和 *技能名 — 进行技能检定。
  *   自动附加属性调整与熟练加值（若该技能熟练），对比场景 DC，
  *   并调用 Cloudflare AI 生成 RP 描述。
+ *
+ *   导出 performSkillCheck() 供 index.ts 在检测到 *技能名 时直接调用。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -17,8 +19,6 @@ import {
   attrNameToKey,
   getDC,
   type DndSkillRow,
-  type DndCharacterRow,
-  type DndCharAttributes,
 } from '../lib/dndCore';
 
 // ── 内部: 查询技能 ────────────────────────────────────────
@@ -72,29 +72,41 @@ ${dcText}
   }
 }
 
-// ── 主处理 ────────────────────────────────────────────────
+// ── 公共检定函数（/skill 命令 和 *技能名 共用）─────────────
 
-export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<void> {
-  const chatId = parsed.chatId!;
-  const threadId = parsed.threadId;
-  const userId = String(parsed.from?.id ?? '');
-  const args = parsed.args ?? [];
+export async function performSkillCheck(
+  env: Env,
+  chatId: number,
+  threadId: number | undefined,
+  userId: string,
+  skillName: string,
+): Promise<void> {
+  if (!skillName) {
+    await TgMessage.sendText(env, {
+      chat_id: chatId,
+      text: '⚠️ 用法：<code>/skill 技能名</code> 或 <code>*技能名</code>\n示例：<code>*扑倒</code>',
+      parse_mode: 'HTML',
+      message_thread_id: threadId,
+      reply_markup: deleteMarkup,
+    });
+    return;
+  }
 
   if (!env.DB) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: '⚠️ DND 系统需要 D1 数据库支持，当前环境未配置。',
       message_thread_id: threadId,
+      reply_markup: deleteMarkup,
     });
     return;
   }
 
-  // 1. 检查角色
   const char = await getCharacter(env, chatId, userId);
   if (!char) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: '⚠️ 你还没有角色。使用 <code>/new 种族 职业 角色名</code> 创建。',
+      text: '⚠️ 你还没有角色。使用 <code>/new 种族 职业 角色名</code> 创建。\n创建后执行 <code>/skill 技能名</code> 或 <code>*技能名</code> 进行检定。',
       parse_mode: 'HTML',
       message_thread_id: threadId,
       reply_markup: deleteMarkup,
@@ -102,19 +114,6 @@ export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<vo
     return;
   }
 
-  const skillName = args.join(' ').trim();
-  if (!skillName) {
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: '⚠️ 用法：<code>/skill 技能名</code>\n示例：<code>/skill 扑倒</code>',
-      parse_mode: 'HTML',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
-    });
-    return;
-  }
-
-  // 2. 查找技能
   const skill = await findSkill(env, chatId, skillName);
   if (!skill) {
     await TgMessage.sendText(env, {
@@ -128,30 +127,27 @@ export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<vo
   }
 
   const attrs = parseAttributes(char.attributes);
-  let profs: string[] = [];
-  try { profs = JSON.parse(char.proficiencies); } catch {}
 
-  // 3. 判断熟练
+  // 判断熟练
   const isProficient = char.class === skill.class_name;
   const baseRoll = isProficient ? rollD20() : rollD10();
   const dieLabel = isProficient ? 'd20' : 'd10';
 
-  // 4. 属性调整值
+  // 属性调整值
   const attrKey = attrNameToKey(skill.linked_attr);
   const attrVal = attrKey ? attrs[attrKey] : 10;
   const attrMod = calcMod(attrVal);
 
-  // 5. 种族加值
+  // 种族加值
   let raceBonus = 0;
   try {
     const rb: Record<string, number> = JSON.parse(skill.race_bonus);
     if (rb[char.race]) raceBonus = rb[char.race];
   } catch {}
 
-  // 6. 最终结果
   const total = baseRoll + attrMod + raceBonus;
 
-  // 7. DC 比较
+  // DC 比较
   const dcInfo = await getDC(env, chatId);
   let dcLine = '';
   let success: boolean | null = null;
@@ -161,14 +157,14 @@ export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<vo
     if (dcInfo.description) dcLine += ` — ${escapeHtml(dcInfo.description)}`;
   }
 
-  // 8. RP 描述（AI）
+  // RP 描述（AI）
   let flavorLine = '';
   if (env.AI) {
     const flavor = await generateFlavor(env, skillName, total, success, dcInfo);
     if (flavor) flavorLine = `\n📝 ${escapeHtml(flavor)}`;
   }
 
-  // 9. 组装输出
+  // 组装输出
   const parts: string[] = [];
   if (isProficient) parts.push(`熟练(+${attrMod >= 0 ? '+' : ''}${attrMod})`);
   else parts.push(`${escapeHtml(skill.linked_attr)}(${attrMod >= 0 ? '+' : ''}${attrMod})`);
@@ -188,4 +184,15 @@ export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<vo
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
   });
+}
+
+// ── /skill 命令入口 ────────────────────────────────────────
+
+export async function handleDndSkill(parsed: ParsedUpdate, env: Env): Promise<void> {
+  const chatId = parsed.chatId!;
+  const threadId = parsed.threadId;
+  const userId = String(parsed.from?.id ?? '');
+  const args = parsed.args ?? [];
+
+  await performSkillCheck(env, chatId, threadId, userId, args.join(' ').trim());
 }

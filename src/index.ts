@@ -329,6 +329,18 @@ export default {
 						return new Response('OK', { status: 200 });
 					}
 				} else {
+					// *技能名 → 等同于 /skill 技能名
+					const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
+					if (rawText.startsWith('*') && !rawText.startsWith('**')) {
+						const skillName = rawText.slice(1).trim();
+						if (skillName) {
+							const { performSkillCheck } = await import('./commands/dndSkill');
+							const chatId = parsedMessage.chatId!;
+							const threadId = parsedMessage.threadId;
+							const userId = String(parsedMessage.from?.id ?? '');
+							await performSkillCheck(env, chatId, threadId, userId, skillName);
+						}
+					}
 					await handleBackup(parsedMessage, env);
 				}
 			}
