@@ -18,7 +18,6 @@ import {
   attrKeyToName,
   attrNameToKey,
   ALL_ATTR_KEYS,
-  getCharacter,
   saveCharacter,
   getRaceBonuses,
   getClassInfo,
@@ -161,18 +160,7 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
     return;
   }
 
-  if (await getCharacter(env, chatId, userId)) {
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: `⚠️ 你已有角色，每个用户只能创建一个角色。`,
-      parse_mode: 'HTML',
-      message_thread_id: threadId,
-      reply_markup: deleteMarkup,
-    });
-    return;
-  }
-
-  // 掷属性 → 写入 DB
+  // 掷属性 → 写入 DB（已有角色则覆盖）
   const rolled = await rollAttrs(env, chatId, raceName, className);
   if (!rolled) {
     await TgMessage.sendText(env, { chat_id: chatId, text: '⚠️ 生成角色失败，请重试。', message_thread_id: threadId });
