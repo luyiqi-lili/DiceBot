@@ -54,11 +54,11 @@ async function generateFlavor(
     const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
       messages: [{
         role: 'system',
-        content: '你是一个专精于龙与地下城（DND）跑团叙事的主持人。用简洁生动的文笔描述角色的行动，注重动作细节和环境氛围，像小说一样。输出1-2句中文，不要复读数值，不要以"你"开头，用第三人称叙述。',
+        content: '你是跑团叙事主持人。根据技能的描述来创作角色动作，注重细节和氛围，像奇幻小说一样。输出1-2句纯中文，不要复读数值，不要出现英文，用第三人称叙述。',
       },
       {
         role: 'user',
-        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n${skillName}（${skillDesc}）检定结果为${outcome}（掷点${result}）。\n\n请根据结果描述角色的动作情景：`,
+        content: `角色${charInfo}${oppInfo}${scenePrompt}\n\n技能「${skillName}」：${skillDesc}\n检定结果：${outcome}\n\n请围绕「${skillDesc}」来描写角色这次${skillName}的动作情景，纯中文：`,
       }],
       max_tokens: 120,
     });
