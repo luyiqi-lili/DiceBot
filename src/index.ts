@@ -152,7 +152,8 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 		case 'fish':     { const { handleFishCallback } = await import('./commands/fish'); return handleFishCallback; }
 		case 'groll':    { const { handleGrollCallback } = await import('./commands/groll'); return handleGrollCallback; }
 		case 'lottery':  { const { handleLotteryCallback } = await import('./commands/lottery'); return handleLotteryCallback; }
-		case 'dnd_reroll': { const { handleDndRerollCallback } = await import('./commands/dndNew'); return handleDndRerollCallback; }
+		case 'dnd_reroll':  { const { handleDndRerollCallback } = await import('./commands/dndNew'); return handleDndRerollCallback; }
+		case 'dnd_confirm': { const { handleDndConfirmCallback } = await import('./commands/dndNew'); return handleDndConfirmCallback; }
 		default: return null;
 	}
 }
