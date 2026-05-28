@@ -60,6 +60,6 @@ describe('/rose', () => {
 		await handleRose(makeMsg({ args: ['send'], isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
 		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
 		expect(text).toContain('好感度记录失败');
-		expect(text).toContain('已扣除');
+		expect(text).toContain('请稍后重试');
 	});
 });
