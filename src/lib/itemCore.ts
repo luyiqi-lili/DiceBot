@@ -4,7 +4,7 @@
  */
 
 import type { Env } from '../index';
-import { calcMod, parseAttributes, type DndCharAttributes } from './dndCore';
+import { calcMod, parseAttributes, rollD, type DndCharAttributes } from './dndCore';
 
 // ── 类型 ──────────────────────────────────────────────────
 
@@ -15,6 +15,7 @@ export interface ItemTemplate {
   item_type: '装备' | '消耗品';
   slot: string;
   attr_bonus: string;  // JSON
+  damage: string;      // "1d8力量"
   uses: number;
   description: string;
 }
@@ -30,6 +31,7 @@ export interface InventoryItem {
   item_type: string;
   slot: string;
   attr_bonus: string;
+  damage: string;
   uses: number;
   description: string;
 }
@@ -52,13 +54,13 @@ export const SLOT_NAMES: Record<EquipSlot, string> = {
 export async function createTemplate(
   env: Env, chatId: string,
   name: string, itemType: '装备' | '消耗品',
-  slot: string, attrBonus: Record<string,number>, uses: number, description: string,
+  slot: string, attrBonus: Record<string,number>, damage: string, uses: number, description: string,
 ): Promise<void> {
   if (!env.DB) return;
   await env.DB.prepare(
-    `INSERT OR REPLACE INTO dnd_item_templates (chat_id, name, item_type, slot, attr_bonus, uses, description)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).bind(chatId, name, itemType, slot, JSON.stringify(attrBonus), uses, description).run();
+    `INSERT OR REPLACE INTO dnd_item_templates (chat_id, name, item_type, slot, attr_bonus, damage, uses, description)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(chatId, name, itemType, slot, JSON.stringify(attrBonus), damage, uses, description).run();
 }
 
 export async function getAllTemplates(env: Env, chatId: string): Promise<ItemTemplate[]> {
@@ -110,7 +112,7 @@ export async function getUserInventory(
 ): Promise<InventoryItem[]> {
   if (!env.DB) return [];
   const r = await env.DB.prepare(
-    `SELECT inv.*, tpl.name, tpl.item_type, tpl.slot, tpl.attr_bonus, tpl.uses, tpl.description
+    `SELECT inv.*, tpl.name, tpl.item_type, tpl.slot, tpl.attr_bonus, tpl.damage, tpl.uses, tpl.description
      FROM dnd_inventory inv
      JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
      WHERE inv.chat_id = ? AND inv.user_id = ?
@@ -124,7 +126,7 @@ export async function getInventoryItem(
 ): Promise<InventoryItem | null> {
   if (!env.DB) return null;
   return await env.DB.prepare(
-    `SELECT inv.*, tpl.name, tpl.item_type, tpl.slot, tpl.attr_bonus, tpl.uses, tpl.description
+    `SELECT inv.*, tpl.name, tpl.item_type, tpl.slot, tpl.attr_bonus, tpl.damage, tpl.uses, tpl.description
      FROM dnd_inventory inv
      JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
      WHERE inv.id = ? AND inv.chat_id = ?`
@@ -220,6 +222,73 @@ export async function getEquippedBonuses(
       for (const [k, v] of Object.entries(bonus)) {
         result[k] = (result[k] ?? 0) + v;
       }
+    } catch {}
+  }
+  return result;
+}
+
+// ── 武器相关 ──────────────────────────────────────────────
+
+/** 获取已装备的武器（weapon slot）*/
+export async function getEquippedWeapon(
+  env: Env, chatId: string, userId: string,
+): Promise<InventoryItem | null> {
+  if (!env.DB) return null;
+  return await env.DB.prepare(
+    `SELECT inv.*, tpl.name, tpl.item_type, tpl.slot, tpl.attr_bonus, tpl.damage, tpl.uses, tpl.description
+     FROM dnd_inventory inv
+     JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
+     WHERE inv.chat_id = ? AND inv.user_id = ? AND inv.equipped = 1 AND tpl.slot = 'weapon'`
+  ).bind(chatId, userId).first<InventoryItem>() ?? null;
+}
+
+/** 解析伤害骰文本 "1d8力量" → {dice:"1d8", attr:"力量"} | "2d6" → {dice:"2d6", attr:""} */
+export function parseDamage(damageStr: string): { dice: string; attr: string } {
+  if (!damageStr) return { dice: '1d4', attr: '' };
+  const m = damageStr.match(/^(\d*d\d+|d\d+)([力量敏捷体质智力感知魅力]*)$/);
+  if (!m) return { dice: '1d4', attr: '' };
+  return { dice: m[1], attr: m[2] || '' };
+}
+
+/** 掷武器伤害 = 骰子部分 + 属性调整值 */
+export function rollWeaponDamage(damageStr: string, attrs: DndCharAttributes, attrBonus: Record<string, number>): { total: number; diceLabel: string } {
+  const parsed = parseDamage(damageStr);
+  // 解析骰子: "1d8" → 1个d8
+  const diceMatch = parsed.dice.match(/^(\d*)d(\d+)$/);
+  let diceTotal = 0;
+  let diceLabel = parsed.dice;
+  if (diceMatch) {
+    const count = diceMatch[1] ? parseInt(diceMatch[1]) : 1;
+    const faces = parseInt(diceMatch[2]);
+    const rolls: number[] = [];
+    for (let i = 0; i < count; i++) rolls.push(rollD(faces));
+    diceTotal = rolls.reduce((a, b) => a + b, 0);
+    diceLabel = `${count}d${faces}(${rolls.join('+')})`;
+  }
+  let attrTotal = 0;
+  if (parsed.attr) {
+    const keyMap: Record<string, keyof DndCharAttributes> = {
+      '力量': 'str', '敏捷': 'dex', '体质': 'con', '智力': 'int', '感知': 'wis', '魅力': 'cha',
+    };
+    const k = keyMap[parsed.attr];
+    if (k) attrTotal = calcMod(attrs[k]) + (attrBonus[parsed.attr] ?? 0);
+  }
+  return { total: diceTotal + attrTotal, diceLabel };
+}
+
+/** 获取角色已装备物品中 weapon 部位的 attr_bonus 合并 */
+export async function getWeaponEquipBonus(env: Env, chatId: string, userId: string): Promise<Record<string, number>> {
+  if (!env.DB) return {};
+  const rows = await env.DB.prepare(
+    `SELECT tpl.attr_bonus FROM dnd_inventory inv
+     JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
+     WHERE inv.chat_id = ? AND inv.user_id = ? AND inv.equipped = 1 AND tpl.slot = 'weapon'`
+  ).bind(chatId, userId).all<{ attr_bonus: string }>();
+  const result: Record<string, number> = {};
+  for (const row of (rows.results ?? [])) {
+    try {
+      const bonus: Record<string, number> = JSON.parse(row.attr_bonus);
+      for (const [k, v] of Object.entries(bonus)) result[k] = (result[k] ?? 0) + v;
     } catch {}
   }
   return result;

@@ -140,6 +140,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'skills':  { const { handleDndSkills } = await import('./commands/dndSkills'); return handleDndSkills; }
 		case 'rest':    { const { handleDndRest } = await import('./commands/dndRest'); return handleDndRest; }
 		case 'gm':      { const { handleDndGm } = await import('./commands/dndGm'); return handleDndGm; }
+		case 'attack':  { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
 		default: return null;
 	}
 }
@@ -331,12 +332,11 @@ export default {
 						return new Response('OK', { status: 200 });
 					}
 				} else {
-					// *技能名 → 等同于 /skill 技能名；支持回复目标
+					// *技能名 / *武器名 → 优先武器，降级技能
 					const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
 					if (rawText.startsWith('*') && !rawText.startsWith('**')) {
-						const skillName = rawText.slice(1).trim();
-						if (skillName) {
-							const { performSkillCheck } = await import('./commands/dndSkill');
+						const starName = rawText.slice(1).trim();
+						if (starName) {
 							const chatId = parsedMessage.chatId!;
 							const threadId = parsedMessage.threadId;
 							const userId = String(parsedMessage.from?.id ?? '');
@@ -347,7 +347,17 @@ export default {
 								opts.targetName = parsedMessage.replyToMessage.from.first_name || opts.targetUserId;
 							}
 							opts.deleteMsgId = parsedMessage.message?.message_id;
-							await performSkillCheck(env, chatId, threadId, userId, skillName, opts);
+
+							// 先检查是否匹配已装备武器
+							const { getEquippedWeapon } = await import('../lib/itemCore');
+							const weapon = await getEquippedWeapon(env, String(chatId), userId);
+							if (weapon && weapon.damage && (weapon.name === starName || starName === '')) {
+								const { performAttack } = await import('./commands/dndAttack');
+								await performAttack(env, chatId, threadId, userId, starName, opts);
+							} else {
+								const { performSkillCheck } = await import('./commands/dndSkill');
+								await performSkillCheck(env, chatId, threadId, userId, starName, opts);
+							}
 						}
 					}
 					await handleBackup(parsedMessage, env);

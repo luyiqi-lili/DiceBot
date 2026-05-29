@@ -697,8 +697,9 @@ async function handleItemCreate(
   if (args.length < 3) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: '⚠️ 格式：<code>/gm item create 名称 装备/消耗品 [部位] [+N属性] [次数] 描述</code>\n' +
-        '示例：<code>/gm item create 铁头盔 装备 head +1体质 坚固的头盔</code>\n' +
+      text: '⚠️ 格式：<code>/gm item create 名称 装备/消耗品 [部位] [+N属性] [伤害骰] [次数] 描述</code>\n' +
+        '示例：<code>/gm item create 铁头盔 装备 head +1体质 坚固</code>\n' +
+        '示例：<code>/gm item create 长剑 装备 weapon +2力量 d8力量 锋利的长剑</code>\n' +
         '示例：<code>/gm item create 治疗药水 消耗品 3 恢复体力</code>',
       parse_mode: 'HTML', message_thread_id: threadId,
     });
@@ -716,22 +717,25 @@ async function handleItemCreate(
 
   let slot = '';
   let attrBonus: Record<string, number> = {};
+  let damage = '';
   let uses = 0;
   let descStart = 2;
 
   if (itemType === '装备') {
-    // 解析部位: args[2] 可能是有效部位
     if (EQUIP_SLOTS.includes(args[2] as any)) {
       slot = args[2];
       descStart = 3;
     }
-    // 解析属性: 下一个参数可能是 +N属性
     if (args.length > descStart && /^[+-]\d/.test(args[descStart])) {
       attrBonus = parseAttrBonus(args[descStart]);
       descStart++;
     }
+    // 伤害骰: d8力量 / 2d6敏捷 / d4
+    if (args.length > descStart && /^(\d*d\d+|\d+d\d+|d\d+)/.test(args[descStart])) {
+      damage = args[descStart];
+      descStart++;
+    }
   } else {
-    // 消耗品: 下一个参数可能是次数
     if (/^\d+$/.test(args[2])) {
       uses = parseInt(args[2], 10);
       descStart = 3;
@@ -740,16 +744,17 @@ async function handleItemCreate(
 
   const description = args.slice(descStart).join(' ');
 
-  await createTemplate(env, String(chatId), name, itemType, slot, attrBonus, uses, description);
+  await createTemplate(env, String(chatId), name, itemType, slot, attrBonus, damage, uses, description);
 
   const bonusStr = Object.keys(attrBonus).length > 0
     ? ` | ${fmtAttrBonuses(attrBonus)}`
     : '';
+  const dmgStr = damage ? ` | 伤害 ${damage}` : '';
   const usesStr = itemType === '消耗品' ? ` | ×${uses || '∞'}` : '';
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: `✅ 物品「${escapeHtml(name)}」已创建：${itemType}${slot ? ' [' + slot + ']' : ''}${bonusStr}${usesStr} — ${escapeHtml(description)}`,
+    text: `✅ 物品「${escapeHtml(name)}」已创建：${itemType}${slot ? ' [' + slot + ']' : ''}${bonusStr}${dmgStr}${usesStr} — ${escapeHtml(description)}`,
     parse_mode: 'HTML', message_thread_id: threadId,
   });
 }

@@ -16,7 +16,7 @@ import {
   ALL_ATTR_KEYS,
   type DndCharacterRow,
 } from '../lib/dndCore';
-import { getEquippedBonuses, getUserInventory, SLOT_NAMES, type EquipSlot } from '../lib/itemCore';
+import { getEquippedBonuses, getUserInventory, getEquippedWeapon, parseDamage, SLOT_NAMES, type EquipSlot } from '../lib/itemCore';
 
 function fmtRaceBonusesText(bonuses: Record<string, number>): string {
   if (!bonuses || Object.keys(bonuses).length === 0) return '';
@@ -59,7 +59,7 @@ function fmtCharSheetFull(
     `<b>📊 属性</b>\n` +
     attrLines + '\n\n' +
     (equipped.length > 0
-      ? `<b>🛡️ 装备加成</b>\n` + equipped.map(e => `  ${escapeHtml(e.slot)} ${escapeHtml(e.name)} (${escapeHtml(e.bonus)})`).join('\n') + '\n\n'
+      ? `<b>🛡️ 已装备</b>\n` + equipped.map(e => `  ${escapeHtml(e.slot)} ${escapeHtml(e.name)}${e.bonus ? ' (' + escapeHtml(e.bonus) + ')' : ''}`).join('\n') + '\n\n'
       : '') +
     `<b>🏹 技能熟练</b>\n` +
     (profs.length > 0 ? profs.map(s => `  ✔ ${escapeHtml(s)}`).join('\n') : '  暂无') + '\n\n' +
@@ -95,11 +95,12 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
   }
 
   // 查询种族加值、职业信息、装备加成
-  const [raceBonuses, classInfo, inventory, equipAttrBonus] = await Promise.all([
+  const [raceBonuses, classInfo, inventory, equipAttrBonus, weapon] = await Promise.all([
     getRaceBonuses(env, chatId, char.race),
     getClassInfo(env, chatId, char.class),
     getUserInventory(env, String(chatId), userId),
     getEquippedBonuses(env, String(chatId), userId),
+    getEquippedWeapon(env, String(chatId), userId),
   ]);
 
   const equipped = inventory
@@ -114,9 +115,21 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
       return { name: i.name, slot: slotName, bonus };
     });
 
+  // 拼接武器统计
+  let charSheet = fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0, equipped, equipAttrBonus);
+  if (weapon && weapon.damage) {
+    const attrs = parseAttributes(char.attributes);
+    const parsed = parseDamage(weapon.damage);
+    const attrMap: Record<string, string> = { '力量': 'str', '敏捷': 'dex', '体质': 'con', '智力': 'int', '感知': 'wis', '魅力': 'cha' };
+    const k = parsed.attr ? (attrMap[parsed.attr] ?? null) : null;
+    const attrMod = k ? calcMod(attrs[k as keyof typeof attrs]) : 0;
+    const modStr = attrMod >= 0 ? `+${attrMod}` : `${attrMod}`;
+    charSheet += `\n<b>⚔️ 武器</b>\n  ${escapeHtml(weapon.name)}  伤害 ${parsed.dice}${parsed.attr ? '+' + parsed.attr + '(' + modStr + ')' : ''}`;
+  }
+
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: fmtCharSheetFull(char, raceBonuses ?? {}, classInfo?.primary_attr ?? '?', classInfo?.hit_die ?? 0, equipped, equipAttrBonus),
+    text: charSheet,
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
