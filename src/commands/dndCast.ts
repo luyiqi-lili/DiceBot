@@ -8,7 +8,7 @@ import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {
-  getCharacter, parseAttributes, calcMod, rollD20,
+  getCharacter, parseAttributes, calcMod, rollD20, rollD10,
   attrNameToKey, type DndSkillRow, type DndCharacterRow,
 } from '../lib/dndCore';
 import { rollWeaponDamage, getWeaponEquipBonus } from '../lib/itemCore';
@@ -18,24 +18,6 @@ async function findSkill(env: Env, chatId: number, name: string): Promise<DndSki
   return await env.DB.prepare(
     `SELECT * FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
   ).bind(String(chatId), name).first<DndSkillRow>() ?? null;
-}
-
-/** 计算目标 AC */
-async function calcTargetAC(env: Env, chatId: number, userId: string): Promise<number> {
-  if (!env.DB) return 10;
-  const char = await getCharacter(env, chatId, userId);
-  if (!char) return 10;
-  const attrs = parseAttributes(char.attributes);
-  const dexMod = calcMod(attrs.dex);
-  const rows = await env.DB.prepare(
-    `SELECT tpl.attr_bonus FROM dnd_inventory inv JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
-     WHERE inv.chat_id = ? AND inv.user_id = ? AND inv.equipped = 1`
-  ).bind(String(chatId), userId).all<{ attr_bonus: string }>();
-  let equipDex = 0;
-  for (const row of (rows.results ?? [])) {
-    try { const b: Record<string, number> = JSON.parse(row.attr_bonus); if (b['敏捷']) equipDex += b['敏捷']; } catch {}
-  }
-  return 10 + dexMod + equipDex;
 }
 
 export async function performCast(
@@ -93,6 +75,7 @@ export async function performCast(
 
   const attrs = parseAttributes(char.attributes);
   const isHeal = skill.damage.includes('heal');
+  const isProficient = char.class === skill.class_name;
 
   const attrKeyMap: Record<string, string> = { '力量': 'str', '敏捷': 'dex', '体质': 'con', '智力': 'int', '感知': 'wis', '魅力': 'cha' };
 
@@ -101,58 +84,93 @@ export async function performCast(
   const weaponEquipBonus = await getWeaponEquipBonus(env, String(chatId), userId);
   const dmg = rollWeaponDamage(dmgStr, attrs, weaponEquipBonus);
 
-  // 攻击掷骰
-  const attackRoll = rollD20();
+  // 攻击方属性调整值（取 damage 中指定的属性，如 2d6智力 → 智力）
   let attrMod = 0;
   const m = dmgStr.match(/([力量敏捷体质智力感知魅力]+)$/);
   if (m) {
     const k = attrKeyMap[m[1]] as keyof typeof attrs | undefined;
     if (k) attrMod = calcMod(attrs[k]);
   }
-  const attackTotal = attackRoll + attrMod;
+
+  // 攻击方种族加值
+  let attackerRaceBonus = 0;
+  try {
+    const rb: Record<string, number> = JSON.parse(skill.race_bonus);
+    if (rb[char.race]) attackerRaceBonus = rb[char.race];
+  } catch {}
+
+  // 掷骰（熟练 d20，非熟练 d10）
+  const attackRoll = isProficient ? rollD20() : rollD10();
+  const dieLabel = isProficient ? 'd20' : 'd10';
+  const attackTotal = attackRoll + attrMod + attackerRaceBonus;
 
   let text = `🔮 <b>${escapeHtml(spellName)}</b> 施放！`;
   text += `\n💎 MP: ${char.mana_current}/${char.mana_max}`;
 
   if (isHeal) {
-    // 治疗 = 回复目标 HP
+    // 治疗 — 非熟练减半
+    const healAmount = isProficient ? dmg.total : Math.floor(dmg.total / 2);
+    const profNote = isProficient ? '' : ' <i>(非熟练减半)</i>';
     if (opts?.targetUserId) {
       const target = await getCharacter(env, chatId, opts.targetUserId);
       if (target) {
-        const newHp = Math.min(target.hp_max, target.hp_current + dmg.total);
+        const newHp = Math.min(target.hp_max, target.hp_current + healAmount);
         await env.DB.prepare(
           `UPDATE dnd_characters SET hp_current = ? WHERE chat_id = ? AND user_id = ?`
         ).bind(newHp, String(chatId), opts.targetUserId).run();
-        text += `\n💚 ${escapeHtml(target.char_name)} 回复 ${dmg.total} HP → ${newHp}/${target.hp_max}`;
+        text += `\n💚 ${escapeHtml(target.char_name)} 回复 ${healAmount} HP → ${newHp}/${target.hp_max}${profNote}`;
       }
     } else {
-      // 自治疗
-      const newHp = Math.min(char.hp_max, char.hp_current + dmg.total);
+      const newHp = Math.min(char.hp_max, char.hp_current + healAmount);
       await env.DB.prepare(
         `UPDATE dnd_characters SET hp_current = ? WHERE chat_id = ? AND user_id = ?`
       ).bind(newHp, String(chatId), userId).run();
-      text += `\n💚 自愈 ${dmg.total} HP → ${newHp}/${char.hp_max}`;
+      text += `\n💚 自愈 ${healAmount} HP → ${newHp}/${char.hp_max}${profNote}`;
     }
   } else if (opts?.targetUserId) {
-    // 攻击魔法
-    const targetAC = await calcTargetAC(env, chatId, opts.targetUserId);
-    const hit = attackTotal > targetAC;
-    text += `\n🎯 命中：d20(${attackRoll}) + 属性(${attrMod >= 0 ? '+' : ''}${attrMod}) = ${attackTotal}`;
-    text += `\n🛡️ ${escapeHtml(opts.targetName || '目标')} AC: ${targetAC} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
+    // 攻击魔法 — PVP 对抗：双方各掷 d20 + 属性 + 种族
+    const targetChar = await getCharacter(env, chatId, opts.targetUserId);
+    if (targetChar) {
+      const targetAttrs = parseAttributes(targetChar.attributes);
 
-    if (hit) {
-      const target = await getCharacter(env, chatId, opts.targetUserId);
-      if (target) {
-        const newHp = Math.max(0, target.hp_current - dmg.total);
+      // 防御方属性（取同属性）
+      let defAttrMod = 0;
+      if (m) {
+        const k = attrKeyMap[m[1]] as keyof typeof attrs | undefined;
+        if (k) defAttrMod = calcMod(targetAttrs[k]);
+      }
+
+      // 防御方种族加值
+      let defRaceBonus = 0;
+      try {
+        const rb: Record<string, number> = JSON.parse(skill.race_bonus);
+        if (rb[targetChar.race]) defRaceBonus = rb[targetChar.race];
+      } catch {}
+
+      const targetIsProficient = targetChar.class === skill.class_name;
+      const defRoll = targetIsProficient ? rollD20() : rollD10();
+      const defDieLabel = targetIsProficient ? 'd20' : 'd10';
+      const defTotal = defRoll + defAttrMod + defRaceBonus;
+
+      const hit = attackTotal > defTotal;
+
+      text += `\n🎯 攻击方 ${escapeHtml(char.char_name)}：${dieLabel}(${attackRoll}) + 属性(${attrMod >= 0 ? '+' : ''}${attrMod})${attackerRaceBonus ? ' + 种族(+'+attackerRaceBonus+')' : ''} = <b>${attackTotal}</b>`;
+      text += `\n🛡️ 防御方 ${escapeHtml(targetChar.char_name)}：${defDieLabel}(${defRoll}) + 属性(${defAttrMod >= 0 ? '+' : ''}${defAttrMod})${defRaceBonus ? ' + 种族(+'+defRaceBonus+')' : ''} = <b>${defTotal}</b>`;
+      text += `\n⚔️ ${attackTotal} vs ${defTotal} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
+
+      if (hit) {
+        const newHp = Math.max(0, targetChar.hp_current - dmg.total);
         await env.DB.prepare(
           `UPDATE dnd_characters SET hp_current = ? WHERE chat_id = ? AND user_id = ?`
         ).bind(newHp, String(chatId), opts.targetUserId).run();
         text += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod}) = <b>${dmg.total}</b>`;
-        text += `\n❤️ ${escapeHtml(target.char_name)} HP: ${target.hp_current} → ${newHp}`;
+        text += `\n❤️ ${escapeHtml(targetChar.char_name)} HP: ${targetChar.hp_current} → ${newHp}`;
       }
+    } else {
+      text += `\n⚠️ 目标没有角色。`;
     }
   } else {
-    text += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod}) = <b>${dmg.total}</b>`;
+    text += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod})${attackerRaceBonus ? ' + 种族(+'+attackerRaceBonus+')' : ''} = <b>${dmg.total}</b>`;
     text += `\n（无目标，伤害不生效）`;
   }
 
