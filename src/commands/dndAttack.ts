@@ -1,47 +1,21 @@
 /**
  * @file src/commands/dndAttack.ts
  * @description /attack <武器名> 和 *武器名 — 攻击检定。
- *   回复目标 → 攻击目标角色；非回复 → 无目标（只显示命中+伤害）。
+ *   武器熟练 → D20，否则 D10。防御方 D20+主属性对抗。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {
-  getCharacter, getRaceBonuses, parseAttributes, calcMod, rollD20,
-  attrNameToKey, type DndCharacterRow,
+  getCharacter, getClassInfo, parseAttributes, calcMod, rollD20, rollD10,
+  type DndCharacterRow,
 } from '../lib/dndCore';
 import {
   getEquippedWeapon, getWeaponEquipBonus, rollWeaponDamage,
-  parseDamage, type InventoryItem,
+  parseDamage,
 } from '../lib/itemCore';
 
-/** 计算目标 AC = 10 + 敏捷调整 + 所有已装备物品属性中的敏捷加值 */
-async function calcTargetAC(env: Env, chatId: number, userId: string): Promise<number> {
-  if (!env.DB) return 10;
-  const char = await getCharacter(env, chatId, userId);
-  if (!char) return 10;
-  const attrs = parseAttributes(char.attributes);
-  const dexMod = calcMod(attrs.dex);
-
-  // 已装备物品的敏捷加值
-  const rows = await env.DB.prepare(
-    `SELECT tpl.attr_bonus FROM dnd_inventory inv
-     JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
-     WHERE inv.chat_id = ? AND inv.user_id = ? AND inv.equipped = 1`
-  ).bind(String(chatId), userId).all<{ attr_bonus: string }>();
-  let equipDex = 0;
-  for (const row of (rows.results ?? [])) {
-    try {
-      const bonuses: Record<string, number> = JSON.parse(row.attr_bonus);
-      if (bonuses['敏捷']) equipDex += bonuses['敏捷'];
-    } catch {}
-  }
-
-  return 10 + dexMod + equipDex;
-}
-
-/** 攻击检定主函数 */
 export async function performAttack(
   env: Env, chatId: number, threadId: number | undefined,
   userId: string, weaponName: string,
@@ -58,7 +32,6 @@ export async function performAttack(
     return;
   }
 
-  // 查找已装备武器
   const weapon = await getEquippedWeapon(env, String(chatId), userId);
   if (!weapon || !weapon.damage) {
     await TgMessage.sendText(env, { chat_id: chatId, text: '⚠️ 你没有装备武器。请先 /item 装备一把武器。', message_thread_id: threadId, reply_markup: deleteMarkup });
@@ -68,45 +41,61 @@ export async function performAttack(
   const attrs = parseAttributes(char.attributes);
   const weaponEquipBonus = await getWeaponEquipBonus(env, String(chatId), userId);
 
-  // 武器属性加值
+  // 武器属性加值（保持用武器 damage 中指定的属性）
   const parsedDmg = parseDamage(weapon.damage);
   const attrKeyMap: Record<string, keyof typeof attrs> = { '力量': 'str', '敏捷': 'dex', '体质': 'con', '智力': 'int', '感知': 'wis', '魅力': 'cha' };
   const dmgAttr = parsedDmg.attr ? (attrKeyMap[parsedDmg.attr] ?? 'str') : 'str';
   const attrMod = calcMod(attrs[dmgAttr]);
   const equipAttrBonus = weaponEquipBonus[parsedDmg.attr] ?? 0;
 
-  // 攻击掷骰
-  const attackRoll = rollD20();
-  const attackTotal = attackRoll + attrMod + equipAttrBonus;
+  // 熟练判定：武器名在 proficiencies 里 → D20，否则 D10
+  let profs: string[] = [];
+  try { profs = JSON.parse(char.proficiencies); } catch {}
+  const isProficient = profs.includes(weapon.name);
+  const baseRoll = isProficient ? rollD20() : rollD10();
+  const dieLabel = isProficient ? 'd20' : 'd10';
+  const attackTotal = baseRoll + attrMod + equipAttrBonus;
+  const profNote = isProficient ? '' : ' <i>(非熟练)</i>';
+
   const attackParts = [`属性(${attrMod >= 0 ? '+' : ''}${attrMod})`];
   if (equipAttrBonus) attackParts.push(`装备(+${equipAttrBonus})`);
   const attackFormula = ` + ${attackParts.join(' + ')}`;
 
   // 目标
   let targetLine = '';
-  let targetAC: number | null = null;
-  let targetChar: DndCharacterRow | null = null;
   if (opts?.targetUserId) {
-    targetAC = await calcTargetAC(env, chatId, opts.targetUserId);
-    targetChar = await getCharacter(env, chatId, opts.targetUserId);
-    const hit = attackTotal > targetAC;
-    const tgtName = opts.targetName || (targetChar?.char_name || '目标');
-    targetLine = `\n🛡️ ${escapeHtml(tgtName)} AC: ${targetAC} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
+    const targetChar = await getCharacter(env, chatId, opts.targetUserId);
+    if (targetChar) {
+      // 防御方 D20 + 主属性调整
+      const tgtClassInfo = await getClassInfo(env, chatId, targetChar.class);
+      const tgtAttrs = parseAttributes(targetChar.attributes);
+      const tgtPrimary = tgtClassInfo?.primary_attr ?? '力量';
+      const tgtKey = attrKeyMap[tgtPrimary] as keyof typeof attrs | undefined;
+      const tgtAttrMod = tgtKey ? calcMod(tgtAttrs[tgtKey]) : 0;
+      const defRoll = rollD20();
+      const defTotal = defRoll + tgtAttrMod;
 
-    // 命中 → 伤害
-    if (hit && targetChar) {
-      const dmg = rollWeaponDamage(weapon.damage, attrs, weaponEquipBonus);
-      const newHp = Math.max(0, targetChar.hp_current - dmg.total);
-      await env.DB.prepare(
-        `UPDATE dnd_characters SET hp_current = ?, updated_at = datetime('now') WHERE chat_id = ? AND user_id = ?`
-      ).bind(newHp, String(chatId), opts.targetUserId).run();
-      targetLine += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod})${equipAttrBonus ? ' + 装备(+' + equipAttrBonus + ')' : ''} = <b>${dmg.total}</b>`;
-      targetLine += `\n❤️ ${escapeHtml(targetChar.char_name)} HP: ${targetChar.hp_current} → ${newHp}`;
+      const hit = attackTotal > defTotal;
+      const tgtName = targetChar.char_name;
+      targetLine = `\n🛡️ ${escapeHtml(tgtName)}：d20(${defRoll}) + ${escapeHtml(tgtPrimary)}(${tgtAttrMod >= 0 ? '+' : ''}${tgtAttrMod}) = <b>${defTotal}</b>`;
+      targetLine += `\n⚔️ ${attackTotal} vs ${defTotal} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
+
+      if (hit) {
+        const dmg = rollWeaponDamage(weapon.damage, attrs, weaponEquipBonus);
+        const newHp = Math.max(0, targetChar.hp_current - dmg.total);
+        await env.DB.prepare(
+          `UPDATE dnd_characters SET hp_current = ?, updated_at = datetime('now') WHERE chat_id = ? AND user_id = ?`
+        ).bind(newHp, String(chatId), opts.targetUserId).run();
+        targetLine += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod})${equipAttrBonus ? ' + 装备(+' + equipAttrBonus + ')' : ''} = <b>${dmg.total}</b>`;
+        targetLine += `\n❤️ ${escapeHtml(tgtName)} HP: ${targetChar.hp_current} → ${newHp}`;
+      }
+    } else {
+      targetLine = `\n⚠️ 目标没有角色。`;
     }
   }
 
   const text =
-    `⚔️ <b>${escapeHtml(weapon.name)}</b>攻击：d20(${attackRoll})${attackFormula} = <b>${attackTotal}</b>` +
+    `⚔️ <b>${escapeHtml(weapon.name)}</b>攻击${profNote}：${dieLabel}(${baseRoll})${attackFormula} = <b>${attackTotal}</b>` +
     targetLine;
 
   const sendOpts: any = { chat_id: chatId, text, parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup };

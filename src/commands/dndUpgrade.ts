@@ -11,10 +11,11 @@ import {
   getSkillsForClass, attrKeyToName, ALL_ATTR_KEYS,
   type DndCharAttributes,
 } from '../lib/dndCore';
+import { getUserInventory } from '../lib/itemCore';
 
 // ── 回调类型 ──────────────────────────────────────────────
 
-interface LvUpCb { type: 'lu'; a: 'menu' | 'choose' | 'stat_up' | 'skill_up'; v?: string }
+interface LvUpCb { type: 'lu'; a: 'menu' | 'stat_up' | 'skill_up' | 'wpn_up'; v?: string }
 
 /** 升到下一级需要的 XP */
 function nextLevelXP(level: number): number {
@@ -53,6 +54,7 @@ export async function handleDndLvUp(parsed: ParsedUpdate, env: Env): Promise<voi
     buttons.push([
       { text: '💪 属性 +1', callback_data: JSON.stringify({ type: 'lu', a: 'stat_up' } as LvUpCb) },
       { text: '🏹 学技能', callback_data: JSON.stringify({ type: 'lu', a: 'skill_up' } as LvUpCb) },
+      { text: '⚔️ 武器熟练', callback_data: JSON.stringify({ type: 'lu', a: 'wpn_up' } as LvUpCb) },
     ]);
   }
 
@@ -99,6 +101,7 @@ export async function handleLvUpCallback(cq: any, cd: any, env: Env): Promise<vo
 
   if (cd.a === 'stat_up') await doStatUp(env, cq, chatId, userId, cd.v);
   else if (cd.a === 'skill_up') await doSkillUp(env, cq, chatId, userId, cd.v);
+  else if (cd.a === 'wpn_up') await doWpnUp(env, cq, chatId, userId, cd.v);
   else if (cd.a === 'menu') await refreshMenu(env, cq, chatId, userId);
 }
 
@@ -251,6 +254,81 @@ async function confirmSkillUp(env: Env, cq: any, chatId: number, userId: string,
   await TgMessage.answerCallbackQuery(env, cq.id, { text: `学会 ${skillName}！升级至 Lv.${char.level+1}` });
 }
 
+// ── 武器熟练 ─────────────────────────────────────────────
+
+async function doWpnUp(env: Env, cq: any, chatId: number, userId: string, preselect?: string) {
+  const char = await getCharacter(env, chatId, userId);
+  if (!char) return;
+
+  if (preselect) {
+    await confirmWpnUp(env, cq, chatId, userId, preselect);
+    return;
+  }
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！需要 ${need}`, show_alert: true });
+    return;
+  }
+
+  let profs: string[] = [];
+  try { profs = JSON.parse(char.proficiencies); } catch {}
+
+  // 从背包查 weapon 部位的物品
+  const inventory = await getUserInventory(env, String(chatId), userId);
+  const weapons = inventory.filter(i => i.slot === 'weapon' && !profs.includes(i.name));
+
+  const buttons: any[] = [];
+  for (const w of weapons) {
+    buttons.push([{
+      text: `${w.name}`,
+      callback_data: JSON.stringify({ type: 'lu', a: 'wpn_up', v: w.name } as LvUpCb),
+    }]);
+  }
+
+  if (buttons.length === 0) {
+    buttons.push([{ text: '✅ 没有未熟练的武器', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
+  }
+  buttons.push([{ text: '🔙 取消', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
+
+  await TgMessage.editMessageText(env, {
+    chat_id: chatId, message_id: cq.message.message_id,
+    text: `⚔️ <b>选择要熟练的武器</b>\n⭐ 升级后将消耗 ${need} XP\n\n背包中 weapon 部位物品：`,
+    parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
+  });
+  await TgMessage.answerCallbackQuery(env, cq.id);
+}
+
+async function confirmWpnUp(env: Env, cq: any, chatId: number, userId: string, wpnName: string) {
+  const char = await getCharacter(env, chatId, userId);
+  if (!char) return;
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！`, show_alert: true });
+    return;
+  }
+
+  let profs: string[] = [];
+  try { profs = JSON.parse(char.proficiencies); } catch {}
+  if (profs.includes(wpnName)) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: '已熟练此武器', show_alert: true });
+    return;
+  }
+
+  profs.push(wpnName);
+  await saveCharacter(env, {
+    chat_id: String(chatId), user_id: userId,
+    char_name: char.char_name, race: char.race, class: char.class,
+    hp_max: char.hp_max, hp_current: char.hp_current,
+    attributes: parseAttributes(char.attributes), proficiencies: profs,
+    level: char.level + 1, xp: char.xp - need,
+  });
+
+  await refreshMenu(env, cq, chatId, userId);
+  await TgMessage.answerCallbackQuery(env, cq.id, { text: `熟练 ${wpnName}！升级至 Lv.${char.level+1}` });
+}
+
 // ── 刷新主菜单 ────────────────────────────────────────────
 
 async function refreshMenu(env: Env, cq: any, chatId: number, userId: string) {
@@ -270,6 +348,7 @@ async function refreshMenu(env: Env, cq: any, chatId: number, userId: string) {
     buttons.push([
       { text: '💪 属性 +1', callback_data: JSON.stringify({ type: 'lu', a: 'stat_up' } as LvUpCb) },
       { text: '🏹 学技能', callback_data: JSON.stringify({ type: 'lu', a: 'skill_up' } as LvUpCb) },
+      { text: '⚔️ 武器熟练', callback_data: JSON.stringify({ type: 'lu', a: 'wpn_up' } as LvUpCb) },
     ]);
   }
   buttons.push([{ text: '🔙 关闭', callback_data: JSON.stringify({ type: 'delete_message' }) }]);
