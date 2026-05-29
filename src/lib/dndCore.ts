@@ -516,9 +516,9 @@ export function calcMaxHP(hitDie: number, conMod: number): number {
 // ── 法力系统 ──────────────────────────────────────────────
 
 /** 计算初始最大法力 */
-export function calcManaMax(className: string, level: number, intMod: number, wisMod: number): number {
-  if (['法师', '术士', '巫师'].includes(className)) return 10 + level * 3 + intMod;
-  if (['牧师', '德鲁伊'].includes(className)) return 8 + level * 2 + wisMod;
+export function calcManaMax(primaryAttr: string, level: number, intMod: number, wisMod: number): number {
+  if (primaryAttr === '智力') return 10 + level * 3 + intMod;
+  if (primaryAttr === '感知') return 8 + level * 2 + wisMod;
   return 0;
 }
 

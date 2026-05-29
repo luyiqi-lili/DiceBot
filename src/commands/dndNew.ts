@@ -99,7 +99,7 @@ async function rollAttrs(
   const skills = await getSkillsForClass(env, chatId, className);
   const proficiencies = skills.map(s => s.skill_name);
 
-  const manaMax = calcManaMax(className, 1, calcMod(attrs.int), calcMod(attrs.wis));
+  const manaMax = calcManaMax(classInfo?.primary_attr ?? '力量', 1, calcMod(attrs.int), calcMod(attrs.wis));
 
   return { attrs, hpMax, manaMax, proficiencies, raceBonuses, classPrimaryAttr: classInfo?.primary_attr ?? '力量', classHitDie: hitDie };
 }
