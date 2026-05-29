@@ -349,7 +349,7 @@ export default {
 							opts.deleteMsgId = parsedMessage.message?.message_id;
 
 							// 先检查是否匹配已装备武器
-							const { getEquippedWeapon } = await import('../lib/itemCore');
+							const { getEquippedWeapon } = await import('./lib/itemCore');
 							const weapon = await getEquippedWeapon(env, String(chatId), userId);
 							if (weapon && weapon.damage && (weapon.name === starName || starName === '')) {
 								const { performAttack } = await import('./commands/dndAttack');
