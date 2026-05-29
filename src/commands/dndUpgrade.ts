@@ -1,7 +1,6 @@
 /**
  * @file src/commands/dndUpgrade.ts
- * @description /lvup — XP 消费升级（属性/技能熟练）。
- *   按钮交互：选择路径 → 展示可选项 → 确认购买。
+ * @description /lvup — 升级系统：消耗 XP 升一级，获得一次属性+1/学技能选择权。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -9,26 +8,20 @@ import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {
   getCharacter, parseAttributes, saveCharacter,
-  getSkillsForClass, attrKeyToName, ALL_ATTR_KEYS, fmtMod,
-  type DndCharAttributes, type DndCharacterRow,
+  getSkillsForClass, attrKeyToName, ALL_ATTR_KEYS,
+  type DndCharAttributes,
 } from '../lib/dndCore';
 
-// ── 回调类型（极小化）─────────────────────────────────────
+// ── 回调类型 ──────────────────────────────────────────────
 
-interface LvUpCb { t: 'lu'; a: 'menu' | 'stats' | 'skills' | 'stat_buy' | 'skill_buy'; v?: string }
+interface LvUpCb { type: 'lu'; a: 'menu' | 'choose' | 'stat_up' | 'skill_up'; v?: string }
 
-const ATTR_COST_BASE = 50;
-const SKILL_COST_BASE = 100;
-const SKILL_COST_PER = 50;
-
-function statCost(currentVal: number): number {
-  return Math.max(ATTR_COST_BASE, (currentVal - 8) * ATTR_COST_BASE);
-}
-function skillCost(alreadyLearned: number): number {
-  return SKILL_COST_BASE + alreadyLearned * SKILL_COST_PER;
+/** 升到下一级需要的 XP */
+function nextLevelXP(level: number): number {
+  return level * 100;
 }
 
-// ── /lvup 主菜单 ──────────────────────────────────────────
+// ── /lvup ─────────────────────────────────────────────────
 
 export async function handleDndLvUp(parsed: ParsedUpdate, env: Env): Promise<void> {
   const chatId = parsed.chatId!;
@@ -46,25 +39,32 @@ export async function handleDndLvUp(parsed: ParsedUpdate, env: Env): Promise<voi
     return;
   }
 
+  const need = nextLevelXP(char.level);
+  const canUp = char.xp >= need;
   let profs: string[] = [];
   try { profs = JSON.parse(char.proficiencies); } catch {}
 
-  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp}\n🏹 已熟练: ${profs.length} 项\n\n请选择升级方向：`;
+  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp} / 下一级 ${need}\n🏹 已熟练: ${profs.length} 项` +
+    (canUp ? `\n\n可升级！选择奖励：` : `\n\n⚠️ XP 不足，还需 ${need - char.xp}`);
 
-  const cb = (a: string): LvUpCb => ({ t: 'lu', a: a as any });
+  const buttons: any[] = [];
+
+  if (canUp) {
+    buttons.push([
+      { text: '💪 属性 +1', callback_data: JSON.stringify({ type: 'lu', a: 'stat_up' } as LvUpCb) },
+      { text: '🏹 学技能', callback_data: JSON.stringify({ type: 'lu', a: 'skill_up' } as LvUpCb) },
+    ]);
+  }
+
+  buttons.push([{ text: '🔙 关闭', callback_data: JSON.stringify({ type: 'delete_message' }) }]);
+
   await TgMessage.sendText(env, {
     chat_id: chatId, text, parse_mode: 'HTML', message_thread_id: threadId,
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '💪 属性提升', callback_data: JSON.stringify(cb('stats')) },
-         { text: '🏹 学习技能', callback_data: JSON.stringify(cb('skills')) }],
-        [{ text: '🔙 关闭', callback_data: JSON.stringify({ type: 'delete_message' }) }],
-      ],
-    },
+    reply_markup: { inline_keyboard: buttons },
   });
 }
 
-// ── /level 查看 ───────────────────────────────────────────
+// ── /level ────────────────────────────────────────────────
 
 export async function handleDndLevel(parsed: ParsedUpdate, env: Env): Promise<void> {
   const chatId = parsed.chatId!;
@@ -84,87 +84,114 @@ export async function handleDndLevel(parsed: ParsedUpdate, env: Env): Promise<vo
 
   let profs: string[] = [];
   try { profs = JSON.parse(char.proficiencies); } catch {}
-
-  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp}\n🏹 已熟练: ${profs.join(', ') || '无'}`;
+  const need = nextLevelXP(char.level);
+  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp} / 下一级 ${need}\n🏹 已熟练: ${profs.join(', ') || '无'}`;
   await TgMessage.sendText(env, { chat_id: chatId, text, parse_mode: 'HTML', message_thread_id: threadId, reply_markup: deleteMarkup });
 }
 
 // ── 回调总入口 ────────────────────────────────────────────
 
 export async function handleLvUpCallback(cq: any, cd: any, env: Env): Promise<void> {
-  if (!cd || cd.t !== 'lu') return;
+  if (!cd || cd.type !== 'lu') return;
   const userId = String(cq.from?.id);
   const chatId = cq.message?.chat?.id;
   if (!env.DB || !chatId) return;
 
-  if (cd.a === 'stats') await showStats(env, cq, chatId, userId);
-  else if (cd.a === 'skills') await showSkills(env, cq, chatId, userId);
-  else if (cd.a === 'stat_buy') await buyStat(env, cq, chatId, userId, cd.v);
-  else if (cd.a === 'skill_buy') await buySkill(env, cq, chatId, userId, cd.v);
-  else await showMenu(env, cq, chatId, userId);
+  if (cd.a === 'stat_up') await doStatUp(env, cq, chatId, userId, cd.v);
+  else if (cd.a === 'skill_up') await doSkillUp(env, cq, chatId, userId, cd.v);
+  else if (cd.a === 'menu') await refreshMenu(env, cq, chatId, userId);
 }
 
-// ── 属性列表 ──────────────────────────────────────────────
+// ── 升级 + 属性 +1 ────────────────────────────────────────
 
-async function showStats(env: Env, cq: any, chatId: number, userId: string) {
+async function doStatUp(env: Env, cq: any, chatId: number, userId: string, preselect?: string) {
   const char = await getCharacter(env, chatId, userId);
   if (!char) return;
-  const attrs = parseAttributes(char.attributes);
 
+  if (preselect) {
+    await confirmStatUp(env, cq, chatId, userId, preselect);
+    return;
+  }
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！需要 ${need}`, show_alert: true });
+    return;
+  }
+
+  // 展示属性列表供选择
+  const attrs = parseAttributes(char.attributes);
   const buttons: any[] = [];
   for (const k of ALL_ATTR_KEYS) {
     const val = attrs[k];
     if (val >= 18) continue;
-    const cost = statCost(val);
-    const disabled = char.xp < cost;
-    const label = `${attrKeyToName(k)} ${val}→${val + 1} [${cost}XP]${disabled ? ' ❌' : ''}`;
-    buttons.push([{ text: label, callback_data: JSON.stringify({ t: 'lu', a: 'stat_buy', v: k } as LvUpCb) }]);
+    buttons.push([{
+      text: `${attrKeyToName(k)} ${val} → ${val + 1}`,
+      callback_data: JSON.stringify({ type: 'lu', a: 'stat_up', v: k } as LvUpCb),
+    }]);
   }
 
-  buttons.push([{ text: '🔙 返回', callback_data: JSON.stringify({ t: 'lu', a: 'menu' } as LvUpCb) }]);
-
-  const text = `💪 <b>属性提升</b>\n⭐ 可用 XP: ${char.xp}\n\n选择要提升的属性（上限 18）：`;
+  if (buttons.length === 0) {
+    buttons.push([{ text: '🚫 全属性已达上限', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
+  }
+  buttons.push([{ text: '🔙 取消', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
 
   await TgMessage.editMessageText(env, {
     chat_id: chatId, message_id: cq.message.message_id,
-    text, parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
+    text: `💪 <b>选择要提升的属性</b>\n⭐ 升级后将消耗 ${need} XP`,
+    parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
   });
   await TgMessage.answerCallbackQuery(env, cq.id);
 }
 
-// ── 购买属性 ──────────────────────────────────────────────
+// ── 确认属性升级（v 有效时）────────────────────────────────
 
-async function buyStat(env: Env, cq: any, chatId: number, userId: string, attrKey: string) {
+async function confirmStatUp(env: Env, cq: any, chatId: number, userId: string, attrKey: string) {
   const char = await getCharacter(env, chatId, userId);
   if (!char) return;
-  const attrs = parseAttributes(char.attributes);
-  const k = attrKey as keyof DndCharAttributes;
-  const val = attrs[k];
-  if (!val || val >= 18) return;
-  const cost = statCost(val);
-  if (char.xp < cost) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！需要 ${cost}，当前 ${char.xp}`, show_alert: true });
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！`, show_alert: true });
     return;
   }
 
-  attrs[k] = val + 1;
+  const attrs = parseAttributes(char.attributes);
+  const k = attrKey as keyof DndCharAttributes;
+  const old = attrs[k];
+  if (!old || old >= 18) return;
+
+  attrs[k] = old + 1;
   await saveCharacter(env, {
     chat_id: String(chatId), user_id: userId,
     char_name: char.char_name, race: char.race, class: char.class,
     hp_max: char.hp_max, hp_current: char.hp_current,
     attributes: attrs, proficiencies: JSON.parse(char.proficiencies || '[]'),
-    level: char.level, xp: char.xp - cost,
+    level: char.level + 1, xp: char.xp - need,
   });
 
-  await showStats(env, cq, chatId, userId);
-  await TgMessage.answerCallbackQuery(env, cq.id, { text: `${attrKeyToName(k)} ${val}→${val+1}！消耗 ${cost} XP` });
+  await refreshMenu(env, cq, chatId, userId);
+  await TgMessage.answerCallbackQuery(env, cq.id, { text: `${attrKeyToName(k)} ${old}→${old+1}！升级至 Lv.${char.level+1}` });
 }
 
-// ── 技能列表 ──────────────────────────────────────────────
+// ── 升级 + 学技能 ─────────────────────────────────────────
 
-async function showSkills(env: Env, cq: any, chatId: number, userId: string) {
+async function doSkillUp(env: Env, cq: any, chatId: number, userId: string, preselect?: string) {
   const char = await getCharacter(env, chatId, userId);
   if (!char) return;
+
+  // 如果携带有 v（具体技能名），直接执行升级
+  if (preselect) {
+    await confirmSkillUp(env, cq, chatId, userId, preselect);
+    return;
+  }
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！需要 ${need}`, show_alert: true });
+    return;
+  }
+
   let profs: string[] = [];
   try { profs = JSON.parse(char.proficiencies); } catch {}
 
@@ -173,41 +200,41 @@ async function showSkills(env: Env, cq: any, chatId: number, userId: string) {
 
   for (const s of skills) {
     if (profs.includes(s.skill_name)) continue;
-    const cost = skillCost(profs.length);
-    const disabled = char.xp < cost;
-    const label = `${s.skill_name} (${s.linked_attr}) [${cost}XP]${disabled ? ' ❌' : ''}`;
-    buttons.push([{ text: label, callback_data: JSON.stringify({ t: 'lu', a: 'skill_buy', v: s.skill_name } as LvUpCb) }]);
+    buttons.push([{
+      text: `${s.skill_name} (${s.linked_attr})`,
+      callback_data: JSON.stringify({ type: 'lu', a: 'skill_up', v: s.skill_name } as LvUpCb),
+    }]);
   }
 
   if (buttons.length === 0) {
-    buttons.push([{ text: '✅ 已全部掌握！', callback_data: JSON.stringify({ t: 'lu', a: 'menu' } as LvUpCb) }]);
+    buttons.push([{ text: '✅ 已全部掌握！', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
   }
-  buttons.push([{ text: '🔙 返回', callback_data: JSON.stringify({ t: 'lu', a: 'menu' } as LvUpCb) }]);
-
-  const text = `🏹 <b>学习技能</b>\n⭐ 可用 XP: ${char.xp}\n\n只能学习本职业（${escapeHtml(char.class)}）技能：`;
+  buttons.push([{ text: '🔙 取消', callback_data: JSON.stringify({ type: 'lu', a: 'menu' } as LvUpCb) }]);
 
   await TgMessage.editMessageText(env, {
     chat_id: chatId, message_id: cq.message.message_id,
-    text, parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
+    text: `🏹 <b>选择要学习的技能</b>\n⭐ 升级后将消耗 ${need} XP\n\n本职业（${escapeHtml(char.class)}）可选技能：`,
+    parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
   });
   await TgMessage.answerCallbackQuery(env, cq.id);
 }
 
-// ── 购买技能 ──────────────────────────────────────────────
+// ── 确认技能 — 消耗 XP 升级 ───────────────────────────────
 
-async function buySkill(env: Env, cq: any, chatId: number, userId: string, skillName: string) {
+async function confirmSkillUp(env: Env, cq: any, chatId: number, userId: string, skillName: string) {
   const char = await getCharacter(env, chatId, userId);
   if (!char) return;
+
+  const need = nextLevelXP(char.level);
+  if (char.xp < need) {
+    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！`, show_alert: true });
+    return;
+  }
+
   let profs: string[] = [];
   try { profs = JSON.parse(char.proficiencies); } catch {}
   if (profs.includes(skillName)) {
     await TgMessage.answerCallbackQuery(env, cq.id, { text: '已学会此技能', show_alert: true });
-    return;
-  }
-
-  const cost = skillCost(profs.length);
-  if (char.xp < cost) {
-    await TgMessage.answerCallbackQuery(env, cq.id, { text: `XP 不足！需要 ${cost}，当前 ${char.xp}`, show_alert: true });
     return;
   }
 
@@ -217,34 +244,39 @@ async function buySkill(env: Env, cq: any, chatId: number, userId: string, skill
     char_name: char.char_name, race: char.race, class: char.class,
     hp_max: char.hp_max, hp_current: char.hp_current,
     attributes: parseAttributes(char.attributes), proficiencies: profs,
-    level: char.level, xp: char.xp - cost,
+    level: char.level + 1, xp: char.xp - need,
   });
 
-  await showSkills(env, cq, chatId, userId);
-  await TgMessage.answerCallbackQuery(env, cq.id, { text: `学会 ${skillName}！消耗 ${cost} XP` });
+  await refreshMenu(env, cq, chatId, userId);
+  await TgMessage.answerCallbackQuery(env, cq.id, { text: `学会 ${skillName}！升级至 Lv.${char.level+1}` });
 }
 
-// ── 返回主菜单 ────────────────────────────────────────────
+// ── 刷新主菜单 ────────────────────────────────────────────
 
-async function showMenu(env: Env, cq: any, chatId: number, userId: string) {
+async function refreshMenu(env: Env, cq: any, chatId: number, userId: string) {
   const char = await getCharacter(env, chatId, userId);
   if (!char) return;
+
+  const need = nextLevelXP(char.level);
+  const canUp = char.xp >= need;
   let profs: string[] = [];
   try { profs = JSON.parse(char.proficiencies); } catch {}
 
-  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp}\n🏹 已熟练: ${profs.length} 项\n\n请选择升级方向：`;
+  const text = `📊 <b>${escapeHtml(char.char_name)}</b> Lv.${char.level}\n⭐ XP: ${char.xp} / 下一级 ${need}\n🏹 已熟练: ${profs.length} 项` +
+    (canUp ? `\n\n可升级！选择奖励：` : `\n\n⚠️ XP 不足，还需 ${need - char.xp}`);
 
-  const cb = (a: string): LvUpCb => ({ t: 'lu', a: a as any });
+  const buttons: any[] = [];
+  if (canUp) {
+    buttons.push([
+      { text: '💪 属性 +1', callback_data: JSON.stringify({ type: 'lu', a: 'stat_up' } as LvUpCb) },
+      { text: '🏹 学技能', callback_data: JSON.stringify({ type: 'lu', a: 'skill_up' } as LvUpCb) },
+    ]);
+  }
+  buttons.push([{ text: '🔙 关闭', callback_data: JSON.stringify({ type: 'delete_message' }) }]);
+
   await TgMessage.editMessageText(env, {
     chat_id: chatId, message_id: cq.message.message_id,
-    text, parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '💪 属性提升', callback_data: JSON.stringify(cb('stats')) },
-         { text: '🏹 学习技能', callback_data: JSON.stringify(cb('skills')) }],
-        [{ text: '🔙 关闭', callback_data: JSON.stringify({ type: 'delete_message' }) }],
-      ],
-    },
+    text, parse_mode: 'HTML', reply_markup: { inline_keyboard: buttons },
   });
   await TgMessage.answerCallbackQuery(env, cq.id);
 }
