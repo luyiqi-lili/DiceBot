@@ -141,6 +141,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'rest':    { const { handleDndRest } = await import('./commands/dndRest'); return handleDndRest; }
 		case 'gm':      { const { handleDndGm } = await import('./commands/dndGm'); return handleDndGm; }
 		case 'attack':  { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
+		case 'atk':     { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
 		default: return null;
 	}
 }
@@ -348,10 +349,10 @@ export default {
 							}
 							opts.deleteMsgId = parsedMessage.message?.message_id;
 
-							// 先检查是否匹配已装备武器
+							// 先检查是否匹配已装备武器，*攻击 强制武器
 							const { getEquippedWeapon } = await import('./lib/itemCore');
 							const weapon = await getEquippedWeapon(env, String(chatId), userId);
-							if (weapon && weapon.damage && (weapon.name === starName || starName === '')) {
+							if (weapon && weapon.damage && (weapon.name === starName || starName === '攻击' || starName === '')) {
 								const { performAttack } = await import('./commands/dndAttack');
 								await performAttack(env, chatId, threadId, userId, starName, opts);
 							} else {
