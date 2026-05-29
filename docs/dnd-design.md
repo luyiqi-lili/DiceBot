@@ -306,8 +306,13 @@ CREATE INDEX IF NOT EXISTS idx_inv_equip ON dnd_inventory(chat_id, user_id, equi
 | `test/commands/dndSkill.spec.ts` | 测试 |
 | `test/commands/dndGm.spec.ts` | 测试 |
 
+### 新建文件
+| 文件 | 用途 |
+|------|------|
+| `src/commands/dndAttack.ts` | `/attack` + `performAttack`（攻击检定、AC计算、伤害骰） |
+
 ### 修改文件
-- `src/index.ts` — `loadCommand()` 添加 8 个 case；`loadCallback()` 添加 `dnd_reroll`/`dnd_confirm`/`item_action`
+- `src/index.ts` — `loadCommand()` 添加 9 个 case；`loadCallback()` 添加 `dnd_reroll`/`dnd_confirm`/`item_action`；非命令消息支持 `*武器名` 检测
 - `src/routes.ts` — `COMMAND_ROUTES` 添加 `/gm`（deleteMsg: false）
 - `src/commands/item.ts` — `handleItemCallback` 按钮背包回调
 - `src/commands/dndChar.ts` — 装备加成显示
