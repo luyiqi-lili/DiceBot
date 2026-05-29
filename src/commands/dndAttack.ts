@@ -8,7 +8,7 @@ import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {
-  getCharacter, getClassInfo, parseAttributes, calcMod, rollD20, rollD10,
+  getCharacter, parseAttributes, calcMod, rollD20, rollD10,
   type DndCharacterRow,
 } from '../lib/dndCore';
 import {
@@ -64,21 +64,25 @@ export async function performAttack(
   // 目标
   let targetLine = '';
   if (opts?.targetUserId) {
-    const targetChar = await getCharacter(env, chatId, opts.targetUserId);
-    if (targetChar) {
-      // 防御方 D20 + 主属性调整
-      const tgtClassInfo = await getClassInfo(env, chatId, targetChar.class);
-      const tgtAttrs = parseAttributes(targetChar.attributes);
-      const tgtPrimary = tgtClassInfo?.primary_attr ?? '力量';
-      const tgtKey = attrKeyMap[tgtPrimary] as keyof typeof attrs | undefined;
-      const tgtAttrMod = tgtKey ? calcMod(tgtAttrs[tgtKey]) : 0;
-      const defRoll = rollD20();
-      const defTotal = defRoll + tgtAttrMod;
+    const tgtChar = await getCharacter(env, chatId, opts.targetUserId);
+    if (tgtChar) {
+      const tgtAttrs = parseAttributes(tgtChar.attributes);
+      const dexMod = calcMod(tgtAttrs.dex);
 
-      const hit = attackTotal > defTotal;
-      const tgtName = targetChar.char_name;
-      targetLine = `\n🛡️ ${escapeHtml(tgtName)}：d20(${defRoll}) + ${escapeHtml(tgtPrimary)}(${tgtAttrMod >= 0 ? '+' : ''}${tgtAttrMod}) = <b>${defTotal}</b>`;
-      targetLine += `\n⚔️ ${attackTotal} vs ${defTotal} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
+      // 已装备物品的敏捷加值
+      const rows = await env.DB.prepare(
+        `SELECT tpl.attr_bonus FROM dnd_inventory inv JOIN dnd_item_templates tpl ON inv.template_id = tpl.id
+         WHERE inv.chat_id = ? AND inv.user_id = ? AND inv.equipped = 1`
+      ).bind(String(chatId), opts.targetUserId).all<{ attr_bonus: string }>();
+      let equipDex = 0;
+      for (const row of (rows.results ?? [])) {
+        try { const b: Record<string, number> = JSON.parse(row.attr_bonus); if (b['敏捷']) equipDex += b['敏捷']; } catch {}
+      }
+
+      const ac = 10 + dexMod + equipDex;
+      const hit = attackTotal > ac;
+      const tgtName = tgtChar.char_name;
+      targetLine = `\n🛡️ ${escapeHtml(tgtName)} AC: ${ac} → ${hit ? '✅ 命中！' : '❌ 未命中'}`;
 
       if (hit) {
         const dmg = rollWeaponDamage(weapon.damage, attrs, weaponEquipBonus);
@@ -87,7 +91,7 @@ export async function performAttack(
           `UPDATE dnd_characters SET hp_current = ?, updated_at = datetime('now') WHERE chat_id = ? AND user_id = ?`
         ).bind(newHp, String(chatId), opts.targetUserId).run();
         targetLine += `\n💥 伤害：${dmg.diceLabel} + 属性(${attrMod >= 0 ? '+' : ''}${attrMod})${equipAttrBonus ? ' + 装备(+' + equipAttrBonus + ')' : ''} = <b>${dmg.total}</b>`;
-        targetLine += `\n❤️ ${escapeHtml(tgtName)} HP: ${targetChar.hp_current} → ${newHp}`;
+        targetLine += `\n❤️ ${escapeHtml(tgtName)} HP: ${tgtChar.hp_current} → ${newHp}`;
       }
     } else {
       targetLine = `\n⚠️ 目标没有角色。`;
