@@ -11,6 +11,7 @@ import {
   getRaceBonuses,
   getClassInfo,
   parseAttributes,
+  calcMod,
   fmtMod,
   attrKeyToName,
   ALL_ATTR_KEYS,
