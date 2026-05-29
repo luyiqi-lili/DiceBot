@@ -145,7 +145,10 @@ export async function performSkillCheck(
 
   // 发起者加成
   const my = await calcCharBonus(env, chatId, char, skill);
-  const isProficient = char.class === skill.class_name;
+  // 判断熟练（proficiencies 列表）
+  let profs: string[] = [];
+  try { profs = JSON.parse(char.proficiencies); } catch {}
+  const isProficient = profs.includes(skill.skill_name);
   const baseRoll = isProficient ? rollD20() : rollD10();
   const dieLabel = isProficient ? 'd20' : 'd10';
   const myTotal = baseRoll + my.attrMod + my.raceBonus;

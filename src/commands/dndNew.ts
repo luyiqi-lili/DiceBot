@@ -24,7 +24,6 @@ import {
   saveCharacter,
   getRaceBonuses,
   getClassInfo,
-  getSkillsForClass,
   initPresetsToDB,
   getCharacter,
   type DndCharAttributes,
@@ -96,8 +95,8 @@ async function rollAttrs(
   const hitDie = classInfo?.hit_die ?? 6;
   const hpMax = calcMaxHP(hitDie, calcMod(attrs.con));
 
-  const skills = await getSkillsForClass(env, chatId, className);
-  const proficiencies = skills.map(s => s.skill_name);
+  // 熟练项初始为空，需通过 /lvup 购买
+  const proficiencies: string[] = [];
 
   const manaMax = calcManaMax(classInfo?.primary_attr ?? '力量', 1, calcMod(attrs.int), calcMod(attrs.wis));
 

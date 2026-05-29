@@ -75,7 +75,9 @@ export async function performCast(
 
   const attrs = parseAttributes(char.attributes);
   const isHeal = skill.damage.includes('heal');
-  const isProficient = char.class === skill.class_name;
+  let profs: string[] = [];
+  try { profs = JSON.parse(char.proficiencies); } catch {}
+  const isProficient = profs.includes(skill.skill_name);
 
   const attrKeyMap: Record<string, string> = { '力量': 'str', '敏捷': 'dex', '体质': 'con', '智力': 'int', '感知': 'wis', '魅力': 'cha' };
 
@@ -147,7 +149,9 @@ export async function performCast(
         if (rb[targetChar.race]) defRaceBonus = rb[targetChar.race];
       } catch {}
 
-      const targetIsProficient = targetChar.class === skill.class_name;
+      let tProfs: string[] = [];
+      try { tProfs = JSON.parse(targetChar.proficiencies); } catch {}
+      const targetIsProficient = tProfs.includes(skill.skill_name);
       const defRoll = targetIsProficient ? rollD20() : rollD10();
       const defDieLabel = targetIsProficient ? 'd20' : 'd10';
       const defTotal = defRoll + defAttrMod + defRaceBonus;

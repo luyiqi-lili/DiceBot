@@ -143,6 +143,8 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'attack':  { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
 		case 'atk':     { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
 		case 'cast':    { const { handleDndCast } = await import('./commands/dndCast'); return handleDndCast; }
+		case 'lvup':    { const { handleDndLvUp } = await import('./commands/dndUpgrade'); return handleDndLvUp; }
+		case 'level':   { const { handleDndLevel } = await import('./commands/dndUpgrade'); return handleDndLevel; }
 		default: return null;
 	}
 }
@@ -158,6 +160,7 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 		case 'dnd_reroll':  { const { handleDndRerollCallback } = await import('./commands/dndNew'); return handleDndRerollCallback; }
 		case 'dnd_confirm': { const { handleDndConfirmCallback } = await import('./commands/dndNew'); return handleDndConfirmCallback; }
 		case 'item_action':{ const { handleItemCallback } = await import('./commands/item'); return handleItemCallback; }
+		case 'lu':        { const { handleLvUpCallback } = await import('./commands/dndUpgrade'); return handleLvUpCallback; }
 		default: return null;
 	}
 }
