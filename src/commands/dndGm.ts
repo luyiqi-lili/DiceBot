@@ -128,15 +128,35 @@ async function sendHelp(env: Env, chatId: number, threadId?: number) {
   await TgMessage.sendText(env, {
     chat_id: chatId,
     text: `⚙️ <b>DND GM 命令</b>\n\n` +
-      `<code>/gm 种族</code> — 列出所有种族\n` +
-      `<code>/gm 种族加值 种族 +1属性 描述</code> — 幂等设置种族加值\n` +
-      `<code>/gm 职业</code> — 列出所有职业\n` +
-      `<code>/gm 职业 职业名 主属性 [生命骰] 描述</code> — 幂等设置职业\n` +
-      `<code>/gm 技能</code> — 列出所有技能\n` +
-      `<code>/gm 技能 技能名 种族+N 职业 属性 描述</code> — 幂等设置技能\n` +
+      `<b>🧬 种族管理</b>\n` +
+      `<code>/gm 种族</code> — 列出\n` +
+      `<code>/gm 种族加值 种族 +1属性 描述</code>\n` +
+      `  例: <code>/gm 种族加值 精灵 +2敏捷,+1智力 精灵身手矫健又博学</code>\n\n` +
+      `<b>⚔️ 职业管理</b>\n` +
+      `<code>/gm 职业</code> — 列出\n` +
+      `<code>/gm 职业 职业名 主属性 [生命骰] 描述</code>\n` +
+      `  例: <code>/gm 职业 战士 力量 10 战士依靠力量使用武器</code>\n\n` +
+      `<b>🏹 技能管理</b>\n` +
+      `<code>/gm 技能</code> — 列出\n` +
+      `<code>/gm 技能 技能名 种族+N 职业 属性 描述</code>\n` +
+      `  例: <code>/gm 技能 扑倒 精灵+1 战士 敏捷 扑倒后什么都方便</code>\n` +
+      `  例: <code>/gm 技能 火球术 人类+1 法师 智力 凝聚火焰掷向敌人</code>\n\n` +
+      `<b>📦 物品管理</b>\n` +
+      `<code>/gm item list</code> — 列出模板\n` +
+      `<code>/gm item create 名称 装备/消耗品 [部位] [+N属性] [伤害骰] [次数] 描述</code>\n` +
+      `  武器: <code>/gm item create 长剑 装备 weapon +2力量 d8力量 锋利的长剑</code>\n` +
+      `  防具: <code>/gm item create 布甲 装备 body +1敏捷 轻便的布甲</code>\n` +
+      `  消耗: <code>/gm item create 治疗药水 消耗品 3 恢复体力</code>\n` +
+      `<code>/gm item delete 名称</code> — 删除模板\n` +
+      `<code>/gm item give 名称 [数量]</code> — 回复某人发放\n\n` +
+      `<b>📌 场景与 XP</b>\n` +
       `<code>/gm dc 数值 描述</code> — 设置场景 DC\n` +
+      `  例: <code>/gm dc 12 地面湿滑难以下脚</code>\n` +
       `<code>/gm addxp 数值</code> — 回复某人添加 XP\n` +
-      `<code>/gm setgm</code> — 回复某人设为 GM（仅超管）`,
+      `  例: 回复某人 <code>/gm addxp 50</code>\n\n` +
+      `<b>🛡️ 管理</b>\n` +
+      `<code>/gm setgm</code> — 回复某人设为 GM（仅超管）\n` +
+      `<code>/gm 种族</code> <code>/gm 职业</code> <code>/gm 技能</code> <code>/gm item list</code> — 查看当前配置`,
     parse_mode: 'HTML',
     message_thread_id: threadId,
     reply_markup: deleteMarkup,
