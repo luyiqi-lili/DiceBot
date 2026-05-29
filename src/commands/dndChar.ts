@@ -128,6 +128,11 @@ export async function handleDndChar(parsed: ParsedUpdate, env: Env): Promise<voi
     charSheet += `\n<b>⚔️ 武器</b>\n  ${escapeHtml(weapon.name)}  伤害 ${parsed.dice}${parsed.attr ? '+' + parsed.attr + '(' + modStr + ')' : ''}`;
   }
 
+  // MP 显示
+  if (char.mana_max > 0) {
+    charSheet += `\n\n💎 <b>MP</b>: ${char.mana_current}/${char.mana_max}`;
+  }
+
   await TgMessage.sendText(env, {
     chat_id: chatId,
     text: charSheet,

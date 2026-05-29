@@ -72,11 +72,17 @@ export async function handleDndRest(parsed: ParsedUpdate, env: Env): Promise<voi
 
     char.hp_current = char.hp_max;
     char.rest_long_used++;
-    await updateCharAndRest(env, char);
+    // 重置法力
+    char.mana_current = char.mana_max;
+    await env.DB.prepare(
+      `UPDATE dnd_characters SET hp_current = ?, rest_short_used = ?, rest_long_used = ?, rest_date = ?, mana_current = ?, updated_at = datetime('now')
+       WHERE chat_id = ? AND user_id = ?`
+    ).bind(char.hp_current, char.rest_short_used, char.rest_long_used, char.rest_date, char.mana_current, char.chat_id, char.user_id).run();
 
+    const manaLine = char.mana_max > 0 ? `\n💎 MP 恢复至 ${char.mana_current}/${char.mana_max}` : '';
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `💤 <b>长休完成！</b>\n❤️ HP 恢复至 ${char.hp_current}/${char.hp_max}`,
+      text: `💤 <b>长休完成！</b>\n❤️ HP 恢复至 ${char.hp_current}/${char.hp_max}${manaLine}`,
       parse_mode: 'HTML',
       message_thread_id: threadId,
       reply_markup: deleteMarkup,

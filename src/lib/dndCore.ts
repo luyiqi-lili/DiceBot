@@ -34,6 +34,9 @@ export interface DndSkillRow {
   linked_attr: string;
   class_name: string;
   race_bonus: string; // JSON
+  damage: string;
+  mana_cost: number;
+  spell_level: number;
   description: string;
 }
 
@@ -54,6 +57,9 @@ export interface DndCharacterRow {
   rest_short_used: number;
   rest_long_used: number;
   rest_date: string;
+  mana_max: number;
+  mana_current: number;
+  mana_date: string;
 }
 
 export interface DndCharAttributes {
@@ -303,6 +309,9 @@ export async function saveCharacter(
     rest_short_used?: number;
     rest_long_used?: number;
     rest_date?: string;
+    mana_max?: number;
+    mana_current?: number;
+    mana_date?: string;
   },
 ): Promise<void> {
   if (!env.DB) return;
@@ -310,8 +319,9 @@ export async function saveCharacter(
     `INSERT OR REPLACE INTO dnd_characters
      (chat_id, user_id, char_name, race, class, level, xp, hp_max, hp_current,
       attributes, proficiencies, equipment,
-      rest_short_used, rest_long_used, rest_date, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      rest_short_used, rest_long_used, rest_date,
+      mana_max, mana_current, mana_date, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   )
     .bind(
       char.chat_id,
@@ -329,6 +339,9 @@ export async function saveCharacter(
       char.rest_short_used ?? 0,
       char.rest_long_used ?? 0,
       char.rest_date ?? '',
+      char.mana_max ?? 0,
+      char.mana_current ?? 0,
+      char.mana_date ?? '',
     )
     .run();
 }
@@ -486,9 +499,9 @@ export async function initPresetsToDB(env: Env, chatId: string | number): Promis
     ).bind(cid, s.skill_name).first();
     if (!exists) {
       await env.DB.prepare(
-        `INSERT INTO dnd_skills (chat_id, skill_name, linked_attr, class_name, race_bonus, description)
-         VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(cid, s.skill_name, s.linked_attr, s.class_name, JSON.stringify(s.race_bonus), s.description).run();
+        `INSERT INTO dnd_skills (chat_id, skill_name, linked_attr, class_name, race_bonus, damage, mana_cost, spell_level, description)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(cid, s.skill_name, s.linked_attr, s.class_name, JSON.stringify(s.race_bonus), s.damage, s.mana_cost, s.spell_level, s.description).run();
     }
   }
 }
@@ -498,4 +511,37 @@ export async function initPresetsToDB(env: Env, chatId: string | number): Promis
 /** 计算初始最大 HP = 职业生命骰取满 + CON 调整值（最小为 1） */
 export function calcMaxHP(hitDie: number, conMod: number): number {
   return Math.max(1, hitDie + conMod);
+}
+
+// ── 法力系统 ──────────────────────────────────────────────
+
+/** 计算初始最大法力 */
+export function calcManaMax(className: string, level: number, intMod: number, wisMod: number): number {
+  if (['法师', '术士', '巫师'].includes(className)) return 10 + level * 3 + intMod;
+  if (['牧师', '德鲁伊'].includes(className)) return 8 + level * 2 + wisMod;
+  return 0;
+}
+
+/** 重置每日法力 */
+export async function resetMana(env: Env, char: DndCharacterRow): Promise<void> {
+  if (!env.DB || char.mana_max <= 0) return;
+  const today = new Date().toISOString().split('T')[0];
+  if (char.mana_date !== today) {
+    await env.DB.prepare(
+      `UPDATE dnd_characters SET mana_current = mana_max, mana_date = ?, updated_at = datetime('now')
+       WHERE chat_id = ? AND user_id = ?`
+    ).bind(today, char.chat_id, char.user_id).run();
+  }
+}
+
+/** 保存角色法力（及重置日期）*/
+export async function saveCharMana(
+  env: Env, chatId: string, userId: string,
+  manaCurrent: number, manaMax: number, date: string,
+): Promise<void> {
+  if (!env.DB) return;
+  await env.DB.prepare(
+    `UPDATE dnd_characters SET mana_current = ?, mana_max = ?, mana_date = ?, updated_at = datetime('now')
+     WHERE chat_id = ? AND user_id = ?`
+  ).bind(manaCurrent, manaMax, date, chatId, userId).run();
 }

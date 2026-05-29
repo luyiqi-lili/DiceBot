@@ -433,11 +433,12 @@ async function handleSkillSet(
     return;
   }
 
-  // 格式: /gm 技能 <技能名> <种族加值> <职业> <属性> <描述>
   if (args.length < 4) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: '⚠️ 格式：<code>/gm 技能 技能名 种族+N 职业 属性 描述</code>\n示例：<code>/gm 技能 扑倒 精灵+1 战士 敏捷 扑到目标</code>',
+      text: '⚠️ 格式：<code>/gm 技能 技能名 种族+N 职业 属性 [法力] [伤害骰] [等级] 描述</code>\n' +
+        '物理技能：<code>/gm 技能 扑倒 精灵+1 战士 敏捷 扑到目标</code>\n' +
+        '魔法技能：<code>/gm 技能 火球术 人类+1 法师 智力 3 2d6 1 凝聚火焰掷向敌人</code>',
       parse_mode: 'HTML',
       message_thread_id: threadId,
     });
@@ -448,7 +449,28 @@ async function handleSkillSet(
   const raceBonusText = args[1];
   const className = args[2];
   const linkedAttr = args[3];
-  const description = args.slice(4).join(' ');
+
+  // 解析可选参数: [法力消耗] [伤害骰] [法术等级]
+  let manaCost = 0;
+  let damage = '';
+  let spellLevel = 1;
+  let descIdx = 4;
+  if (args.length > descIdx && /^\d+$/.test(args[descIdx])) {
+    manaCost = parseInt(args[descIdx], 10);
+    descIdx++;
+  }
+  if (args.length > descIdx && /^(\d*d\d+|\d+d\d+|d\d+)/.test(args[descIdx])) {
+    damage = args[descIdx];
+    descIdx++;
+  } else if (args.length > descIdx && args[descIdx] === 'heal' && args.length > descIdx + 1 && /^(\d*d\d+)/.test(args[descIdx + 1])) {
+    damage = args[descIdx + 1] + ' heal';
+    descIdx += 2;
+  }
+  if (args.length > descIdx && /^\d+$/.test(args[descIdx])) {
+    spellLevel = parseInt(args[descIdx], 10);
+    descIdx++;
+  }
+  const description = args.slice(descIdx).join(' ');
 
   // 解析种族加值 "精灵+1" 或 "人类+1"
   const raceBonus = parseSkillRaceBonus(raceBonusText);
@@ -472,25 +494,27 @@ async function handleSkillSet(
 
   if (existing) {
     await env.DB!.prepare(
-      `UPDATE dnd_skills SET linked_attr = ?, class_name = ?, race_bonus = ?, description = ?, updated_at = datetime('now')
+      `UPDATE dnd_skills SET linked_attr = ?, class_name = ?, race_bonus = ?, damage = ?, mana_cost = ?, spell_level = ?, description = ?, updated_at = datetime('now')
        WHERE chat_id = ? AND skill_name = ?`
     )
-      .bind(linkedAttr, className, JSON.stringify(raceBonus), description, String(chatId), skillName)
+      .bind(linkedAttr, className, JSON.stringify(raceBonus), damage, manaCost, spellLevel, description, String(chatId), skillName)
       .run();
   } else {
     await env.DB!.prepare(
-      `INSERT INTO dnd_skills (chat_id, skill_name, linked_attr, class_name, race_bonus, description)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO dnd_skills (chat_id, skill_name, linked_attr, class_name, race_bonus, damage, mana_cost, spell_level, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(String(chatId), skillName, linkedAttr, className, JSON.stringify(raceBonus), description)
+      .bind(String(chatId), skillName, linkedAttr, className, JSON.stringify(raceBonus), damage, manaCost, spellLevel, description)
       .run();
   }
 
   const raceStr = Object.entries(raceBonus).map(([k, v]) => `${k}${v >= 0 ? '+' : ''}${v}`).join(', ') || '无';
+  const dmgStr = damage ? ` | 伤害 ${damage}` : '';
+  const manaStr = manaCost ? ` | 消耗 ${manaCost} MP` : '';
 
   await TgMessage.sendText(env, {
     chat_id: chatId,
-    text: `✅ 技能「${escapeHtml(skillName)}」已更新：${escapeHtml(linkedAttr)} | ${escapeHtml(className)} | 种族: ${escapeHtml(raceStr)} — ${escapeHtml(description)}`,
+    text: `✅ 技能「${escapeHtml(skillName)}」已更新：${escapeHtml(linkedAttr)} | ${escapeHtml(className)} | 种族: ${escapeHtml(raceStr)}${dmgStr}${manaStr} | Lv.${spellLevel} — ${escapeHtml(description)}`,
     parse_mode: 'HTML',
     message_thread_id: threadId,
   });

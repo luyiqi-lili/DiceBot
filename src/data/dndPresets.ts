@@ -57,6 +57,9 @@ export const PRESET_SKILLS: Array<{
   linked_attr: string;
   class_name: string;
   race_bonus: Record<string, number>;
+  damage: string;
+  mana_cost: number;
+  spell_level: number;
   description: string;
 }> = [
   {
@@ -64,6 +67,9 @@ export const PRESET_SKILLS: Array<{
     linked_attr: '敏捷',
     class_name: '战士',
     race_bonus: { '精灵': 1 },
+    damage: '',
+    mana_cost: 0,
+    spell_level: 1,
     description: '扑倒目标之后，做什么都很方便了',
   },
   {
@@ -71,6 +77,29 @@ export const PRESET_SKILLS: Array<{
     linked_attr: '力量',
     class_name: '战士',
     race_bonus: { '人类': 1 },
+    damage: '',
+    mana_cost: 0,
+    spell_level: 1,
     description: '拳头也是交流感情的一种方法',
+  },
+  {
+    skill_name: '火球术',
+    linked_attr: '智力',
+    class_name: '法师',
+    race_bonus: { '人类': 1 },
+    damage: '2d6智力',
+    mana_cost: 3,
+    spell_level: 1,
+    description: '指尖凝聚火焰掷向敌人',
+  },
+  {
+    skill_name: '治疗术',
+    linked_attr: '感知',
+    class_name: '牧师',
+    race_bonus: {},
+    damage: '1d8智力 heal',
+    mana_cost: 2,
+    spell_level: 1,
+    description: '柔和的光芒包裹目标，加速伤口愈合',
   },
 ];

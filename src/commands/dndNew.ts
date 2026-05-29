@@ -16,6 +16,7 @@ import {
   shuffle,
   calcMod,
   calcMaxHP,
+  calcManaMax,
   fmtMod,
   attrKeyToName,
   attrNameToKey,
@@ -75,7 +76,7 @@ function fmtCharSheet(
 async function rollAttrs(
   env: Env, chatId: number, raceName: string, className: string,
 ): Promise<{
-  attrs: DndCharAttributes; hpMax: number; proficiencies: string[];
+  attrs: DndCharAttributes; hpMax: number; manaMax: number; proficiencies: string[];
   raceBonuses: Record<string, number>; classPrimaryAttr: string; classHitDie: number;
 } | null> {
   const rolls = roll6x4d6k3();
@@ -98,7 +99,9 @@ async function rollAttrs(
   const skills = await getSkillsForClass(env, chatId, className);
   const proficiencies = skills.map(s => s.skill_name);
 
-  return { attrs, hpMax, proficiencies, raceBonuses, classPrimaryAttr: classInfo?.primary_attr ?? '力量', classHitDie: hitDie };
+  const manaMax = calcManaMax(className, 1, calcMod(attrs.int), calcMod(attrs.wis));
+
+  return { attrs, hpMax, manaMax, proficiencies, raceBonuses, classPrimaryAttr: classInfo?.primary_attr ?? '力量', classHitDie: hitDie };
 }
 
 // ── /new 主入口 ────────────────────────────────────────────
@@ -180,6 +183,8 @@ export async function handleDndNew(parsed: ParsedUpdate, env: Env): Promise<void
     char_name: charName, race: raceName, class: className,
     hp_max: rolled.hpMax, hp_current: rolled.hpMax,
     attributes: rolled.attrs, proficiencies: rolled.proficiencies,
+    mana_max: rolled.manaMax, mana_current: rolled.manaMax,
+    mana_date: new Date().toISOString().split('T')[0],
   });
 
   // 预览消息 — callback 只含 type（~15 字节）
@@ -246,6 +251,8 @@ export async function handleDndRerollCallback(callbackQuery: any, callbackData: 
     char_name: char.char_name, race: char.race, class: char.class,
     hp_max: rolled.hpMax, hp_current: rolled.hpMax,
     attributes: rolled.attrs, proficiencies: rolled.proficiencies,
+    mana_max: rolled.manaMax, mana_current: rolled.manaMax,
+    mana_date: new Date().toISOString().split('T')[0],
   });
 
   // 更新消息

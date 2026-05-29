@@ -142,6 +142,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'gm':      { const { handleDndGm } = await import('./commands/dndGm'); return handleDndGm; }
 		case 'attack':  { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
 		case 'atk':     { const { handleDndAttack } = await import('./commands/dndAttack'); return handleDndAttack; }
+		case 'cast':    { const { handleDndCast } = await import('./commands/dndCast'); return handleDndCast; }
 		default: return null;
 	}
 }
@@ -349,15 +350,24 @@ export default {
 							}
 							opts.deleteMsgId = parsedMessage.message?.message_id;
 
-							// 先检查是否匹配已装备武器，*攻击 强制武器
+							// 优先级: 武器 > 魔法 > 技能
 							const { getEquippedWeapon } = await import('./lib/itemCore');
 							const weapon = await getEquippedWeapon(env, String(chatId), userId);
 							if (weapon && weapon.damage && (weapon.name === starName || starName === '攻击' || starName === '')) {
 								const { performAttack } = await import('./commands/dndAttack');
 								await performAttack(env, chatId, threadId, userId, starName, opts);
 							} else {
-								const { performSkillCheck } = await import('./commands/dndSkill');
-								await performSkillCheck(env, chatId, threadId, userId, starName, opts);
+								// 检查是否是有 damage/mana 的魔法
+								const starSkill = env.DB ? await env.DB.prepare(
+									`SELECT damage, mana_cost FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
+								).bind(String(chatId), starName).first<{ damage: string; mana_cost: number }>() : null;
+								if (starSkill && (starSkill.damage || starSkill.mana_cost > 0)) {
+									const { performCast } = await import('./commands/dndCast');
+									await performCast(env, chatId, threadId, userId, starName, opts);
+								} else {
+									const { performSkillCheck } = await import('./commands/dndSkill');
+									await performSkillCheck(env, chatId, threadId, userId, starName, opts);
+								}
 							}
 						}
 					}
