@@ -14,6 +14,21 @@ Codex CLI execution runs outside Cloudflare Workers through `scripts/wish-execut
 
 ## Environment
 
+The easiest local setup is:
+
+```bash
+scripts/wish-local.sh setup
+scripts/wish-local.sh install-cron
+```
+
+This writes local secrets to `.wish-local.env`, which is ignored by git. It installs the digest every 10 minutes and the executor every 5 minutes. Manual commands:
+
+```bash
+scripts/wish-local.sh status
+scripts/wish-local.sh digest
+scripts/wish-local.sh execute
+```
+
 Set these variables for `scripts/wish-digest.sh`:
 
 ```bash
