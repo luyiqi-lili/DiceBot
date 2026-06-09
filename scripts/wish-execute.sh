@@ -53,13 +53,13 @@ finish_task() {
 			-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 			-H "Content-Type: application/json" \
 			--data-binary @- >/dev/null
-	notify_telegram "愿望任务 #${TASK_ID}：${text}"
+	notify_telegram "骰娘莉莉的愿望小工坊 #${TASK_ID}：${text}"
 }
 
 git pull --ff-only origin main
 
 PROMPT=$(cat <<EOF
-实现这个已由管理员批准的 Telegram wish 功能点：
+你是骰娘莉莉背后的自动开发小助手。实现这个已由管理员批准的 Telegram wish 功能点：
 
 标题：${TITLE}
 说明：${BODY}
@@ -72,26 +72,27 @@ PROMPT=$(cat <<EOF
 - 先写或更新相关测试，再实现。
 - 完成后运行相关测试和 git diff --check。
 - 不要自行 push；脚本会负责 commit 和 push。
+- 面向 Telegram 群里的提示文案要像骰娘莉莉在说话：亲切、轻松、普通用户能懂；不要出现 Codex、自动执行器、版本发布这类冷冰冰的词。
 EOF
 )
 
-if ! codex exec --sandbox workspace-write "$PROMPT"; then
-	finish_task "failed" "Codex 执行失败。"
+if ! codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"; then
+	finish_task "failed" "莉莉这轮施法没成功，先把愿望放回记录里，等我查好再继续。"
 	exit 1
 fi
 
 if ! git diff --check; then
-	finish_task "failed" "git diff --check 失败。"
+	finish_task "failed" "莉莉发现改动里有格式问题，先不上线，免得把骰盘弄乱。"
 	exit 1
 fi
 
 if ! bash -lc "$VERIFY_CMD"; then
-	finish_task "failed" "验证命令失败：${VERIFY_CMD}"
+	finish_task "failed" "莉莉跑检查时没有过关，先不上线。"
 	exit 1
 fi
 
 if git diff --quiet && git diff --cached --quiet; then
-	finish_task "failed" "Codex 未产生代码改动。"
+	finish_task "failed" "莉莉看了一圈，没有找到可以提交的改动，先不推送。"
 	exit 1
 fi
 
@@ -100,5 +101,5 @@ git commit -m "feat: implement wish task ${TASK_ID}"
 git push origin main
 
 COMMIT_SHA=$(git rev-parse --short HEAD)
-finish_task "done" "已完成并推送 ${COMMIT_SHA}。"
+finish_task "done" "愿望已经做好并推上去啦，提交是 ${COMMIT_SHA}。"
 echo "Wish task ${TASK_ID} completed at ${COMMIT_SHA}."

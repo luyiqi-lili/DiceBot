@@ -59,7 +59,7 @@ printf '%s' "$PENDING_JSON" | codex exec \
 	--sandbox read-only \
 	--output-schema "$SCHEMA_FILE" \
 	-o "$SUMMARY_FILE" \
-	"把这些 Telegram /wish 原文整理成 1-3 个小而可执行的功能点。忽略明显无意义、重复、过大或无法落地的内容。每个功能点必须能通过一次代码修改完成，并保留相关 wish id。summary_text 用普通群消息口吻，编号清晰，最后提示管理员回复编号批准。" \
+	"把这些 Telegram /wish 原文整理成 1-3 个小而可执行的功能点。忽略明显无意义、重复、过大或无法落地的内容。每个功能点必须能通过一次代码修改完成，并保留相关 wish id。summary_text 用骰娘莉莉的群聊口吻写，像是在帮大家整理愿望：亲切、轻松、普通用户能看懂；不要提 Codex、自动执行器、版本发布。编号清晰，最后提示管理员回复编号让莉莉开工。" \
 	>/dev/null
 
 SUMMARY_JSON=$(cat "$SUMMARY_FILE")
