@@ -69,7 +69,16 @@ if [ "$ITEM_COUNT" -eq 0 ]; then
 	exit 0
 fi
 
-TEXT=$(printf '%s' "$SUMMARY_JSON" | jq -r '.summary_text')
+TEXT=$(printf '%s' "$SUMMARY_JSON" | jq -r '
+	.summary_text
+	+ "\n\n"
+	+ (
+		.items
+		| map((.itemNumber | tostring) + ". " + .title + "\n" + .body)
+		| join("\n\n")
+	)
+	+ "\n\n父亲大人回复编号，就可以让莉莉开工。"
+')
 TG_RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 	-H "Content-Type: application/json" \
 	-d "$(jq -n \
