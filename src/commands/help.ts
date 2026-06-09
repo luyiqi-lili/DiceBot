@@ -36,6 +36,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/fish X</code> — 花费 X 鱼饵钓鱼
  <code>/fish check</code> — 查看今日钓鱼情况
  <code>/fish add 名称 价值</code> — 花费 10c 添加鱼（价值 1-13）
+ <code>/fish list</code> / <code>/fish remove 序号</code> — 管理鱼种（管理员）
  <code>/fate</code> — 塔罗占卜（抽3张牌）
  <code>/em</code> / <code>/me</code> / <code>/emote</code> — 动作指令，如 /em 开心地跳了起来
  <code>/duel 赌注</code> — 回复某人发起赌注决斗
@@ -92,6 +93,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
         { text: "/rose send", switch_inline_query_current_chat: `/rose send` },
         { text: "/fish", switch_inline_query_current_chat: `/fish 3` },
         { text: "/fish add", switch_inline_query_current_chat: `/fish add 🐟新鱼 1` },
+        { text: "/fish list", switch_inline_query_current_chat: `/fish list` },
       ],
       [
         { text: "/coin ", switch_inline_query_current_chat: `/coin ` },

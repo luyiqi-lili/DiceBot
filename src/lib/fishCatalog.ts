@@ -84,3 +84,18 @@ export async function addFishToCatalog(
 	await setFishCatalog(kv, catalog);
 	return fish;
 }
+
+export async function removeFishFromCatalog(kv: KVNamespace, oneBasedIndex: number): Promise<FishCatalogItem> {
+	if (!Number.isInteger(oneBasedIndex) || oneBasedIndex < 1) {
+		throw new Error('fish index must be a positive integer');
+	}
+
+	const catalog = await getFishCatalog(kv);
+	if (oneBasedIndex > catalog.length) {
+		throw new Error(`fish index out of range: ${oneBasedIndex}`);
+	}
+
+	const [removed] = catalog.splice(oneBasedIndex - 1, 1);
+	await setFishCatalog(kv, catalog);
+	return removed;
+}

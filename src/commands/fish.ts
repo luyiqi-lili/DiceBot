@@ -8,6 +8,7 @@ import {
 	getFishCatalog,
 	MAX_USER_FISH_VALUE,
 	MIN_USER_FISH_VALUE,
+	removeFishFromCatalog,
 } from '../lib/fishCatalog';
 import { escapeHtml, stripHtml } from '../lib/util';
 import {
@@ -21,11 +22,38 @@ import {
 
 type FishEnv = Env;
 
+const FISH_ADMIN_UIDS = new Set<number>([8080375150]);
+const FISH_LIST_PAGE_SIZE = 20;
+
 function requireFishKv(env: FishEnv): KVNamespace {
 	if (!env.FISH_KV) {
 		throw new Error('FISH_KV is not configured');
 	}
 	return env.FISH_KV;
+}
+
+function isFishAdmin(userId: unknown): boolean {
+	return FISH_ADMIN_UIDS.has(Number(userId));
+}
+
+function formatFishCatalogPage(fishList: Array<{ name: string; value: number; hookRate: number }>, pageArg?: string): string {
+	const totalPages = Math.max(1, Math.ceil(fishList.length / FISH_LIST_PAGE_SIZE));
+	const requestedPage = Math.max(1, parseInt(pageArg || '1', 10) || 1);
+	const page = Math.min(requestedPage, totalPages);
+	const start = (page - 1) * FISH_LIST_PAGE_SIZE;
+	const rows = fishList.slice(start, start + FISH_LIST_PAGE_SIZE);
+	const lines = rows.map((fish, idx) => {
+		const index = start + idx + 1;
+		const cleanName = escapeHtml(stripHtml(fish.name).trim() || fish.name);
+		return `#${index} ${cleanName} — value ${fish.value}, hook ${fish.hookRate}`;
+	});
+
+	return (
+		`<blockquote expandable><b>鱼种列表 ${page}/${totalPages}</b>（共 ${fishList.length} 条）\n` +
+		(lines.length ? lines.join('\n') : '暂无鱼种') +
+		`\n</blockquote>` +
+		`删除：<code>/fish remove 序号</code>；翻页：<code>/fish list 页码</code>`
+	);
 }
 
 /**
@@ -345,6 +373,75 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
 	// 解析参数：鱼饵花费在 args[0]
 	const args = parsedMessage.args ?? [];
+
+	if (args[0] === 'list') {
+		const chatId = parsedMessage.chatId!;
+		const threadId = parsedMessage.threadId;
+		const from = parsedMessage.from!;
+		if (!isFishAdmin(from.id)) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 只有管理员可以查看鱼种列表。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		const fishList = await getFishCatalog(requireFishKv(env));
+		await TgMessage.sendText(env, {
+			chat_id: chatId,
+			text: formatFishCatalogPage(fishList, args[1]),
+			parse_mode: 'HTML',
+			message_thread_id: threadId,
+		});
+		return;
+	}
+
+	if (args[0] === 'remove') {
+		const chatId = parsedMessage.chatId!;
+		const threadId = parsedMessage.threadId;
+		const from = parsedMessage.from!;
+		if (!isFishAdmin(from.id)) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 只有管理员可以删除鱼。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		const index = Number(args[1]);
+		if (!Number.isInteger(index) || index < 1) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 用法：<code>/fish remove 序号</code>，序号来自 <code>/fish list</code>。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		try {
+			const removed = await removeFishFromCatalog(requireFishKv(env), index);
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `✅ 删除成功：#${index} ${escapeHtml(stripHtml(removed.name).trim() || removed.name)}，价值 ${removed.value}。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+		} catch (e) {
+			console.error('[fish] remove fish failed', e);
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 删除失败，请确认序号存在。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+		}
+		return;
+	}
 
 	if (args[0] === 'add') {
 		const chatId = parsedMessage.chatId!;

@@ -69,4 +69,45 @@ describe('fish', () => {
 		expect(fishKv.put).not.toHaveBeenCalled();
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('扣费失败');
 	});
+	it('list 只有管理员可以查看鱼种列表', async () => {
+		const fishKv = makeKv({ [FISH_CATALOG_KEY]: JSON.stringify([{ name: '<a href="tg://user?id=1" >鱼A</a>', hookRate: 0.4, value: 1 }]) });
+
+		await handleFish(makeParsed({ args: ['list'] }), { FISH_KV: fishKv } as any);
+
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('只有管理员');
+		expect(fishKv.get).not.toHaveBeenCalled();
+	});
+	it('list 管理员分页查看鱼种列表', async () => {
+		const fishKv = makeKv({ [FISH_CATALOG_KEY]: JSON.stringify([{ name: '<a href="tg://user?id=1" >鱼A</a>', hookRate: 0.4, value: 1 }]) });
+
+		await handleFish(makeParsed({ from: { id: 8080375150, first_name: 'Admin' }, args: ['list'] }), { FISH_KV: fishKv } as any);
+
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).toContain('鱼种列表');
+		expect(text).toContain('#1');
+		expect(text).toContain('鱼A');
+	});
+	it('remove 只有管理员可以删除鱼', async () => {
+		const fishKv = makeKv({ [FISH_CATALOG_KEY]: JSON.stringify([{ name: '<a href="tg://user?id=1" >鱼A</a>', hookRate: 0.4, value: 1 }]) });
+
+		await handleFish(makeParsed({ args: ['remove', '1'] }), { FISH_KV: fishKv } as any);
+
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('只有管理员');
+		expect(fishKv.put).not.toHaveBeenCalled();
+	});
+	it('remove 管理员按 list 序号删除鱼', async () => {
+		const fishKv = makeKv({
+			[FISH_CATALOG_KEY]: JSON.stringify([
+				{ name: '<a href="tg://user?id=1" >鱼A</a>', hookRate: 0.4, value: 1 },
+				{ name: '<a href="tg://user?id=2" >鱼B</a>', hookRate: 0.3, value: 3 },
+			]),
+		});
+
+		await handleFish(makeParsed({ from: { id: 8080375150, first_name: 'Admin' }, args: ['remove', '2'] }), { FISH_KV: fishKv } as any);
+
+		const saved = JSON.parse(String(await fishKv.get(FISH_CATALOG_KEY)));
+		expect(saved).toEqual([{ name: '<a href="tg://user?id=1" >鱼A</a>', hookRate: 0.4, value: 1 }]);
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('删除成功');
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('鱼B');
+	});
 });
