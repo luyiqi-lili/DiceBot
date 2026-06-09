@@ -224,6 +224,30 @@ describe('wishCore', () => {
 		expect(db.wishes.map(w => w.status)).toEqual(['summarized', 'summarized']);
 	});
 
+	it('does not duplicate summary tasks for the same Telegram message', async () => {
+		const db = new MemoryWishDB();
+		await createWish(db as any, { chatId: -1001, threadId: 89, userId: 1, firstName: 'A', body: '加签到' });
+
+		const first = await createWishSummary(db as any, {
+			messageId: 500,
+			chatId: -1001,
+			threadId: 89,
+			body: '1. 每日签到奖励',
+			items: [{ itemNumber: 1, title: '每日签到奖励', body: '增加 /checkin', wishIds: [1] }],
+		});
+		const second = await createWishSummary(db as any, {
+			messageId: 500,
+			chatId: -1001,
+			threadId: 89,
+			body: '1. 每日签到奖励',
+			items: [{ itemNumber: 1, title: '每日签到奖励', body: '增加 /checkin', wishIds: [1] }],
+		});
+
+		expect(second.id).toBe(first.id);
+		expect(db.summaries).toHaveLength(1);
+		expect(db.tasks).toHaveLength(1);
+	});
+
 	it('approves tasks by summary message number, then claims one approved task', async () => {
 		const db = new MemoryWishDB();
 		await createWishSummary(db as any, {

@@ -83,7 +83,7 @@ TEXT=$(printf '%s' "$SUMMARY_JSON" | jq -r '
 	)
 	+ "\n\n父亲大人回复编号，就可以让莉莉开工。"
 ')
-TG_RESPONSE=$(curl_once -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+TG_RESPONSE=$(curl_retry -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 	-H "Content-Type: application/json" \
 	-d "$(jq -n \
 		--arg chat_id "$CHAT_ID" \
@@ -104,7 +104,7 @@ jq -n \
 	--arg body "$TEXT" \
 	--argjson items "$(printf '%s' "$SUMMARY_JSON" | jq '.items')" \
 	'{messageId: $messageId, chatId: $chatId, threadId: $threadId, body: $body, items: $items}' |
-curl_once -X POST "${WORKER_BASE_URL%/}/api/wish/summaries" \
+curl_retry -X POST "${WORKER_BASE_URL%/}/api/wish/summaries" \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	-H "Content-Type: application/json" \
 	--data-binary @- \

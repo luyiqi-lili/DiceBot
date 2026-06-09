@@ -172,6 +172,12 @@ export async function createWishSummary(
 	},
 ): Promise<WishSummaryRecord> {
 	await ensureWishTables(db);
+	const existing = await findWishSummaryByMessageId(db, input.messageId, {
+		chatId: input.chatId,
+		threadId: input.threadId ?? null,
+	});
+	if (existing) return existing;
+
 	const itemsJson = JSON.stringify(input.items);
 	const summaryResult = await db.prepare(`
 		INSERT INTO wish_summaries (message_id, chat_id, thread_id, body, items_json, created_at)

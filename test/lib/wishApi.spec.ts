@@ -58,6 +58,15 @@ class MemoryWishDB {
 			},
 			async first() {
 				if (sql.includes('SELECT id FROM wishes')) return db.wishes.at(-1) ?? null;
+				if (sql.includes('SELECT * FROM wish_summaries')) {
+					const [messageId, chatId, threadId] = this.binds;
+					const row = db.summaries.find(s =>
+						s.message_id === Number(messageId)
+						&& (chatId === undefined || s.chat_id === String(chatId))
+						&& (threadId === undefined || s.thread_id === (threadId === null ? null : String(threadId)))
+					);
+					return row ? { ...row } : null;
+				}
 				if (sql.includes('SELECT * FROM wish_tasks WHERE status = "approved"')) {
 					const task = db.tasks.find(t => t.status === 'approved');
 					return task ? { ...task } : null;

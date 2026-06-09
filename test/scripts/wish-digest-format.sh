@@ -10,6 +10,7 @@ BIN_DIR="${TMP_DIR}/bin"
 TG_LOG="${TMP_DIR}/telegram.json"
 SUMMARY_LOG="${TMP_DIR}/summary.json"
 PENDING_COUNT="${TMP_DIR}/pending-count"
+SUMMARY_COUNT="${TMP_DIR}/summary-count"
 
 mkdir -p "$SCRIPT_DIR" "$BIN_DIR"
 cp "${ROOT_DIR}/scripts/wish-digest.sh" "${SCRIPT_DIR}/wish-digest.sh"
@@ -38,6 +39,13 @@ elif printf '%s\n' "$ARGS" | grep -q 'api.telegram.org'; then
 	done
 	printf '{"ok":true,"result":{"message_id":537294}}\n'
 elif printf '%s\n' "$ARGS" | grep -q '/api/wish/summaries'; then
+	count=$(cat "$WISH_SUMMARY_COUNT" 2>/dev/null || printf '0')
+	count=$((count + 1))
+	printf '%s' "$count" > "$WISH_SUMMARY_COUNT"
+	if [ "$count" -eq 1 ]; then
+		echo "simulated Cloudflare summary timeout" >&2
+		exit 28
+	fi
 	cat > "$WISH_SUMMARY_LOG"
 	printf '{"summary":{"id":2}}\n'
 else
@@ -81,6 +89,7 @@ TOPIC_ID="89" \
 WISH_TG_LOG="$TG_LOG" \
 WISH_SUMMARY_LOG="$SUMMARY_LOG" \
 WISH_PENDING_COUNT="$PENDING_COUNT" \
+WISH_SUMMARY_COUNT="$SUMMARY_COUNT" \
 WISH_RETRY_DELAY="0" \
 bash "${SCRIPT_DIR}/wish-digest.sh" >/dev/null
 
@@ -106,5 +115,10 @@ fi
 
 if [ "$(cat "$PENDING_COUNT")" -ne 2 ]; then
 	echo "Expected pending request to retry once after a transient failure." >&2
+	exit 1
+fi
+
+if [ "$(cat "$SUMMARY_COUNT")" -ne 2 ]; then
+	echo "Expected summary creation to retry once after a transient failure." >&2
 	exit 1
 fi
