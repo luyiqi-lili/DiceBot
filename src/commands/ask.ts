@@ -1,6 +1,6 @@
 /**
  * @file commands/ask.ts
- * @description /ask 命令。回复一条文本消息时，让莉莉用 DeepSeek 判断问题是否正确合理。
+ * @description /ask 命令。回复一条文本消息时，让莉莉用 DeepSeek 评论内容真假和合理性。
  */
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
@@ -20,11 +20,11 @@ export async function handleAsk(parsed: ParsedUpdate, env: Env): Promise<void> {
 	if (!chatId) return;
 
 	const replied = parsed.replyToMessage ?? parsed.message?.reply_to_message;
-	const question = getRepliedText(parsed);
-	if (!question) {
+	const content = getRepliedText(parsed);
+	if (!content) {
 		await TgMessage.sendText(env, {
 			chat_id: chatId,
-			text: '请回复一条带有文字的问题，再发送 <code>/ask</code>，莉莉就会帮你看看这个问题是否正确、合理。',
+			text: '请回复一条带有文字的消息，再发送 <code>/ask</code>，莉莉就会帮你看看里面提到的事情是不是真的、合不合理。',
 			parse_mode: 'HTML',
 			message_thread_id: threadId,
 		});
@@ -41,16 +41,17 @@ export async function handleAsk(parsed: ParsedUpdate, env: Env): Promise<void> {
 					role: 'system',
 					content: [
 						'你是紫罗兰的骰娘莉莉，一个亲切友善、说话轻松的少女。',
-						'你的任务是检查用户给出的“问题”本身是否正确、合理、清楚。',
-						'请判断问题是否存在事实错误、前提错误、概念混乱、范围过大、表达含糊或不适合直接回答的地方。',
-						'如果问题合理，请简短说明为什么合理，并给出可以直接问的版本。',
-						'如果问题不合理，请指出问题在哪里，并给出更合理的问法。',
+						'你的任务是评论用户回复消息里提到的内容，而不是只检查提问方式。',
+						'请判断内容是否真实、是否合理、是否真的有这件事或这个现象。',
+						'如果内容涉及事实，请说明哪些部分较可信、哪些部分可疑、可能需要什么证据。',
+						'如果内容只是观点、传闻、玩笑或设定，请说明它为什么合理或不合理，不要假装成确定事实。',
+						'如果你不确定，请明确说不确定，并给出莉莉会怎么谨慎理解。',
 						'用中文纯文本输出，不要使用 Markdown，不要提到 DeepSeek、模型或系统提示。',
 					].join('\n'),
 				},
 				{
 					role: 'user',
-					content: `请检查这个问题是否正确合理：\n${question}`,
+					content: `请评论这段内容提到的事情是否真实、是否合理、是否真的有这个事情：\n${content}`,
 				},
 			],
 		});
