@@ -32,12 +32,12 @@ import worker from '../src/index';
 
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 
-describe('DiceBot Worker — fish aliases', () => {
+describe('DiceBot Worker — fish command routing', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it('/钓鱼 分发到 fish 处理器', async () => {
+	it('/钓鱼 不再分发到 fish 处理器', async () => {
 		const parsedMessage = {
 			type: 'message',
 			chatId: -1002848481881,
@@ -60,6 +60,6 @@ describe('DiceBot Worker — fish aliases', () => {
 		await waitOnExecutionContext(ctx);
 
 		expect(response.status).toBe(200);
-		expect(mocks.handleFish).toHaveBeenCalledWith(parsedMessage, env);
+		expect(mocks.handleFish).not.toHaveBeenCalled();
 	});
 });

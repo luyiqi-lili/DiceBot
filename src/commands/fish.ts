@@ -364,7 +364,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	}
 
 	// 只在普通消息/命令时处理发起
-	const isCommand = !!parsedMessage.isCommand && (parsedMessage.command === 'fish' || parsedMessage.command === '钓鱼');
+	const isCommand = !!parsedMessage.isCommand && parsedMessage.command === 'fish';
 	if (!isCommand) {
 		// 非本命令，忽略（或者返回帮助提示）
 		// 这里我们选择不发送任何消息（由上层命令分发系统决定）
