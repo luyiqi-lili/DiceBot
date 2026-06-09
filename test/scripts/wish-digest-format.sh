@@ -9,14 +9,23 @@ SCRIPT_DIR="${TMP_DIR}/scripts"
 BIN_DIR="${TMP_DIR}/bin"
 TG_LOG="${TMP_DIR}/telegram.json"
 SUMMARY_LOG="${TMP_DIR}/summary.json"
+PENDING_COUNT="${TMP_DIR}/pending-count"
 
 mkdir -p "$SCRIPT_DIR" "$BIN_DIR"
 cp "${ROOT_DIR}/scripts/wish-digest.sh" "${SCRIPT_DIR}/wish-digest.sh"
+cp "${ROOT_DIR}/scripts/wish-net.sh" "${SCRIPT_DIR}/wish-net.sh"
 
 cat >"${BIN_DIR}/curl" <<'STUB'
 #!/bin/bash
 ARGS=$(printf '%s\n' "$*")
 if printf '%s\n' "$ARGS" | grep -q '/api/wish/pending'; then
+	count=$(cat "$WISH_PENDING_COUNT" 2>/dev/null || printf '0')
+	count=$((count + 1))
+	printf '%s' "$count" > "$WISH_PENDING_COUNT"
+	if [ "$count" -eq 1 ]; then
+		echo "simulated Cloudflare timeout" >&2
+		exit 28
+	fi
 	printf '{"wishes":[{"id":2,"body":"钓鱼的功能还是只要/fish 不要/钓鱼了"}]}\n'
 elif printf '%s\n' "$ARGS" | grep -q 'api.telegram.org'; then
 	while [ "$#" -gt 0 ]; do
@@ -71,6 +80,8 @@ CHAT_ID="-1001" \
 TOPIC_ID="89" \
 WISH_TG_LOG="$TG_LOG" \
 WISH_SUMMARY_LOG="$SUMMARY_LOG" \
+WISH_PENDING_COUNT="$PENDING_COUNT" \
+WISH_RETRY_DELAY="0" \
 bash "${SCRIPT_DIR}/wish-digest.sh" >/dev/null
 
 TG_TEXT=$(jq -r '.text' "$TG_LOG")
@@ -90,5 +101,10 @@ fi
 
 if [ "$SUMMARY_BODY" != "$TG_TEXT" ]; then
 	echo "Expected stored summary body to match Telegram text." >&2
+	exit 1
+fi
+
+if [ "$(cat "$PENDING_COUNT")" -ne 2 ]; then
+	echo "Expected pending request to retry once after a transient failure." >&2
 	exit 1
 fi

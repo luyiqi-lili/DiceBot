@@ -36,6 +36,12 @@ class MemoryWishDB {
 					for (const wish of db.wishes) if (ids.map(Number).includes(wish.id)) { wish.status = String(status); wish.summary_id = Number(summaryId); }
 					return {};
 				}
+				if (sql.includes('SET status = "approved"') && sql.includes('status = "in_progress"')) {
+					for (const task of db.tasks) {
+						if (task.status === 'in_progress') task.status = 'approved';
+					}
+					return {};
+				}
 				if (sql.includes('UPDATE wish_tasks SET status = "in_progress"')) {
 					const [id] = this.binds;
 					const task = db.tasks.find(t => t.id === Number(id));

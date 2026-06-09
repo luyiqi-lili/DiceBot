@@ -5,6 +5,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/wish-net.sh
+source "${SCRIPT_DIR}/wish-net.sh"
+
 : "${WORKER_BASE_URL:?WORKER_BASE_URL is required}"
 : "${EXTERNAL_API_KEY:?EXTERNAL_API_KEY is required}"
 
@@ -35,7 +39,7 @@ notify_telegram() {
 		return 0
 	fi
 
-	curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+	curl_once -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 		-H "Content-Type: application/json" \
 		-d "$(jq -n \
 			--arg chat_id "$CHAT_ID" \
@@ -50,7 +54,7 @@ if has_worktree_changes; then
 	exit 1
 fi
 
-CLAIM_JSON=$(curl -sS -X POST \
+CLAIM_JSON=$(curl_once -X POST \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	"${WORKER_BASE_URL%/}/api/wish/approved/claim")
 
@@ -68,11 +72,12 @@ WISH_IDS=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.wish_ids_json')
 finish_task() {
 	local status="$1"
 	local text="$2"
-	jq -n --arg status "$status" --arg resultText "$text" '{status: $status, resultText: $resultText}' |
-		curl -sS -X POST "${WORKER_BASE_URL%/}/api/wish/tasks/${TASK_ID}/status" \
-			-H "X-API-Key: ${EXTERNAL_API_KEY}" \
-			-H "Content-Type: application/json" \
-			--data-binary @- >/dev/null
+	local payload
+	payload=$(jq -n --arg status "$status" --arg resultText "$text" '{status: $status, resultText: $resultText}')
+	curl_retry -X POST "${WORKER_BASE_URL%/}/api/wish/tasks/${TASK_ID}/status" \
+		-H "X-API-Key: ${EXTERNAL_API_KEY}" \
+		-H "Content-Type: application/json" \
+		--data-binary "$payload" >/dev/null
 	notify_telegram "骰娘莉莉的愿望小工坊 #${TASK_ID}：${text}"
 }
 

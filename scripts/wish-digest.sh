@@ -5,13 +5,17 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/wish-net.sh
+source "${SCRIPT_DIR}/wish-net.sh"
+
 : "${WORKER_BASE_URL:?WORKER_BASE_URL is required, e.g. https://telegram-bot.example.workers.dev}"
 : "${EXTERNAL_API_KEY:?EXTERNAL_API_KEY is required}"
 : "${BOT_TOKEN:?BOT_TOKEN is required}"
 : "${CHAT_ID:?CHAT_ID is required}"
 : "${TOPIC_ID:?TOPIC_ID is required}"
 
-PENDING_JSON=$(curl -sS \
+PENDING_JSON=$(curl_retry \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	"${WORKER_BASE_URL%/}/api/wish/pending?limit=50")
 
@@ -79,7 +83,7 @@ TEXT=$(printf '%s' "$SUMMARY_JSON" | jq -r '
 	)
 	+ "\n\n父亲大人回复编号，就可以让莉莉开工。"
 ')
-TG_RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+TG_RESPONSE=$(curl_once -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
 	-H "Content-Type: application/json" \
 	-d "$(jq -n \
 		--arg chat_id "$CHAT_ID" \
@@ -100,7 +104,7 @@ jq -n \
 	--arg body "$TEXT" \
 	--argjson items "$(printf '%s' "$SUMMARY_JSON" | jq '.items')" \
 	'{messageId: $messageId, chatId: $chatId, threadId: $threadId, body: $body, items: $items}' |
-curl -sS -X POST "${WORKER_BASE_URL%/}/api/wish/summaries" \
+curl_once -X POST "${WORKER_BASE_URL%/}/api/wish/summaries" \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	-H "Content-Type: application/json" \
 	--data-binary @- \

@@ -38,6 +38,7 @@ type Task = {
 	status: string;
 	approved_by: string | null;
 	result_text: string | null;
+	updated_at?: string;
 };
 
 class MemoryWishDB {
@@ -96,8 +97,18 @@ class MemoryWishDB {
 						status: 'summarized',
 						approved_by: null,
 						result_text: null,
+						updated_at: '2026-06-09 00:00:00',
 					});
 					return { meta: { last_row_id: db.nextTaskId - 1 } };
+				}
+				if (sql.includes('SET status = "approved"') && sql.includes('status = "in_progress"')) {
+					for (const task of db.tasks) {
+						if (task.status === 'in_progress') {
+							task.status = 'approved';
+							task.result_text = 'requeued';
+						}
+					}
+					return { success: true };
 				}
 				if (sql.includes('UPDATE wishes SET status =')) {
 					const status = String(this.binds[0]);
@@ -234,6 +245,30 @@ describe('wishCore', () => {
 		expect(approved.map(t => t.title)).toEqual(['每日签到奖励']);
 		expect(claimed).toMatchObject({ title: '每日签到奖励', status: 'approved' });
 		expect(db.tasks[0]).toMatchObject({ status: 'done', result_text: 'pushed abc123' });
+	});
+
+	it('requeues stale in-progress tasks before claiming', async () => {
+		const db = new MemoryWishDB();
+		await createWishSummary(db as any, {
+			messageId: 500,
+			chatId: -1001,
+			threadId: 89,
+			body: '1. 每日签到奖励',
+			items: [{ itemNumber: 1, title: '每日签到奖励', body: '增加 /checkin', wishIds: [1] }],
+		});
+		await approveWishSummaryItems(db as any, {
+			messageId: 500,
+			itemNumbers: [1],
+			approvedBy: 8080375150,
+		});
+		const firstClaim = await claimApprovedWishTask(db as any);
+		db.tasks[0].updated_at = '2000-01-01 00:00:00';
+
+		const recoveredClaim = await claimApprovedWishTask(db as any);
+
+		expect(firstClaim?.id).toBe(1);
+		expect(recoveredClaim?.id).toBe(1);
+		expect(db.tasks[0].status).toBe('in_progress');
 	});
 
 	it('scopes approval to the replied chat and topic', async () => {

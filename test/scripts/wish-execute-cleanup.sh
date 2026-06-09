@@ -9,9 +9,11 @@ REPO_DIR="${TMP_DIR}/repo"
 REMOTE_DIR="${TMP_DIR}/remote.git"
 BIN_DIR="${TMP_DIR}/bin"
 STATUS_LOG="${TMP_DIR}/status.json"
+STATUS_COUNT="${TMP_DIR}/status-count"
 
 mkdir -p "$REPO_DIR/scripts" "$BIN_DIR"
 cp "${ROOT_DIR}/scripts/wish-execute.sh" "${REPO_DIR}/scripts/wish-execute.sh"
+cp "${ROOT_DIR}/scripts/wish-net.sh" "${REPO_DIR}/scripts/wish-net.sh"
 
 git init -q -b main "$REPO_DIR"
 git -C "$REPO_DIR" config user.email "test@example.com"
@@ -28,7 +30,21 @@ cat >"${BIN_DIR}/curl" <<'STUB'
 if printf '%s\n' "$@" | grep -q '/api/wish/approved/claim'; then
 	printf '{"task":{"id":1,"title":"兼容命令","body":"增加中文命令","wish_ids_json":"[1]"}}\n'
 elif printf '%s\n' "$@" | grep -q '/api/wish/tasks/1/status'; then
-	cat > "$WISH_STATUS_LOG"
+	count=$(cat "$WISH_STATUS_COUNT" 2>/dev/null || printf '0')
+	count=$((count + 1))
+	printf '%s' "$count" > "$WISH_STATUS_COUNT"
+	if [ "$count" -eq 1 ]; then
+		echo "simulated Cloudflare timeout" >&2
+		exit 28
+	fi
+	while [ "$#" -gt 0 ]; do
+		if [ "$1" = "--data-binary" ]; then
+			shift
+			printf '%s' "$1" > "$WISH_STATUS_LOG"
+			break
+		fi
+		shift
+	done
 	printf '{"ok":true}\n'
 else
 	printf '{"ok":true}\n'
@@ -51,6 +67,8 @@ set +e
 	WORKER_BASE_URL="https://worker.test" \
 	EXTERNAL_API_KEY="test-key" \
 	WISH_STATUS_LOG="$STATUS_LOG" \
+	WISH_STATUS_COUNT="$STATUS_COUNT" \
+	WISH_RETRY_DELAY="0" \
 	BOT_TOKEN="" \
 	CHAT_ID="" \
 	TOPIC_ID="" \
@@ -74,5 +92,10 @@ fi
 TASK_STATUS=$(jq -r '.status' "$STATUS_LOG")
 if [ "$TASK_STATUS" != "approved" ]; then
 	echo "Expected failed execution to requeue task as approved, got: ${TASK_STATUS}" >&2
+	exit 1
+fi
+
+if [ "$(cat "$STATUS_COUNT")" -ne 2 ]; then
+	echo "Expected task status update to retry once after a transient failure." >&2
 	exit 1
 fi

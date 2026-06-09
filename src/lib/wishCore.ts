@@ -2,6 +2,7 @@ export const WISH_ADMIN_UID = 8080375150;
 
 export type WishStatus = 'pending' | 'summarized' | 'approved' | 'in_progress' | 'done' | 'failed' | 'rejected';
 export type WishTaskStatus = 'summarized' | 'approved' | 'in_progress' | 'done' | 'failed';
+const STALE_IN_PROGRESS_MINUTES = 30;
 
 export interface WishRecord {
 	id: number;
@@ -264,6 +265,14 @@ export async function approveWishSummaryItems(
 
 export async function claimApprovedWishTask(db: D1Database): Promise<WishTaskRecord | null> {
 	await ensureWishTables(db);
+	await db.prepare(`
+		UPDATE wish_tasks
+		SET status = "approved",
+			result_text = "莉莉发现上次处理半路断开啦，已经把愿望放回队列。",
+			updated_at = datetime('now')
+		WHERE status = "in_progress"
+			AND updated_at < datetime('now', ?)
+	`).bind(`-${STALE_IN_PROGRESS_MINUTES} minutes`).run();
 	const task = await db.prepare(`
 		SELECT * FROM wish_tasks WHERE status = "approved" ORDER BY approved_at ASC, id ASC LIMIT 1
 	`).first<WishTaskRecord>();
