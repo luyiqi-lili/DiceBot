@@ -1,7 +1,14 @@
 import { Env } from '../index';
 import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from '../lib/coinService';
-import { fishList, getCastDesc } from '../lib/liveConfig';
+import { getCastDesc } from '../lib/liveConfig';
+import {
+	addFishToCatalog,
+	FISH_ADD_COST,
+	getFishCatalog,
+	MAX_USER_FISH_VALUE,
+	MIN_USER_FISH_VALUE,
+} from '../lib/fishCatalog';
 import { escapeHtml, stripHtml } from '../lib/util';
 import {
 	MAX_FISH_ATTEMPTS,
@@ -13,6 +20,13 @@ import {
 } from '../lib/fishCore';
 
 type FishEnv = Env;
+
+function requireFishKv(env: FishEnv): KVNamespace {
+	if (!env.FISH_KV) {
+		throw new Error('FISH_KV is not configured');
+	}
+	return env.FISH_KV;
+}
 
 /**
  * 池塘汇总记录，用同一个 KV（FISHING_RECORD_KV），key 前缀为 pond:YYYY-MM-DD
@@ -142,6 +156,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	const ownerIdStr = String(ownerId);
 	const currentBal = await coinGetBalance(env.COIN_DO, ownerIdStr);
 	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
+	const fishList = await getFishCatalog(requireFishKv(env));
 
 	const zeroCount = (fishingRecord.results || []).filter((r) => r.fishValue === 0).length;
 	const guaranteePending = zeroCount >= 10 && !Boolean((fishingRecord as any).guaranteeUsed);
@@ -260,7 +275,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	}
 
 
-	const fishCoreResult = (await import("../lib/fishCore")).catchFish(score, baitCost);
+	const fishCoreResult = (await import("../lib/fishCore")).catchFish(score, baitCost, fishList);
 
 	// 记录与国库操作：
 	// - 发起者支付的 baitCost 在发起阶段已经扣除并加入国库（handleFish 已完成 addToTreasury）
@@ -331,6 +346,78 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	// 解析参数：鱼饵花费在 args[0]
 	const args = parsedMessage.args ?? [];
 
+	if (args[0] === 'add') {
+		const chatId = parsedMessage.chatId!;
+		const threadId = parsedMessage.threadId;
+		const from = parsedMessage.from!;
+		const ownerIdStr = String(from.id);
+		const name = String(args[1] ?? '').trim();
+		const value = Number(args[2]);
+
+		if (!name || !Number.isInteger(value)) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 用法：<code>/fish add 名称 价值</code>，价值必须是 ${MIN_USER_FISH_VALUE} 到 ${MAX_USER_FISH_VALUE} 的整数。添加一条鱼需要 ${FISH_ADD_COST}c。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		if (value < MIN_USER_FISH_VALUE || value > MAX_USER_FISH_VALUE) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 鱼的价值必须是 ${MIN_USER_FISH_VALUE} 到 ${MAX_USER_FISH_VALUE} 的整数。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		const currentBal = await coinGetBalance(env.COIN_DO, ownerIdStr);
+		if (currentBal < FISH_ADD_COST) {
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 余额不足，添加一条鱼需要 ${FISH_ADD_COST}c，你当前只有 ${currentBal}c。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		let fish;
+		try {
+			const charge = await addToTreasury(env, env.COIN_DO, ownerIdStr, FISH_ADD_COST, '添加鱼');
+			if (!charge.ok) {
+				await TgMessage.sendText(env, {
+					chat_id: chatId,
+					text: `❌ 扣费失败，未添加鱼。`,
+					parse_mode: 'HTML',
+					message_thread_id: threadId,
+				});
+				return;
+			}
+			fish = await addFishToCatalog(requireFishKv(env), name, value, Number(from.id));
+		} catch (e) {
+			console.error('[fish] add fish failed', e);
+			await TgMessage.sendText(env, {
+				chat_id: chatId,
+				text: `❌ 添加失败，请稍后再试。`,
+				parse_mode: 'HTML',
+				message_thread_id: threadId,
+			});
+			return;
+		}
+
+		await TgMessage.sendText(env, {
+			chat_id: chatId,
+			text: `✅ 添加成功：<b>${fish.name}</b>，价值 <b>${fish.value}</b>，花费 ${FISH_ADD_COST}c。`,
+			parse_mode: 'HTML',
+			message_thread_id: threadId,
+		});
+		return;
+	}
+
 	// 新增：/fish check [YYYYMMDD|YYYY-MM-DD]
 	if (args[0] === 'check') {
 		const dateArg = args[1];
@@ -392,6 +479,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
 	// 读取记录、检查次数
 	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
+	await getFishCatalog(requireFishKv(env));
 	if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
 		await TgMessage.sendText(env, {
 			chat_id: chatId,

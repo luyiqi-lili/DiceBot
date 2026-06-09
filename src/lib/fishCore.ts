@@ -5,7 +5,8 @@
  *   原本两套系统各自实现，现统一为此函数。
  */
 
-import { fishList } from "./liveConfig";
+import { defaultFishList } from "../data/fish";
+import type { FishCatalogItem } from "./fishCatalog";
 
 // ── 常量 ────────────────────────────────────────────────
 export const MAX_FISH_ATTEMPTS = 20;
@@ -56,7 +57,7 @@ function samplePoisson(lambdaNum: number): number {
  * - score > 1000: 鱼跑了
  * - 其余区间：泊松分布决定目标 value → 从 fishList 选区 → hookRate 判定
  */
-export function catchFish(score: number, baitCost: number): CatchResult {
+export function catchFish(score: number, baitCost: number, fishList: FishCatalogItem[] = defaultFishList): CatchResult {
 	if (score < 100) return { hooked: false, fishName: "", fishValue: 0 };
 	if (score > 1000) return { hooked: false, fishName: "", fishValue: 0 };
 

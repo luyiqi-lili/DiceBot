@@ -51,6 +51,10 @@
 					"id": "1608b698ec774932b5a3128074d55147"
 				},
 				{
+					"binding": "FISH_KV", // 鱼种列表 KV
+					"id": "ff95885ba2d74d7ba121644dd683762d"
+				},
+				{
 					"binding": "COIN_KV", // 货币 KV
 					"id": "8d91b0d1ec1d4625be3e68ec2c63efc6"
 				},
@@ -132,6 +136,10 @@
 				{
 					"binding": "FISHING_RECORD_KV", // 钓鱼记录 KV
 					"id": "b638e269b96d487e93f26db0a89ad553"
+				},
+				{
+					"binding": "FISH_KV", // 鱼种列表 KV
+					"id": "b1d789d57e4848be913079c8c1853209"
 				},
 				{
 					"binding": "COIN_KV", // 货币 KV

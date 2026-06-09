@@ -27,6 +27,7 @@ export type Env = {
 	TOPIC_KV: KVNamespace;
 	BOOK_STORE: KVNamespace;
 	FISHING_RECORD_KV: KVNamespace;
+	FISH_KV: KVNamespace;
 	TGBOTCOUNT: KVNamespace;
 	AFFECTION_KV: KVNamespace;
 	ITEM_STORE: KVNamespace;

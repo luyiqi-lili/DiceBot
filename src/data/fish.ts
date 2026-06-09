@@ -3,7 +3,7 @@
  * @description 钓鱼数据：鱼种列表 + 抛竿描述。
  */
 
-export const fishList = [
+export const defaultFishList = [
   { name: "<a href=\"tg://user?id=8445100282\" >🍾破损漂流瓶</a>", hookRate: 0.40, value: 0 },
   { name: "<a href=\"tg://user?id=8445100282\" >🪵浮木</a>", hookRate: 0.40, value: 0 },
   { name: "<a href=\"tg://user?id=8445100282\" >👢没用的靴子", hookRate: 0.40, value: 0 },
@@ -212,6 +212,8 @@ export const fishList = [
 
 ];
 
+export const fishList = defaultFishList;
+
 // ── getCastDesc ──
 /**
  * 根据抛竿力度返回一段日式异世界轻小说风格的描述。
@@ -353,4 +355,3 @@ export function getCastDesc(strength: number): string {
       ]);
   }
 }
-
