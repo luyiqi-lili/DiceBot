@@ -3,12 +3,13 @@
  * @description 塔罗占卜命令处理器（/fate）。
  *   功能：
  *   - 抽牌：从大阿尔卡纳中随机抽取 3 张牌，对应昨天/今天/明天
- *   - 解析：回复已抽牌的消息，调用 Gemini API 进行 AI 牌义解读（消耗 5 💰）
+ *   - 解析：回复已抽牌的消息，调用 DeepSeek API 进行 AI 牌义解读（消耗 5 💰）
  */
 
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { MAJOR_ARCANA } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";
+import { callDeepSeekChat } from "../lib/deepseekClient";
 
 // 从 coin 模块复用 KV 操作函数
 import { getBalance, addToTreasury } from "../lib/coinService";
@@ -79,45 +80,24 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             processingMsgId = undefined;
         }
 
-        // 组装 prompt 并调用 Google API
+        // 组装 prompt 并调用 DeepSeek API
         const systemInstruction =
             "你是一个精通塔罗牌牌义解析的骰娘名叫莉莉，使用幽默诙谐,使用带有感情比喻的日式RPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。";
         const userPrompt = `下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
 
-        const payload = {
-            contents: [{ parts: [{ text: userPrompt }] }],
-            systemInstruction: { parts: [{ text: systemInstruction }] },
-            generationConfig: { thinkingConfig: { thinkingBudget: -1 } }
-        };
-
-        const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
-        if (!apiKeys.length) {
-            const failText = `❌ 抱歉，当前无法进行牌义解析（缺少 API Key）。`;
-            if (processingMsgId) {
-                await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });
-            } else {
-                await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: "HTML", message_thread_id: threadId });
-            }
-            return;
-        }
-
         let textOut: string | undefined;
-        let apiResp: any;
         try {
-            const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-            const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": randomKey
-                },
-                body: JSON.stringify(payload)
+            textOut = await callDeepSeekChat(env, {
+                messages: [
+                    { role: "system", content: systemInstruction },
+                    { role: "user", content: userPrompt },
+                ],
+                temperature: 0.8,
+                maxTokens: 1800,
+                timeoutMs: 90000,
             });
-            apiResp = await res.json();
-            textOut = apiResp?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-            console.log("🔮 [handleFate] Google API response:", apiResp);
         } catch (err) {
-            console.error("🔮 [handleFate] 调用 Google API 失败", err);
+            console.error("🔮 [handleFate] 调用 DeepSeek API 失败", err);
             const failText = `❌ 解析服务调用失败，请稍后重试。`;
             if (processingMsgId) {
                 await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });

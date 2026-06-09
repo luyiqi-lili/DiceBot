@@ -90,14 +90,12 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DevDiceBot"
+				"BOT_USERNAME": "lili_DevDiceBot",
+				"DEEPSEEK_MODEL": "deepseek-v4-pro"
 			}
 		},
 		"prod": {
 			"$schema": "node_modules/wrangler/config-schema.json",
-			"ai": {
-				"binding": "AI"
-			},
 			"name": "telegram-bot",
 			"main": "src/index.ts",
 			"compatibility_date": "2025-06-28",
@@ -184,7 +182,8 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DiceBot"
+				"BOT_USERNAME": "lili_DiceBot",
+				"DEEPSEEK_MODEL": "deepseek-v4-pro"
 			}
 		}
 	}

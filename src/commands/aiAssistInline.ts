@@ -1,19 +1,12 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import { callDeepSeekChat } from "../lib/deepseekClient";
 import type { Env } from '../index';
-
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{ text?: string }>;
-    };
-  }>;
-};
 
 /**
  * 处理 inline_query，提供 AI 辅助聊天建议
  * 1. 根据用户ID查询其最近发送消息的 chat_id 和 thread_id
  * 2. 获取该话题的最近聊天记录作为上下文
- * 3. 调用 Gemini 生成 3-5 条回复建议
+ * 3. 调用 DeepSeek 生成 3-5 条回复建议
  * 4. 返回 Inline 结果
  */
 export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
@@ -31,14 +24,6 @@ export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
   if (!userQuery.trim()) {
     // 如果用户没有输入查询内容，可以返回一些默认建议
     await answerWithDefaultSuggestions(env, inlineQueryId, userId);
-    return;
-  }
-  
-  // 检查 API keys
-  const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
-  if (!apiKeys.length) {
-    console.error("[AI Assist] ⛔️ 缺少 Gemini API Keys");
-    await answerWithError(env, inlineQueryId, "抱歉，AI 服务暂时不可用。");
     return;
   }
   
@@ -60,8 +45,8 @@ export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
     // 3. 构建 AI 提示词
     const prompt = buildAIPrompt(userQuery, recentMessages, topicName);
     
-    // 4. 调用 Gemini 生成回复建议
-    const aiSuggestions = await generateAISuggestions(env, prompt, apiKeys);
+    // 4. 调用 DeepSeek 生成回复建议
+    const aiSuggestions = await generateAISuggestions(env, prompt);
     
     if (!aiSuggestions || aiSuggestions.length === 0) {
       await answerWithError(env, inlineQueryId, "未能生成回复建议，请重试。");
@@ -98,7 +83,11 @@ async function getRecentUserContext(env: Env, userId: number): Promise<{
       LIMIT 1
     `;
     
-    const result = await env.DB!.prepare(sql).bind(userId).all();
+    const result = await env.DB!.prepare(sql).bind(userId).all<{
+      chat_id: number;
+      thread_id: number | null;
+      topic_name: string | null;
+    }>();
     const row = result.results?.[0];
     
     if (!row) {
@@ -106,8 +95,8 @@ async function getRecentUserContext(env: Env, userId: number): Promise<{
     }
     
     return {
-      chatId: row.chat_id,
-      threadId: row.thread_id,
+      chatId: Number(row.chat_id),
+      threadId: row.thread_id === null || row.thread_id === undefined ? null : Number(row.thread_id),
       topicName: row.topic_name || "未知话题"
     };
   } catch (err) {
@@ -195,47 +184,19 @@ ${historyText}
 }
 
 /**
- * 调用 Gemini 生成回复建议
+ * 调用 DeepSeek 生成回复建议
  */
 async function generateAISuggestions(
   env: Env, 
-  prompt: string, 
-  apiKeys: string[]
+  prompt: string
 ): Promise<string[]> {
-  const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-  
-  const controller = new AbortController();
-  const timeout = 30000; // 30 秒超时
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
   try {
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 800,
-        temperature: 0.7,
-      }
-    };
-    
-    const apiRes = await fetch( 
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${randomKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      }
-    );
-    
-    clearTimeout(timeoutId);
-    
-    if (!apiRes.ok) {
-      console.error("[AI Assist] ❌ Gemini API 错误", await apiRes.text());
-      return [];
-    }
-    
-    const json: GeminiResponse = await apiRes.json();
-    const responseText = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const responseText = await callDeepSeekChat(env, {
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 800,
+      temperature: 0.7,
+      timeoutMs: 30000,
+    });
     
     if (!responseText) {
       return [];
@@ -251,11 +212,10 @@ async function generateAISuggestions(
     return suggestions;
     
   } catch (err: any) {
-    clearTimeout(timeoutId);
     if (err.name === 'AbortError') {
-      console.error("[AI Assist] ⏰ Gemini 请求超时");
+      console.error("[AI Assist] ⏰ DeepSeek 请求超时");
     } else {
-      console.error("[AI Assist] ❌ 调用 Gemini 失败", err);
+      console.error("[AI Assist] ❌ 调用 DeepSeek 失败", err);
     }
     return [];
   }

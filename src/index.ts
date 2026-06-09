@@ -39,10 +39,10 @@ export type Env = {
 	DB?: D1Database;
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
-	GOOGLE_API_KEYS?: string; // wrangler secret 存储为 JSON 字符串，使用前需 JSON.parse
-	SILICONFLOW_API_KEY?: string;
-	// Cloudflare AI 绑定
-	AI?: any;
+	DEEPSEEK_API_KEY?: string;
+	DEEPSEEK_API_KEYS?: string;
+	DEEPSEEK_MODEL?: string;
+	DEEPSEEK_BASE_URL?: string;
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
@@ -117,6 +117,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'lottery': { const { handleLottery } = await import('./commands/lottery'); return handleLottery; }
 		case 'act':     { const { handleAct } = await import('./commands/act'); return handleAct; }
 		case 'report':  { const { handleReport } = await import('./commands/report'); return handleReport; }
+		case 'ask':     { const { handleAsk } = await import('./commands/ask'); return handleAsk; }
 		case 'book':    { const { handleBook } = await import('./commands/book'); return handleBook; }
 		case 'whoami':  { const { handleWhoami } = await import('./commands/whoami'); return handleWhoami; }
 		case 'fate':    { const { handleFate } = await import('./commands/fate'); return handleFate; }

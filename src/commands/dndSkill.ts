@@ -6,6 +6,7 @@
 
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml, deleteMarkup } from '../lib/util';
+import { callDeepSeekChat, getDeepSeekApiKeys } from '../lib/deepseekClient';
 import type { Env } from '../index';
 import {
   getCharacter,
@@ -44,7 +45,7 @@ async function generateFlavor(
   success: boolean | null,
   oppName?: string,
 ): Promise<string> {
-  if (!env.AI) return '';
+  if (!getDeepSeekApiKeys(env).length) return '';
 
   let gapDesc = '';
   if (gap > 10) gapDesc = `以巨大优势（超出${gap}点）碾压成功`;
@@ -55,7 +56,7 @@ async function generateFlavor(
   else gapDesc = `惨败，差距${Math.abs(gap)}点，完全被压制`;
 
   try {
-    const resp = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+    const text = await callDeepSeekChat(env, {
       messages: [{
         role: 'system',
         content: '你是跑团叙事主持人。攻击方主动施展技能，成功则对手中招，失败则攻击方自己失误或被闪避——永远不要描述成攻击方被对方反击。根据技能描述判断是物理还是魔法：物理技能用拳脚武器描写，魔法技能才用法术描写。角色的职业标签不影响技能性质。输出1-2句纯中文第三人称。\n\n✅ 正确样例：\n物理技-成功：「弓身一记扫腿，精准勾住对手脚踝将其撂倒」\n物理技-失败：「伸腿横扫却失了准头，只擦过对方护胫，反因惯性踉跄半步」\n魔法技-成功：「指尖绽开冰蓝符文，寒气如蛇缠上对手双腿」\n魔法技-失败：「咒文念到一半气息紊乱，指间的火花噗地熄灭了」\n\n❌ 错误样例：\n「被对手一记反手摔在地上」— 攻击方不能被反击\n「拉斐尔在魔法塔中挥动法杖」— 不要虚构环境\n「法师用魔力一拳打去」— 物理技能不要加魔法',
@@ -64,9 +65,10 @@ async function generateFlavor(
         role: 'user',
         content: `${charName}是攻击方，${oppName || '目标'}是防守方。\n\n技能「${skillName}」：${skillDesc}\n攻击方掷点${myResult}，${gapDesc}\n\n请写出攻击方${charName}施展${skillName}的动作，纯中文：`,
       }],
-      max_tokens: 200,
+      maxTokens: 200,
+      temperature: 0.8,
+      timeoutMs: 30000,
     });
-    const text = ((resp as any)?.response ?? (resp as any)?.choices?.[0]?.message?.content ?? '').trim();
     return text.replace(/^(描述[：:]|情景[：:]|\d+[\.、])\s*/i, '').trim();
   } catch { return ''; }
 }
@@ -193,7 +195,7 @@ export async function performSkillCheck(
 
   // RP 描述
   let flavorLine = '';
-  if (env.AI) {
+  if (getDeepSeekApiKeys(env).length) {
     const gap = oppValue !== null ? myTotal - oppValue
       : (dcInfo?.dc_value ?? 0) > 0 ? myTotal - (dcInfo?.dc_value ?? 0)
       : 0;

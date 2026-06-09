@@ -46,7 +46,7 @@
 
 **数据流**：Telegram webhook → `parseUpdate` 解析 → `loadCommand/loadCallback` 静态 import → handler 执行业务逻辑 → `TgMessage.sendText` 回复 → 备份到 D1
 
-**DND 子系统**：`/dnd /new /char /skill /skills /rest /gm` 命令 + `dnd_confirm/dnd_reroll/item_action` 回调 → D1 数据库（dnd_races/dnd_classes/dnd_skills/dnd_characters/dnd_gm/dnd_dc/dnd_item_templates/dnd_inventory）→ Cloudflare AI 生成技能叙事
+**DND 子系统**：`/dnd /new /char /skill /skills /rest /gm` 命令 + `dnd_confirm/dnd_reroll/item_action` 回调 → D1 数据库（dnd_races/dnd_classes/dnd_skills/dnd_characters/dnd_gm/dnd_dc/dnd_item_templates/dnd_inventory）→ DeepSeek 生成技能叙事
 
 **存储层**：
 - **KV**（8 个 namespace）：配置、书签、新闻、钓鱼记录、话题标题、物品（旧版兼容）、货币缓存
@@ -97,7 +97,8 @@
 | `/news` | 查看当日小道消息 |
 | `/book` | 书签管理 |
 | `/item` | 物品管理 |
-| `/trans` | 回复消息翻译（Gemini API） |
+| `/trans` | 回复消息翻译（DeepSeek API） |
+| `/ask` | 回复问题，让莉莉判断是否正确合理 |
 | `/echo` | 让骰娘评判你的话 |
 | `/whoami` | 查看用户信息 |
 | `/act start/end` | 记录会话并生成摘要 |
@@ -129,7 +130,7 @@
 
 **对抗机制**：回复某人使用技能 → 双方各掷 d20 + 属性 + 种族加值进行 PVP 对抗，差距分档（碾压/轻松/险胜/持平/惜败/惨败）驱动 AI 叙事描写。
 
-**AI 叙事**：每次技能检定调用 Cloudflare AI（Llama 3 8B）生成 DND 小说风格的动作描写，融合技能描述、对抗差距，物理/魔法自动区分，失败不颠倒攻防。
+**AI 叙事**：每次技能检定调用 DeepSeek 生成 DND 小说风格的动作描写，融合技能描述、对抗差距，物理/魔法自动区分，失败不颠倒攻防。
 
 #### 💤 休息
 
@@ -259,7 +260,7 @@
 - **部署工具**：Wrangler CLI
 - **执行平台**：Cloudflare Workers
 - **存储**：KV Namespace × 8 / Durable Objects（CoinDO、LotteryDO）/ D1 Database
-- **API**：Gemini（翻译、汇报、AI 辅助）/ SiliconFlow（备用）
+- **API**：DeepSeek（翻译、汇报、AI 辅助、问题检查、DND 叙事）
 - **源码托管**：GitHub
 - **管理账号**：`luyiqi.lili@gmail.com`
 
@@ -275,8 +276,8 @@
 
 4. **设置 Secrets（API Key）**：
    ```bash
-   wrangler secret put GOOGLE_API_KEY   -e prod
-   wrangler secret put SILICONFLOW_API_KEY -e prod
+   wrangler secret put DEEPSEEK_API_KEY -e prod
+   wrangler secret put DEEPSEEK_API_KEY -e dev
    ```
 
 5. **首轮部署** — 推送到 `main` 自动部署生产，推送到其他分支自动部署开发环境

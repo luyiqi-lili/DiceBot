@@ -1,15 +1,8 @@
-import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
 import { escapeHtml } from '../lib/util';
+import { callDeepSeekChat } from '../lib/deepseekClient';
 
 import type { Env } from '../index';
-
-type GeminiResponse = {
-	candidates?: Array<{
-		content?: {
-			parts?: Array<{ text?: string }>;
-		};
-	}>;
-};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -104,7 +97,7 @@ async function fallbackUpdateLongTermMemory(env: Env, chatId: string, threadId: 
 			.run();
 
 		// 如果没有更新到任何行，则插入新记录
-		if (result.changes === 0) {
+		if ((result as any).changes === 0) {
 			if (threadId === null || threadId === undefined) {
 				const insertSql = `
           INSERT INTO long_term_memory (chat_id, thread_id, memory_text, created_at, updated_at)
@@ -145,7 +138,7 @@ async function getLongTermMemory(env: Env, chatId: string, threadId: string | nu
 
 		const result = await env.DB!.prepare(sql)
 			.bind(...binds)
-			.first();
+			.first<{ memory_text: string }>();
 		return result?.memory_text || '';
 	} catch (error) {
 		console.error('[Report] ❌ 查询长期记忆失败:', error);
@@ -178,7 +171,7 @@ async function getLongTermMemoryWithDetails(
 
 		const result = await env.DB!.prepare(sql)
 			.bind(...binds)
-			.first();
+			.first<{ memory_text: string; created_at: string; updated_at: string }>();
 		return result || null;
 	} catch (error) {
 		console.error('[Report] ❌ 查询长期记忆详情失败:', error);
@@ -189,7 +182,7 @@ async function getLongTermMemoryWithDetails(
 /**
  * /report 命令处理器
  * - 查询过去 24 小时内的 message_history（按 chat_id，若有 threadId 则再按 thread_id）
- * - 组合为 prompt 发送给 Gemini，要求返回简短汇报
+ * - 组合为 prompt 发送给 DeepSeek，要求返回简短汇报
  * - 同时生成并更新长期记忆
  */
 export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
@@ -263,14 +256,6 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 		}
 	}
 
-	// 检查 API keys
-	const apiKeys: string[] = env.GOOGLE_API_KEYS ? JSON.parse(env.GOOGLE_API_KEYS) : [];
-	if (!apiKeys.length) {
-		const failText = `❌ 抱歉，当前无法生成汇报（缺少 API Key）。`;
-		await TgMessage.sendText(env, { chat_id: chatId, text: failText, parse_mode: 'HTML', message_thread_id: threadId });
-		return;
-	}
-
 	// 1. 获取长期记忆
 	const longTermMemory = await getLongTermMemory(env, chatId.toString(), threadId?.toString() || null);
 	console.log('[Report] 📚 获取到的长期记忆长度:', longTermMemory.length);
@@ -330,7 +315,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 			messagesText = messagesText.slice(0, maxTotalChars) + '\n...[additional messages truncated]';
 		}
 
-		// 3. 构建给 Gemini 的复合 prompt（包含汇报和长期记忆更新）
+		// 3. 构建给 DeepSeek 的复合 prompt（包含汇报和长期记忆更新）
 		const chatLabel = `chat_id=${chatId}${threadId ? `, thread_id=${threadId}` : ''}${rows[0]?.topic_name ? `, topic=${rows[0].topic_name}` : ''}`;
 
 		// 主提示词：生成汇报并要求更新长期记忆
@@ -369,48 +354,26 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 
 		const finalPromptContent = `${promptHeader}${messagesText}`;
 
-		console.log('[Report] 📤 发送给 Gemini 的复合 prompt');
+		console.log('[Report] 📤 发送给 DeepSeek 的复合 prompt');
 
-		// 4. 调用 Gemini
-		const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
-
-		const controller = new AbortController();
-		const timeout = 90000; // 增加超时时间至90秒
-		const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-		const payload = {
-			contents: [
-				{
-					parts: [{ text: finalPromptContent }],
-				},
-			],
-			systemInstruction: {
-				parts: [
+		// 4. 调用 DeepSeek
+		let fullResponse = '';
+		try {
+			fullResponse = await callDeepSeekChat(env, {
+				messages: [
 					{
-						text: `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容。你的输出应该是：1) 24小时汇报 2) 以【长期记忆更新】开头的长期记忆更新内容。两部分之间用空行分隔。`,
+						role: 'system',
+						content: `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容。你的输出应该是：1) 24小时汇报 2) 以【长期记忆更新】开头的长期记忆更新内容。两部分之间用空行分隔。`,
 					},
+					{ role: 'user', content: finalPromptContent },
 				],
-			},
-			generationConfig: {
 				temperature: 0.7,
-				//maxOutputTokens: 1500
-			},
-		};
-
-		const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-goog-api-key': randomKey,
-			},
-			body: JSON.stringify(payload),
-			signal: controller.signal,
-		});
-
-		clearTimeout(timeoutId);
-
-		if (!apiRes.ok) {
-			console.error('[Report] ❌ Gemini 返回非 2xx', await apiRes.text());
+				maxTokens: 2000,
+				timeoutMs: 90000,
+			});
+			console.log('[Report] ✅ DeepSeek 响应接收成功');
+		} catch (err) {
+			console.error('[Report] ❌ DeepSeek 调用失败', err);
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
 				text: '⚠️ 无法从生成模型获取汇报（服务返回错误）。',
@@ -419,12 +382,8 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 			return;
 		}
 
-		const json = (await apiRes.json()) as GeminiResponse;
-		console.log('[Report] ✅ Gemini 响应接收成功');
-
-		const fullResponse = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 		if (!fullResponse) {
-			console.warn('[Report] ⚠️ Gemini 未返回文本候选');
+			console.warn('[Report] ⚠️ DeepSeek 未返回文本候选');
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
 				text: '⚠️ 生成模型未返回有效响应。',

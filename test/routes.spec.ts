@@ -5,4 +5,11 @@ describe('COMMAND_ROUTES', () => {
 	it('/钓鱼 不再注册为 fish 命令别名', () => {
 		expect(COMMAND_ROUTES['钓鱼']).toBeUndefined();
 	});
+
+	it('/ask 注册到问题检查命令', () => {
+		expect(COMMAND_ROUTES.ask).toMatchObject({
+			module: './commands/ask',
+			handler: 'handleAsk',
+		});
+	});
 });

@@ -53,6 +53,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/news</code> — 查看当日小道消息
  <code>/news YYYYMMDD</code> — 查看指定日期消息
  <code>/trans 日语</code> — 回复消息翻译（默认简体中文）
+ <code>/ask</code> — 回复问题，判断是否正确合理
  <code>/echo 内容</code> — 让骰娘评判你的话
  <code>/like</code> — 查看召唤骰娘次数
  <code>/like all</code> — 查看使用排行榜
@@ -87,7 +88,8 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/news", switch_inline_query_current_chat: `/news` },
-        { text: "/trans", switch_inline_query_current_chat: `/trans English` }
+        { text: "/trans", switch_inline_query_current_chat: `/trans English` },
+        { text: "/ask", switch_inline_query_current_chat: `/ask` }
       ],
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },

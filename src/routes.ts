@@ -45,6 +45,9 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 群聊汇报 ── */
 	report:   { module: './commands/report', handler: 'handleReport' },
 
+	/* ── 问题检查 ── */
+	ask:      { module: './commands/ask', handler: 'handleAsk' },
+
 	/* ── 书签 ── */
 	book:     { module: './commands/book', handler: 'handleBook' },
 
