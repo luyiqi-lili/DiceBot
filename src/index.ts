@@ -66,6 +66,11 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 		return handleCoinAPI(request, env, path);
 	}
 
+	if (path.startsWith('/api/wish')) {
+		const { handleWishAPI } = await import('./lib/wishApi');
+		return handleWishAPI(request, env, path);
+	}
+
 	if (path === '/api/health') {
 		return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
 			headers: { 'Content-Type': 'application/json' },
@@ -125,6 +130,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		}
 		case 'help':    { const { handleHelp } = await import('./commands/help'); return handleHelp; }
 		case 'fish':    { const { handleFish } = await import('./commands/fish'); return handleFish; }
+		case 'wish':    { const { handleWish } = await import('./commands/wish'); return handleWish; }
 		case 'coin':    { const { handleCoin } = await import('./commands/coin'); return handleCoin; }
 		case 'trans':   { const { handleTrans } = await import('./commands/trans'); return handleTrans; }
 		case 'echo':    { const { handleEcho } = await import('./commands/echo'); return handleEcho; }
@@ -338,6 +344,12 @@ export default {
 						return new Response('OK', { status: 200 });
 					}
 				} else {
+					const { handleWishApproval } = await import('./commands/wish');
+					const wishHandled = await handleWishApproval(parsedMessage, env);
+					if (wishHandled) {
+						return new Response('OK', { status: 200 });
+					}
+
 					// *技能名 / *武器名 → 优先武器，降级技能
 					const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
 					if (rawText.startsWith('*') && !rawText.startsWith('**')) {
