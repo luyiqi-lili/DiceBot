@@ -7,6 +7,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${WISH_LOCAL_ENV_FILE:-${ROOT_DIR}/.wish-local.env}"
 LOG_DIR="${WISH_LOG_DIR:-${ROOT_DIR}/logs/wish}"
 WORKER_BASE_URL_DEFAULT="https://telegram-bot.luyiqi-lili.workers.dev"
+DEFAULT_PATH="${HOME}/.local/bin:${HOME}/.nvm/versions/node/v20.19.3/bin:${HOME}/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export PATH="${DEFAULT_PATH}:${PATH:-}"
 
 usage() {
 	cat <<EOF
@@ -124,14 +126,18 @@ install_cron() {
 
 	local digest_cmd="*/10 * * * * cd ${ROOT_DIR} && ${ROOT_DIR}/scripts/wish-local.sh digest >> ${LOG_DIR}/digest.log 2>&1"
 	local execute_cmd="*/5 * * * * cd ${ROOT_DIR} && ${ROOT_DIR}/scripts/wish-local.sh execute >> ${LOG_DIR}/execute.log 2>&1"
+	local shell_cmd="SHELL=/bin/bash"
+	local path_cmd="PATH=${DEFAULT_PATH}"
 	local tmp
 	tmp="$(mktemp)"
 
 	crontab -l 2>/dev/null \
+		| grep -v '^SHELL=/bin/bash$' \
+		| grep -v "^PATH=${DEFAULT_PATH}$" \
 		| grep -v "${ROOT_DIR}/scripts/wish-local.sh digest" \
 		| grep -v "${ROOT_DIR}/scripts/wish-local.sh execute" \
 		> "$tmp" || true
-	printf '%s\n%s\n' "$digest_cmd" "$execute_cmd" >> "$tmp"
+	printf '%s\n%s\n%s\n%s\n' "$shell_cmd" "$path_cmd" "$digest_cmd" "$execute_cmd" >> "$tmp"
 	crontab "$tmp"
 	rm -f "$tmp"
 	echo "Installed wish cron jobs:"
@@ -143,6 +149,8 @@ uninstall_cron() {
 	local tmp
 	tmp="$(mktemp)"
 	crontab -l 2>/dev/null \
+		| grep -v '^SHELL=/bin/bash$' \
+		| grep -v "^PATH=${DEFAULT_PATH}$" \
 		| grep -v "${ROOT_DIR}/scripts/wish-local.sh digest" \
 		| grep -v "${ROOT_DIR}/scripts/wish-local.sh execute" \
 		> "$tmp" || true

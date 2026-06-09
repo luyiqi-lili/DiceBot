@@ -26,6 +26,11 @@ notify_telegram() {
 		>/dev/null || true
 }
 
+if ! git diff --quiet || ! git diff --cached --quiet; then
+	echo "Working tree is dirty; refusing to run before claiming a wish task." >&2
+	exit 1
+fi
+
 CLAIM_JSON=$(curl -sS -X POST \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	"${WORKER_BASE_URL%/}/api/wish/approved/claim")
@@ -50,12 +55,6 @@ finish_task() {
 			--data-binary @- >/dev/null
 	notify_telegram "愿望任务 #${TASK_ID}：${text}"
 }
-
-if ! git diff --quiet || ! git diff --cached --quiet; then
-	finish_task "failed" "工作区不干净，自动执行已停止。"
-	echo "Working tree is dirty; refusing to run." >&2
-	exit 1
-fi
 
 git pull --ff-only origin main
 
