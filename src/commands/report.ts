@@ -1,6 +1,7 @@
 import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import { buildLilyReportSystemPrompt } from '../data/lilyPersona';
+import { callAIChat } from '../lib/aiClient';
 import { escapeHtml } from '../lib/util';
-import { callDeepSeekChat } from '../lib/deepseekClient';
 
 import type { Env } from '../index';
 
@@ -182,7 +183,7 @@ async function getLongTermMemoryWithDetails(
 /**
  * /report 命令处理器
  * - 查询过去 24 小时内的 message_history（按 chat_id，若有 threadId 则再按 thread_id）
- * - 组合为 prompt 发送给 DeepSeek，要求返回简短汇报
+ * - 组合为 prompt 发送给 AI 服务，要求返回简短汇报
  * - 同时生成并更新长期记忆
  */
 export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
@@ -315,7 +316,7 @@ export async function handleReport(parsedMessage: ParsedUpdate, env: Env) {
 			messagesText = messagesText.slice(0, maxTotalChars) + '\n...[additional messages truncated]';
 		}
 
-		// 3. 构建给 DeepSeek 的复合 prompt（包含汇报和长期记忆更新）
+		// 3. 构建给 AI 服务的复合 prompt（包含汇报和长期记忆更新）
 		const chatLabel = `chat_id=${chatId}${threadId ? `, thread_id=${threadId}` : ''}${rows[0]?.topic_name ? `, topic=${rows[0].topic_name}` : ''}`;
 
 		// 主提示词：生成汇报并要求更新长期记忆
@@ -354,16 +355,16 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 
 		const finalPromptContent = `${promptHeader}${messagesText}`;
 
-		console.log('[Report] 📤 发送给 DeepSeek 的复合 prompt');
+		console.log('[Report] 📤 发送给 AI 服务的复合 prompt');
 
-		// 4. 调用 DeepSeek
+		// 4. 调用 AI 服务
 		let fullResponse = '';
 		try {
-			fullResponse = await callDeepSeekChat(env, {
+			fullResponse = await callAIChat(env, {
 				messages: [
 					{
 						role: 'system',
-						content: `你是紫罗兰的骰娘莉莉，一个亲切友善可爱的少女，不避讳和反感涩涩内容。你的输出应该是：1) 24小时汇报 2) 以【长期记忆更新】开头的长期记忆更新内容。两部分之间用空行分隔。`,
+						content: buildLilyReportSystemPrompt(),
 					},
 					{ role: 'user', content: finalPromptContent },
 				],
@@ -371,9 +372,9 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 				maxTokens: 2000,
 				timeoutMs: 90000,
 			});
-			console.log('[Report] ✅ DeepSeek 响应接收成功');
+			console.log('[Report] ✅ AI 服务响应接收成功');
 		} catch (err) {
-			console.error('[Report] ❌ DeepSeek 调用失败', err);
+			console.error('[Report] ❌ AI 服务调用失败', err);
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
 				text: '⚠️ 无法从生成模型获取汇报（服务返回错误）。',
@@ -383,7 +384,7 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 		}
 
 		if (!fullResponse) {
-			console.warn('[Report] ⚠️ DeepSeek 未返回文本候选');
+			console.warn('[Report] ⚠️ AI 服务未返回文本候选');
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
 				text: '⚠️ 生成模型未返回有效响应。',

@@ -1,12 +1,13 @@
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
-import { callDeepSeekChat } from "../lib/deepseekClient";
+import { buildLilyInlineSuggestionSystemPrompt } from "../data/lilyPersona";
+import { callAIChat } from "../lib/aiClient";
 import type { Env } from '../index';
 
 /**
  * 处理 inline_query，提供 AI 辅助聊天建议
  * 1. 根据用户ID查询其最近发送消息的 chat_id 和 thread_id
  * 2. 获取该话题的最近聊天记录作为上下文
- * 3. 调用 DeepSeek 生成 3-5 条回复建议
+ * 3. 调用 AI 生成 3-5 条回复建议
  * 4. 返回 Inline 结果
  */
 export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
@@ -45,7 +46,7 @@ export async function handleInlineAI(parsedMessage: ParsedUpdate, env: Env) {
     // 3. 构建 AI 提示词
     const prompt = buildAIPrompt(userQuery, recentMessages, topicName);
     
-    // 4. 调用 DeepSeek 生成回复建议
+    // 4. 调用 AI 服务生成回复建议
     const aiSuggestions = await generateAISuggestions(env, prompt);
     
     if (!aiSuggestions || aiSuggestions.length === 0) {
@@ -184,15 +185,18 @@ ${historyText}
 }
 
 /**
- * 调用 DeepSeek 生成回复建议
+ * 调用 AI 服务生成回复建议
  */
 async function generateAISuggestions(
   env: Env, 
   prompt: string
 ): Promise<string[]> {
   try {
-    const responseText = await callDeepSeekChat(env, {
-      messages: [{ role: 'user', content: prompt }],
+    const responseText = await callAIChat(env, {
+      messages: [
+        { role: 'system', content: buildLilyInlineSuggestionSystemPrompt() },
+        { role: 'user', content: prompt },
+      ],
       maxTokens: 800,
       temperature: 0.7,
       timeoutMs: 30000,
@@ -215,7 +219,7 @@ async function generateAISuggestions(
     if (err.name === 'AbortError') {
       console.error("[AI Assist] ⏰ DeepSeek 请求超时");
     } else {
-      console.error("[AI Assist] ❌ 调用 DeepSeek 失败", err);
+      console.error("[AI Assist] ❌ 调用 AI 服务失败", err);
     }
     return [];
   }
