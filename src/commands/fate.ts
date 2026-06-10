@@ -3,13 +3,14 @@
  * @description 塔罗占卜命令处理器（/fate）。
  *   功能：
  *   - 抽牌：从大阿尔卡纳中随机抽取 3 张牌，对应昨天/今天/明天
- *   - 解析：回复已抽牌的消息，调用 DeepSeek API 进行 AI 牌义解读（消耗 5 💰）
+ *   - 解析：回复已抽牌的消息，调用 AI 服务进行牌义解读（消耗 5 💰）
  */
 
 import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
 import { MAJOR_ARCANA } from "../lib/liveConfig";
+import { buildLilyFateSystemPrompt } from "../data/lilyPersona";
 import { escapeHtml } from "../lib/util";
-import { callDeepSeekChat } from "../lib/deepseekClient";
+import { callAIChat } from "../lib/aiClient";
 
 // 从 coin 模块复用 KV 操作函数
 import { getBalance, addToTreasury } from "../lib/coinService";
@@ -80,16 +81,14 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
             processingMsgId = undefined;
         }
 
-        // 组装 prompt 并调用 DeepSeek API
-        const systemInstruction =
-            "你是一个精通塔罗牌牌义解析的骰娘名叫莉莉，使用幽默诙谐,使用带有感情比喻的日式RPG风格的口气，自然的输出内容，绝对不要使用Markdown格式，不要假定用户的性别，使用更加中性的用户称谓。";
+        // 组装 prompt 并调用 AI 服务
         const userPrompt = `下面是一组 ${fromName} 抽取的三张大阿卡那塔罗牌及位置：\n${cap}\n请首先分别对"昨天"、"今天"、"明天"位置上的塔罗牌含义进行基本解读，然后综合三张卡片给出一个包括[占卜结果、建议、谶语、未来趋势及注意事项]的解析。绝对不要使用Markdown格式。`;
 
         let textOut: string | undefined;
         try {
-            textOut = await callDeepSeekChat(env, {
+            textOut = await callAIChat(env, {
                 messages: [
-                    { role: "system", content: systemInstruction },
+                    { role: "system", content: buildLilyFateSystemPrompt() },
                     { role: "user", content: userPrompt },
                 ],
                 temperature: 0.8,
@@ -97,7 +96,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
                 timeoutMs: 90000,
             });
         } catch (err) {
-            console.error("🔮 [handleFate] 调用 DeepSeek API 失败", err);
+            console.error("🔮 [handleFate] 调用 AI 服务失败", err);
             const failText = `❌ 解析服务调用失败，请稍后重试。`;
             if (processingMsgId) {
                 await TgMessage.editMessageText(env, { chat_id: chatId, message_id: processingMsgId, text: failText, parse_mode: "HTML" });

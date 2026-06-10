@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const deepseek = vi.hoisted(() => ({
-	callDeepSeekChat: vi.fn(),
+const aiClient = vi.hoisted(() => ({
+	callAIChat: vi.fn(),
 }));
 
 vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
-vi.mock('../../src/lib/deepseekClient', () => deepseek);
+vi.mock('../../src/lib/aiClient', () => aiClient);
 
 import TgMessage from '../../src/lib/tgMessage';
 import { handleAsk } from '../../src/commands/ask';
@@ -28,13 +28,13 @@ function makeMsg(o: any = {}): any {
 describe('/ask', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		deepseek.callDeepSeekChat.mockReset();
+		aiClient.callAIChat.mockReset();
 	});
 
 	it('requires replying to a text message', async () => {
 		await handleAsk(makeMsg(), {} as any);
 
-		expect(deepseek.callDeepSeekChat).not.toHaveBeenCalled();
+		expect(aiClient.callAIChat).not.toHaveBeenCalled();
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]).toMatchObject({
 			chat_id: -100999,
 			message_thread_id: 66,
@@ -42,8 +42,8 @@ describe('/ask', () => {
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('回复一条');
 	});
 
-	it('asks DeepSeek to comment on whether the replied content is true and reasonable', async () => {
-		deepseek.callDeepSeekChat.mockResolvedValue('莉莉看法：这件事有真实背景，但这个说法有点夸张。');
+	it('asks AI to comment on whether the replied content is true and reasonable', async () => {
+		aiClient.callAIChat.mockResolvedValue('莉莉看法：这件事有真实背景，但这个说法有点夸张。');
 
 		await handleAsk(
 			makeMsg({
@@ -57,7 +57,7 @@ describe('/ask', () => {
 			{ DEEPSEEK_API_KEY: 'sk-test', DEEPSEEK_MODEL: 'deepseek-v4-pro' } as any,
 		);
 
-		expect(deepseek.callDeepSeekChat).toHaveBeenCalledWith(
+		expect(aiClient.callAIChat).toHaveBeenCalledWith(
 			expect.objectContaining({ DEEPSEEK_MODEL: 'deepseek-v4-pro' }),
 			expect.objectContaining({
 				messages: expect.arrayContaining([
@@ -74,8 +74,8 @@ describe('/ask', () => {
 		expect(reply.reply_to_message_id).toBe(9);
 	});
 
-	it('reports DeepSeek configuration errors without leaking details', async () => {
-		deepseek.callDeepSeekChat.mockRejectedValue(new Error('Missing DEEPSEEK_API_KEY'));
+	it('reports AI configuration errors without leaking details', async () => {
+		aiClient.callAIChat.mockRejectedValue(new Error('Missing DEEPSEEK_API_KEY'));
 
 		await handleAsk(
 			makeMsg({
