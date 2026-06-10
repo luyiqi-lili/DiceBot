@@ -303,6 +303,17 @@ npm test             # 运行测试（vitest）
 npm run cf-typegen   # 生成 Worker 类型定义
 ```
 
+### 线上 E2E
+
+默认单元测试不会访问线上 Worker。需要验证外部 API 时，先加载本地密钥环境，再显式开启 E2E：
+
+```bash
+set -a
+. ./.wish-local.env
+set +a
+RUN_E2E_EXTERNAL_API=1 npm run test:e2e
+```
+
 ---
 
 ## 🔧 新增命令
