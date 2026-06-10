@@ -474,7 +474,11 @@ async function handleSkillSet(
   if (args.length > descIdx && /^(\d*d\d+|\d+d\d+|d\d+)/.test(args[descIdx])) {
     damage = args[descIdx];
     descIdx++;
-  } else if (args.length > descIdx && args[descIdx] === 'heal' && args.length > descIdx + 1 && /^(\d*d\d+)/.test(args[descIdx + 1])) {
+    if (args.length > descIdx && args[descIdx].toLowerCase() === 'heal') {
+      damage += ' heal';
+      descIdx++;
+    }
+  } else if (args.length > descIdx && args[descIdx].toLowerCase() === 'heal' && args.length > descIdx + 1 && /^(\d*d\d+)/.test(args[descIdx + 1])) {
     damage = args[descIdx + 1] + ' heal';
     descIdx += 2;
   }
