@@ -1,38 +1,28 @@
-# Fish KV Catalog Design
+# Fish KV Implementation Record
 
-## Goal
+Chinese translation: [../../zh-CN/superpowers/specs/2026-06-09-fish-kv-design.md](../../zh-CN/superpowers/specs/2026-06-09-fish-kv-design.md)
 
-Move the fishing catalog from the static TypeScript list into a dedicated Cloudflare KV namespace, then allow users to add new fish with `/fish add`.
+## Original Intent
 
-## Decisions
+Move the fish catalog from a static TypeScript list into a Cloudflare KV namespace and allow users to add fish from Telegram.
 
-- Use a dedicated `FISH_KV` binding in both `dev` and `prod`.
-- Store the full catalog under `fish:list:v1`.
-- Keep `src/data/fish.ts` as the default seed and fallback source.
-- On first read, if `FISH_KV` has no catalog, write the current static list into KV and return it.
-- `/fish add <name> <value>` adds a new fish:
-  - `value` must be an integer from `1` to `13`.
-  - Hook rate is server-controlled and derived from the existing default list for that value.
-  - The user pays `10c` via `addToTreasury`.
-  - The stored fish name is HTML-escaped and wrapped in the current Telegram HTML display format.
+## Current Implementation
 
-## Architecture
+The feature is implemented in the current codebase:
 
-- `src/lib/fishCatalog.ts` owns catalog persistence, validation, seed initialization, and value-to-hook-rate mapping.
-- `src/lib/fishCore.ts` stays focused on fishing algorithms and accepts a fish list argument instead of reading static config directly.
-- `src/commands/fish.ts` reads the KV catalog for regular fishing, callback resolution, and guarantee selection.
-- `wrangler.jsonc` declares `FISH_KV` for both environments.
+- `FISH_KV` stores the catalog.
+- `src/lib/fishCatalog.ts` owns catalog loading, seeding, validation, addition, and removal.
+- `src/data/fish.ts` remains the seed/fallback source.
+- `src/commands/fish.ts` supports `/fish add`, `/fish list`, and `/fish remove`.
+- `test/lib/fishCatalog.spec.ts` and `test/commands/fish.spec.ts` cover the active behavior.
 
-## Errors
+## Current User Behavior
 
-- Missing `FISH_KV` returns a user-facing configuration error for commands that need the catalog.
-- Invalid `/fish add` usage returns a usage hint.
-- Values outside `1..13` are rejected.
-- Insufficient balance rejects the add before mutating KV.
+- `/fish add <name> <value>` adds a fish after validation and payment.
+- Values must be in the allowed user range.
+- Duplicate or invalid entries are rejected by catalog logic.
+- `/fish list [page]` and `/fish remove <index>` are admin operations.
 
-## Tests
+## Canonical Documentation
 
-- KV catalog initializes from the static list when empty.
-- `/fish add` deducts 10c and writes the new fish to `FISH_KV`.
-- `/fish add` rejects invalid values.
-- `/fish add` rejects insufficient balance.
+Use [../../fish-system.md](../../fish-system.md) for the maintained fish system manual.

@@ -1,64 +1,43 @@
-# Wish Automation Implementation Plan
+# Wish Automation Implementation Plan Record
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+Chinese translation: [../../zh-CN/superpowers/plans/2026-06-09-wish-automation.md](../../zh-CN/superpowers/plans/2026-06-09-wish-automation.md)
 
-**Goal:** Build `/wish` collection, 10-minute digest tooling, Telegram reply approval, and a local Codex execution handoff.
+## Status
 
-**Architecture:** Store raw wishes, digest summaries, and executable candidate tasks in D1. Cloudflare Worker handles `/wish`, admin reply approval, and authenticated `/api/wish/*` endpoints; local scripts call those endpoints and run Codex CLI outside Workers.
+Implemented. This file is retained as a historical implementation record.
 
-**Tech Stack:** TypeScript Cloudflare Workers, D1, Telegram Bot API, shell scripts, Codex CLI non-interactive mode.
+## Delivered Files
 
----
+- `src/lib/wishCore.ts`
+- `src/lib/wishApi.ts`
+- `src/commands/wish.ts`
+- `scripts/wish-digest.sh`
+- `scripts/wish-execute.sh`
+- `scripts/wish-local.sh`
+- `scripts/wish-net.sh`
+- `docs/wish-automation.md`
+- `test/lib/wishCore.spec.ts`
+- `test/lib/wishApi.spec.ts`
+- `test/commands/wish.spec.ts`
+- `test/scripts/wish-digest-format.sh`
+- `test/scripts/wish-execute-cleanup.sh`
 
-### Task 1: Wish Storage Core
+## Delivered Behavior
 
-**Files:**
-- Create: `src/lib/wishCore.ts`
-- Test: `test/lib/wishCore.spec.ts`
+- Users submit meaningful wishes with `/wish <text>`.
+- Pending wishes are summarized by a local script.
+- Admin replies approve numbered digest items.
+- Approved tasks are claimed by a local executor.
+- Task status is reported through Worker API endpoints.
 
-- [x] Write failing tests for `isMeaningfulWish`, `createWish`, summary creation, approval, claim, and status updates.
-- [x] Implement D1 table initialization and typed helpers.
-- [x] Run `npm test -- test/lib/wishCore.spec.ts`.
+## Verification
 
-### Task 2: Bot Command and Approval
+Focused tests:
 
-**Files:**
-- Create: `src/commands/wish.ts`
-- Modify: `src/routes.ts`
-- Modify: `src/index.ts`
-- Modify: `src/commands/help.ts`
-- Test: `test/commands/wish.spec.ts`
+```bash
+npx vitest run test/lib/wishCore.spec.ts test/lib/wishApi.spec.ts test/commands/wish.spec.ts
+test/scripts/wish-digest-format.sh
+test/scripts/wish-execute-cleanup.sh
+```
 
-- [x] Write failing tests for `/wish`, meaningless wish ignoring, non-admin reply ignored, and admin reply approval.
-- [x] Implement command registration and reply approval hook.
-- [x] Run `npm test -- test/commands/wish.spec.ts`.
-
-### Task 3: Worker API for Local Scripts
-
-**Files:**
-- Modify: `src/index.ts`
-- Test: `test/index.spec.ts` or `test/commands/wish.spec.ts`
-
-- [x] Add authenticated `/api/wish/pending`, `/api/wish/summaries`, `/api/wish/approved/claim`, and `/api/wish/tasks/:id/status` endpoints.
-- [x] Reuse existing `EXTERNAL_API_KEY` check.
-- [x] Run focused API tests.
-
-### Task 4: Local Automation Scripts
-
-**Files:**
-- Create: `scripts/wish-digest.sh`
-- Create: `scripts/wish-execute.sh`
-- Create: `docs/wish-automation.md`
-
-- [x] Implement `wish-digest.sh` for 10-minute cron use: fetch pending wishes, call `codex exec` for 1-3 candidates, send Telegram summary, store summary through API.
-- [x] Implement `wish-execute.sh`: claim one approved task, run Codex CLI, verify, commit, push, report result.
-- [x] Document cron entries and required environment variables.
-
-### Task 5: Verification
-
-**Files:**
-- All changed files
-
-- [x] Run `npm test -- test/lib/wishCore.spec.ts test/commands/wish.spec.ts test/lib/wishApi.spec.ts`.
-- [x] Run `git diff --check`.
-- [x] Run `npm test` and record any existing unrelated failures.
+Canonical documentation: [../../wish-automation.md](../../wish-automation.md).

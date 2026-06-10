@@ -1,35 +1,78 @@
-# 钓鱼系统
+# Fish System
 
-## 存储
+Chinese translation: [zh-CN/fish-system.md](zh-CN/fish-system.md)
 
-- **FISH_KV**（KV）：鱼种列表，key = `fish:list:v1`
-- **FISHING_RECORD_KV**（KV）：钓鱼记录、鱼塘汇总
+The fish system includes a Telegram command flow and a separate web game flow.
 
-## 命令
+## Storage
 
-| 命令 | 说明 |
-|------|------|
-| `/fish X` | 花费 X 鱼饵钓鱼 |
-| `/fish check` | 查看今日钓鱼情况 |
-| `/fish add 名称 价值` | 花费 10c 添加鱼，价值必须为 1-13 |
-| `/fish list [页码]` | 管理员查看鱼种列表，每页 20 条 |
-| `/fish remove 序号` | 管理员按 `/fish list` 的序号删除鱼 |
+| Binding | Purpose |
+|---------|---------|
+| `FISH_KV` | fish catalog under `fish:list:v1` |
+| `FISHING_RECORD_KV` | user fishing records and daily pond summaries |
+| `COIN_DO` | bait payments and fish payouts |
 
-## 钓鱼机制
+`src/data/fish.ts` remains the seed/fallback list for catalog initialization.
 
-- 每天最多尝试 20 次
-- 连续 10 次空竿触发当日一次保底
-- 鱼种列表存储于 `FISH_KV`，`src/data/fish.ts` 作为首次初始化种子
-- 用户新增鱼的上钩率由价值固定匹配，不能自定义
-- `/fish list` 和 `/fish remove` 仅允许用户 `8080375150` 使用
-- 鱼塘每日汇总（总消耗鱼饵、总产出渔获）
+## Commands
 
-## 文件
+Handled by `src/commands/fish.ts`.
 
-| 文件 | 用途 |
-|------|------|
-| `src/lib/fishCore.ts` | 钓鱼核心算法 + KV 记录操作 |
-| `src/lib/fishCatalog.ts` | 鱼种列表 KV 初始化、读取、追加 |
-| `src/commands/fish.ts` | 钓鱼命令处理器 + 鱼塘查询 |
-| `src/data/fish.ts` | 默认鱼种种子 + 抛竿描述 |
-| `src/web/fish/` | 钓鱼 Web 游戏 |
+| Command | Behavior |
+|---------|----------|
+| `/fish <bait>` | Spend bait and create a pull callback |
+| `/fish check` | Show today's fishing record |
+| `/fish add <name> <value>` | Spend 10 coins to add a fish; value must be 1-13 |
+| `/fish list [page]` | Admin list, 20 rows per page |
+| `/fish remove <index>` | Admin remove by visible index |
+
+Admin user set in code: `8080375150`.
+
+## Fishing Callback
+
+The `/fish <bait>` command sends a callback button. `handleFishCallback()`:
+
+- allows only the initiating user to pull
+- calculates score from elapsed seconds and strength
+- rejects duplicate processing for the same message
+- enforces daily attempt limit from `MAX_FISH_ATTEMPTS`
+- records misses, escaped fish, and catches in `FISHING_RECORD_KV`
+- pays caught value from treasury through `COIN_DO`
+- tracks pond total bait, payout, hooked count, and attempt count
+
+## Guarantee
+
+After enough zero-value results, a once-per-day guarantee can select a high-value fish when score is in the catch window.
+
+## Fish Catalog
+
+`src/lib/fishCatalog.ts` owns:
+
+- reading catalog from KV
+- seeding from `src/data/fish.ts`
+- validating user-added fish names and values
+- appending fish
+- removing fish
+- mapping value to hook rate
+
+## Web Game
+
+The web game lives under `src/web/fish/` and is documented in [web-games.md](web-games.md). It has routes for page, data, cast, pull, and score submission.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `src/commands/fish.ts` | Telegram command and callback flow |
+| `src/lib/fishCore.ts` | record and fishing helpers |
+| `src/lib/fishCatalog.ts` | catalog persistence and validation |
+| `src/data/fish.ts` | seed catalog and cast text |
+| `src/web/fish/` | web game |
+
+## Tests
+
+Relevant tests:
+
+- `test/commands/fish.spec.ts`
+- `test/lib/fishCatalog.spec.ts`
+- `test/index-fish-alias.spec.ts`

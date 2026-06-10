@@ -1,41 +1,57 @@
-# 好感度系统
+# Affection System
 
-## 存储
+Chinese translation: [zh-CN/affection-system.md](zh-CN/affection-system.md)
 
-- **D1**（主存储）：`affections` 表 + `rose_sends` 表
-- **AFFECTION_KV**（回退兼容）：读优先 D1，无数据时从 KV 读取并自动迁移
+The affection system tracks directional affection between Telegram users.
 
-## 命令
+## Runtime Entry Point
 
-| 命令 | 说明 |
-|------|------|
-| `/rose` | 回复某人查看你对 ta 的好感度 |
-| `/rose send` | 回复某人送花 🌷（每日首次免费） |
-| `/rose check` | 回复某人查看 ta 收到的好感度排行榜 |
+`/rose` is handled by `src/commands/rose.ts`.
 
-## 好感度等级
+## Storage
 
-按 score 换算 emoji：
+| Store | Role |
+|-------|------|
+| D1 `affections` | primary directional affection records |
+| D1 `rose_sends` | daily free-send tracking |
+| `AFFECTION_KV` | fallback/migration source |
+| `COIN_DO` | paid extra flower cost |
 
-| 分值 | 显示 | 阶段 |
-|------|------|------|
-| 0-9 | — | 无 |
-| 10-39 | 🌱 | 萌芽 |
-| 40-79 | 🌷 | 开花 |
-| 80-159 | 🌹 | 绽放 |
-| 160-319 | 💓 | 心动 |
-| 320-639 | 💖 | 热恋 |
-| 640+ | 💝 | 挚爱 |
+`src/lib/affectionDB.ts` owns the D1/KV fallback logic.
 
-## 迁移策略
+## Commands
 
-- **读**：优先从 D1 查询 → 无数据从 KV 读 → 自动写入 D1
-- **写**：只写 D1，不回写 KV
-- **排行榜**：合并 DB + KV 结果，KV 未迁移的 source 补充到 DB
+| Command | Behavior |
+|---------|----------|
+| `/rose` as reply | Show your affection toward the replied user |
+| `/rose send` as reply | Send a flower to the replied user |
+| `/rose check` | Show incoming affection ranking for self or replied user |
 
-## 文件
+## Sending Flowers
 
-| 文件 | 用途 |
-|------|------|
-| `src/lib/affectionDB.ts` | 好感度 D1/KV 双写存储层 |
-| `src/commands/rose.ts` | 好感度命令处理器 |
+The first daily `/rose send` is free and adds 160 affection.
+
+Additional sends on the same UTC date cost 30 coins through `COIN_DO` and also add 160 affection.
+
+If coin deduction succeeds but D1 write fails, the user is warned that payment was taken but affection failed.
+
+## Ranking
+
+`/rose check` reads a ranking of users who have affection toward the target. The implementation merges D1 and KV fallback data where needed.
+
+## Display
+
+`scoreToEmoji()` in `src/commands/rose.ts` maps scores into repeated emoji tiers. The exact rendering is code-defined rather than a fixed table.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `src/commands/rose.ts` | command behavior |
+| `src/lib/affectionDB.ts` | D1/KV migration and query helpers |
+
+## Tests
+
+Relevant test:
+
+- `test/commands/rose.spec.ts`

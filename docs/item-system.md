@@ -1,34 +1,121 @@
-# 物品系统（旧版 → 新版迁移）
+# Item System
 
-## 旧版（已废弃）
+Chinese translation: [zh-CN/item-system.md](zh-CN/item-system.md)
 
-- **存储**：`ITEM_STORE` KV，key = `item:user:<uid>`
-- **命令**：`/item create`（回复消息创建）、`/item list`、`/item use #N`、`/item send #N`
-- 物品实为消息引用的 JSON 包装（remark + content + link + timestamp）
+The current item system is D1-backed and integrated with DND. The old KV item system is legacy only.
 
-## 新版（当前）
+## Runtime Entry Points
 
-> 已集成到 DND 系统，参见 [DND 设计文档](./dnd-design.md) 第七章。
+- `/item` -> `src/commands/item.ts`
+- `/item send <name> [quantity]` -> `src/commands/item.ts`
+- `/gm item create/list/delete/give` -> `src/commands/dndGm.ts`
+- `item_action` callback -> `handleItemCallback`
 
-- **存储**：D1（`dnd_item_templates` + `dnd_inventory`）
-- **物品类型**：装备（可装备到部位）+ 消耗品（有使用次数）
-- **命令**：`/item`（按钮背包）、`/item send 名称`（赠送）
-- **GM 命令**：`/gm item create/list/delete/give`
-- **装备部位**：head/body/hands/feet/weapon/offhand/accessory
-- 已装备属性加成实时叠加到角色卡和技能检定中
+## Storage
 
-### 按钮交互
+D1 tables:
 
-`/item` 显示按钮式背包：
-- 已装备物品 → [卸下]
-- 未装备装备 → [装备]
-- 消耗品 → [使用]
+```sql
+dnd_item_templates(
+  id,
+  chat_id,
+  name,
+  item_type,
+  slot,
+  attr_bonus,
+  damage,
+  uses,
+  description
+)
 
-回调类型：`item_action`（`eq`/`un`/`use`）
+dnd_inventory(
+  id,
+  chat_id,
+  user_id,
+  template_id,
+  quantity,
+  equipped
+)
+```
 
-## 文件
+`src/lib/itemCore.ts` owns CRUD and domain behavior.
 
-| 文件 | 用途 |
-|------|------|
-| `src/commands/item.ts` | 物品命令处理器（已重写为新版） |
-| `src/lib/itemCore.ts` | 物品模板/背包 CRUD + 装备加成计算 |
+## Template Fields
+
+| Field | Meaning |
+|-------|---------|
+| `item_type` | `装备` or `消耗品` |
+| `slot` | `head`, `body`, `hands`, `feet`, `weapon`, `offhand`, `accessory` |
+| `attr_bonus` | JSON map such as `{"力量":2}` |
+| `damage` | weapon/spell-style dice string such as `d8力量` |
+| `uses` | consumable use count; `0` means infinite |
+| `description` | display text |
+
+## Player Flow
+
+`/item` displays a button backpack:
+
+- equipped items with unequip buttons
+- consumables with use buttons
+- unequipped equipment with equip buttons
+- delete-message button
+
+`/item send <name> [quantity]` must reply to a target user. Only unequipped matching items can be gifted.
+
+## Callback Actions
+
+Callback payload type is `item_action`.
+
+| Action | Behavior |
+|--------|----------|
+| `eq` | Equip item; auto-unequips existing item in the same slot |
+| `un` | Unequip item |
+| `use` | Use consumable; finite items decrement quantity or delete at zero |
+
+After a callback, the bot refreshes the backpack message.
+
+## GM Flow
+
+Examples:
+
+```text
+/gm item create 铁头盔 装备 head +1体质 坚固
+/gm item create 长剑 装备 weapon +2力量 d8力量 锋利的长剑
+/gm item create 治疗药水 消耗品 3 恢复体力
+/gm item give 长剑 1
+```
+
+`give` must reply to the target user.
+
+## DND Integration
+
+Item bonuses feed:
+
+- `/char`
+- `/skill`
+- `/attack`
+- `/cast`
+- `/lvup` weapon proficiency choices
+
+Weapon attacks require an equipped item in `weapon` slot with `damage`.
+
+## Legacy KV System
+
+Legacy behavior used:
+
+- `ITEM_STORE`
+- `/item create`
+- `/item list`
+- `/item use #N`
+- `/item send #N`
+
+Current `/item` does not read `ITEM_STORE`. Tests should mock D1, not KV.
+
+## Tests
+
+`test/commands/item.spec.ts` covers:
+
+- missing D1 warning
+- empty D1 backpack
+- equipped/unequipped/consumable rendering
+- `/item send <name> <quantity>` D1 inventory updates

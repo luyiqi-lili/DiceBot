@@ -1,81 +1,145 @@
 # Wish Automation
 
-## Overview
+Chinese translation: [zh-CN/wish-automation.md](zh-CN/wish-automation.md)
 
-Users submit ideas with:
+Wish automation lets group users submit feature ideas, lets an admin approve summarized candidates, and lets local scripts execute approved tasks outside Cloudflare Workers.
 
-```text
-/wish 增加每日签到奖励
-```
+## Runtime Boundaries
 
-The bot stores meaningful wishes in D1. A local scheduled script summarizes pending wishes every 10 minutes during debugging, sends a Telegram digest, and waits for admin approval. Admin user `8080375150` approves by replying to the digest message with item numbers, such as `1` or `1 3`.
+Cloudflare Worker responsibilities:
 
-Codex CLI execution runs outside Cloudflare Workers through `scripts/wish-execute.sh`.
+- accept `/wish <text>`
+- store wishes in D1
+- approve digest items when admin replies with item numbers
+- expose authenticated `/api/wish/*` endpoints
 
-## Environment
+Local machine responsibilities:
 
-The easiest local setup is:
+- run `scripts/wish-digest.sh`
+- run `scripts/wish-execute.sh`
+- run Codex CLI
+- verify, commit, push, and report results
 
-```bash
-scripts/wish-local.sh setup
-scripts/wish-local.sh install-cron
-```
+Codex does not run inside the Worker.
 
-This writes local secrets to `.wish-local.env`, which is ignored by git. It installs the digest every 10 minutes and the executor every 5 minutes. Manual commands:
+## Telegram Command
 
-```bash
-scripts/wish-local.sh status
-scripts/wish-local.sh digest
-scripts/wish-local.sh execute
-```
+`/wish <idea>`:
 
-Set these variables for `scripts/wish-digest.sh`:
+- requires D1
+- rejects vague or empty wishes
+- stores a pending wish
+- replies with the stored wish id
 
-```bash
-export WORKER_BASE_URL="https://telegram-bot.example.workers.dev"
-export EXTERNAL_API_KEY="..."
-export BOT_TOKEN="..."
-export CHAT_ID="-1002970430696"
-export TOPIC_ID="89"
-```
+Admin approval:
 
-Set these variables for `scripts/wish-execute.sh`:
+- admin id: `8080375150`
+- admin replies to a digest message with item numbers such as `1` or `1 3`
+- optional prefix `做` is accepted by parser
+- approved candidates become executable tasks
 
-```bash
-export WORKER_BASE_URL="https://telegram-bot.example.workers.dev"
-export EXTERNAL_API_KEY="..."
-export WISH_VERIFY_CMD="npm test -- test/lib/wishCore.spec.ts test/commands/wish.spec.ts test/lib/wishApi.spec.ts"
-export BOT_TOKEN="..." # optional: send task status to Telegram
-export CHAT_ID="-1002970430696" # optional
-export TOPIC_ID="89" # optional
-```
+## D1 Data
 
-## Debug Cron
+Core tables are managed by `src/lib/wishCore.ts`:
 
-During debugging, run the digest every 10 minutes:
+- `wishes`
+- `wish_summaries`
+- `wish_tasks`
+
+Statuses include:
+
+- `pending`
+- `summarized`
+- `approved`
+- `in_progress`
+- `done`
+- `failed`
+
+## API Endpoints
+
+Handled by `src/lib/wishApi.ts` under `/api/wish`.
+
+| Endpoint | Method | Behavior |
+|----------|--------|----------|
+| `/api/wish/pending?limit=50` | GET | list pending wishes |
+| `/api/wish/summaries` | POST | store a digest summary and tasks |
+| `/api/wish/approved/claim` | POST | claim one approved task |
+| `/api/wish/tasks/:id/status` | POST | update task status |
+
+API authentication is enforced only when `EXTERNAL_API_KEY` is configured in the Worker environment.
+
+## Local Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/wish-local.sh` | setup, install/uninstall cron, status, manual digest/execute |
+| `scripts/wish-digest.sh` | fetch pending wishes, ask Codex to summarize, send Telegram digest, store summary |
+| `scripts/wish-execute.sh` | claim one approved task, run Codex, verify, commit, push, report |
+| `scripts/wish-net.sh` | shared curl retry helpers |
+
+## Local Environment
+
+`scripts/wish-local.sh setup` writes `.wish-local.env`.
+
+Required for digest:
+
+- `WORKER_BASE_URL`
+- `EXTERNAL_API_KEY`
+- `BOT_TOKEN`
+- `CHAT_ID`
+- `TOPIC_ID`
+
+Required for executor:
+
+- `WORKER_BASE_URL`
+- `EXTERNAL_API_KEY`
+
+Optional executor reporting:
+
+- `BOT_TOKEN`
+- `CHAT_ID`
+- `TOPIC_ID`
+
+Verification command:
+
+- `WISH_VERIFY_CMD`, defaulting to wish-related tests.
+
+## Cron Examples
+
+Digest every 10 minutes:
 
 ```cron
 */10 * * * * cd /home/linux/dicebot/telegram-bot && scripts/wish-digest.sh >> /tmp/wish-digest.log 2>&1
 ```
 
-Run the executor every few minutes if desired:
+Executor every 5 minutes:
 
 ```cron
 */5 * * * * cd /home/linux/dicebot/telegram-bot && scripts/wish-execute.sh >> /tmp/wish-execute.log 2>&1
 ```
 
-## Changing To Daily
-
-Replace the digest cron with a daily schedule, for example:
+Daily digest:
 
 ```cron
 0 9 * * * cd /home/linux/dicebot/telegram-bot && scripts/wish-digest.sh >> /tmp/wish-digest.log 2>&1
 ```
 
-## Safety
+## Safety Behavior
 
-- Only admin user `8080375150` can approve digest items.
-- The executor processes one approved task per run.
-- A dirty working tree stops execution.
-- Failed verification stops push.
-- GitHub Actions deploys after a successful push to `main`.
+`scripts/wish-execute.sh`:
+
+- refuses to run if the working tree is dirty
+- claims one task per run
+- cleans generated changes after failed execution
+- reports failed verification as task failure
+- pushes only after successful execution and verification
+
+## Tests
+
+Relevant tests:
+
+- `test/commands/wish.spec.ts`
+- `test/lib/wishCore.spec.ts`
+- `test/lib/wishApi.spec.ts`
+- `test/scripts/wish-digest-format.sh`
+- `test/scripts/wish-execute-cleanup.sh`
