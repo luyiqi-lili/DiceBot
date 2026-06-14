@@ -5,11 +5,36 @@ import TgMessage from '../../src/lib/tgMessage';
 function makeMsg(o: any = {}): any {
 	return { type: 'message', chatId: -100999, from: { id: 1, first_name: 'Dice' }, isCommand: true, command: 'roll', message: { message_id: 1, chat: { id: -100999 } }, ...o };
 }
+function makeApi() {
+	return { sendMessage: vi.fn().mockResolvedValue({ message_id: 10 }) };
+}
 import { handleRoll } from '../../src/commands/roll';
 describe('/roll', () => {
 	beforeEach(() => vi.clearAllMocks());
-	it('默认', async () => { await handleRoll(makeMsg(), {} as any); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('点'); });
-	it('2d6', async () => { await handleRoll(makeMsg({ args: ['2d6'] }), {} as any); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('d6'); });
-	it('rh 隐藏', async () => { await handleRoll(makeMsg({ command: 'rh', text: '/rh' }), {} as any); expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalledTimes(2); });
-	it('无效', async () => { await handleRoll(makeMsg({ args: ['abc'] }), {} as any); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('无效'); });
+	it('默认', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg(), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('点');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
+	it('2d6', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ args: ['2d6'] }), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('d6');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
+	it('rh 隐藏', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ command: 'rh', text: '/rh' }), {} as any, api as any);
+		expect(api.sendMessage).toHaveBeenCalledTimes(2);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('私聊');
+		expect(api.sendMessage.mock.calls[1]?.[0]).toBe(1);
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
+	it('无效', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ args: ['abc'] }), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('无效');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
 });

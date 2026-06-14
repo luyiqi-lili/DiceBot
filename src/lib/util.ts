@@ -6,8 +6,6 @@
  *   - deleteMarkup: 通用的"删除消息"内联键盘按钮
  */
 
-import TgMessage from "./tgMessage";
-
 /** 转义 HTML 特殊字符（& < > " '），防止 XSS 或 Telegram HTML 解析错误 */
 export function escapeHtml(text: string): string {
     return text
@@ -20,14 +18,16 @@ export function escapeHtml(text: string): string {
 
 
 /** 通用的"删除消息"内联键盘按钮，可在任意回复消息中附加使用 */
-export const deleteMarkup = TgMessage.buildInlineKeyboard([
-    [
-      {
-        text: "删除消息",
-        callback_data: JSON.stringify({ type: "delete_message" })
-      }
+export const deleteMarkup = {
+    inline_keyboard: [
+      [
+        {
+          text: "删除消息",
+          callback_data: JSON.stringify({ type: "delete_message" })
+        }
+      ]
     ]
-  ]);
+  };
 
   /**
    * 去除 HTML 标签并解码 HTML 实体，返回纯文本。

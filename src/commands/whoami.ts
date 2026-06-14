@@ -1,5 +1,6 @@
 // commands/whoami.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import { GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import { escapeHtml, deleteMarkup } from "../lib/util";
 
 /**
@@ -11,7 +12,7 @@ import { escapeHtml, deleteMarkup } from "../lib/util";
  * - 如果回复的消息包含图片（photo[]）或图片类型的 document，额外在回复中包含该图片的 file_id
  * - 函数会返回该 file_id（string），若不存在则返回 null
  */
-export async function handleWhoami(parsed: ParsedUpdate, env: EnvLike): Promise<string | null> {
+export async function handleWhoami(parsed: ParsedUpdate, env: EnvLike, api?: GrammyApiLike): Promise<string | null> {
     if (!parsed || parsed.type !== "message" || !parsed.message) {
         console.log("[whoami] 非 message 或缺少 message，忽略");
         return null;
@@ -75,27 +76,15 @@ export async function handleWhoami(parsed: ParsedUpdate, env: EnvLike): Promise<
         mediaLine;
 
     try {
-        // 使用 TgMessage 发送（保留 forum thread）
-        await TgMessage.sendText(env, {
+        await sendTextWithGrammy(env, {
             chat_id: chatId,
             text: replyText,
             parse_mode: "HTML",
             message_thread_id: threadId,
             reply_markup: deleteMarkup
-        });
+        }, api);
     } catch (err) {
         console.error("[whoami] 发送消息失败", err);
-        // 回退到直接调用低级 send 接口，包含相同字段
-        try {
-            await TgMessage.send(env, "sendMessage", {
-                chat_id: chatId,
-                text: replyText,
-                parse_mode: "HTML",
-                message_thread_id: threadId
-            });
-        } catch (e) {
-            console.error("[whoami] 回退发送也失败", e);
-        }
     }
 
     return mediaFileId;

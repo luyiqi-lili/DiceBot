@@ -10,7 +10,8 @@
  *   - /rh 隐藏掷骰（结果发私聊）
  */
 
-import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import { GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import {escapeHtml}  from "../lib/util";
 
 /**
@@ -133,11 +134,11 @@ function computeRollText(inputRaw: string, userName: string): string {
 }
 
 /**
- * 接受 parsedMessage，直接通过 TgMessage 发送 reply
+ * 接受 parsedMessage，直接通过 grammY API 发送 reply
  * 支持 /rh（隐藏掷骰：将结果发到私聊并在群组提示）
  * 支持 /rd 或 d 的简写
  */
-export async function handleRoll(parsedMessage: ParsedUpdate, env: EnvLike) {
+export async function handleRoll(parsedMessage: ParsedUpdate, env: EnvLike, api?: GrammyApiLike) {
   const chatId = parsedMessage.chatId || parsedMessage.message?.chat?.id;
   const threadId = parsedMessage.threadId;
   const from = parsedMessage.from || parsedMessage.message?.from;
@@ -161,30 +162,30 @@ export async function handleRoll(parsedMessage: ParsedUpdate, env: EnvLike) {
 
   if (isHidden) {
     // 群提示
-    await TgMessage.sendText(env, {
+    await sendTextWithGrammy(env, {
       chat_id: chatId,
       text: `🎲 已将掷骰结果发送至 <b>${userNameEsc}</b> 的私聊。`,
       parse_mode: "HTML",
       message_thread_id: threadId
-    });
+    }, api);
 
     // 私聊发送详细结果（不做 HTML 转义以保留格式，但对用户生成的变量做转义）
-    await TgMessage.sendText(env, {
+    await sendTextWithGrammy(env, {
       chat_id: from.id,
       text: `🎲 <b>你的隐藏掷骰结果</b>：\n${escapeHtml(resultText)}`,
       parse_mode: "HTML"
-    });
+    }, api);
 
     return;
   }
 
   // 普通回复直接发到群组
-  await TgMessage.sendText(env, {
+  await sendTextWithGrammy(env, {
     chat_id: chatId,
     text: escapeHtml(resultText),
     parse_mode: "HTML",
     message_thread_id: threadId
-  });
+  }, api);
 }
 
 export default handleRoll;

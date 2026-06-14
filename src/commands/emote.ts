@@ -1,12 +1,13 @@
 // commands/emote.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import { fetchChatMemberWithGrammy, GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import { deleteMarkup } from "../lib/util";
 
 /**
  * /em 命令处理器
  * 支持别名：/e, /me, /emote （由 index.ts 在命令分发处映射）
  */
-export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
+export async function handleEmote(parsed: ParsedUpdate, env: EnvLike, api?: GrammyApiLike) {
   if (!parsed || parsed.type !== "message" || !parsed.message) {
     console.log("[emote] 非 message 或缺少 message，忽略");
     return;
@@ -35,13 +36,13 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     if (parsed.replyToMessage.from.is_bot) {
       const errText = `哎呀，莉莉可没办法和别的机器人互动哦～请回复一位真人玩家的消息来使用此功能。`;
       try {
-        await TgMessage.sendText(env, {
+        await sendTextWithGrammy(env, {
           chat_id: chatId,
           text: errText,
           parse_mode: "HTML",
           message_thread_id: threadId,
           reply_markup: deleteMarkup // 使用已有的删除按钮
-        });
+        }, api);
       } catch (e) {
         console.error("[emote] 发送‘禁止回复Bot’提示失败", e);
       }
@@ -53,7 +54,7 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     // 记录要回复的 message_id（使 bot 的消息回复同一条被回复消息）
     replyToMessageId = parsed.replyToMessage.message_id;
     try {
-      const member = await TgMessage.fetchChatMember(env, chatId, tgt.id);
+      const member = await fetchChatMemberWithGrammy(env, chatId, tgt.id, api);
       // 优先用 first_name，再 username，再回落到 ID
       targetRaw = (member?.first_name as string) || (member?.username ? `@${member.username}` : (`ID${tgt.id}`));
     } catch (e) {
@@ -79,13 +80,13 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   if (!content || content.trim().length === 0) {
     const hint = `错误：请在 /em 后添加动作描述。例如：<code>/em 开心地跳了起来</code>`;
     try {
-      await TgMessage.sendText(env, {
+      await sendTextWithGrammy(env, {
         chat_id: chatId,
         text: hint,
         parse_mode: "HTML",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
-      });
+      }, api);
     } catch (e) {
       console.error("[emote] 发送空内容提示失败", e);
     }
@@ -99,13 +100,13 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
     // 错误使用 %t：没有回复指定目标
     const errText = `错误：使用 %t 时，请通过 "回复" 一条消息来指定目标用户。`;
     try {
-      await TgMessage.sendText(env, {
+      await sendTextWithGrammy(env, {
         chat_id: chatId,
         text: errText,
         parse_mode: "HTML",
         message_thread_id: threadId,
         reply_markup: deleteMarkup
-      });
+      }, api);
     } catch (e) {
       console.error("[emote] 发送错误提示失败", e);
     }
@@ -133,22 +134,9 @@ export async function handleEmote(parsed: ParsedUpdate, env: EnvLike) {
   }
 
   try {
-    await TgMessage.sendText(env, sendParams);
+    await sendTextWithGrammy(env, sendParams, api);
   } catch (err) {
-    console.error("[emote] 发送 emote 失败，尝试低级接口回退", err);
-    // 回退发送也带上 reply_to_message_id（若有）
-    try {
-      const fallbackParams: any = {
-        chat_id: chatId,
-        text: out,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      };
-      if (replyToMessageId !== undefined) fallbackParams.reply_to_message_id = replyToMessageId;
-      await TgMessage.send(env, "sendMessage", fallbackParams);
-    } catch (e) {
-      console.error("[emote] 回退发送也失败", e);
-    }
+    console.error("[emote] 发送 emote 失败", err);
   }
 }
 
