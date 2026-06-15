@@ -170,6 +170,7 @@ dist
 
 .dev.vars
 .wrangler/
+.superpowers/
 .wish-local.env
 
 # DeepSeek TUI project data
