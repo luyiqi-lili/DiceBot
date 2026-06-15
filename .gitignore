@@ -173,6 +173,10 @@ dist
 .superpowers/
 .wish-local.env
 
+# Local generated/shared data
+/exports/
+/share/
+
 # DeepSeek TUI project data
 
 .deepseek/
