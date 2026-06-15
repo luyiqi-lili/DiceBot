@@ -149,7 +149,7 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-20", "2026-06-21"]);
+const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21", "2026-06-29"]);
 const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
 
 export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
