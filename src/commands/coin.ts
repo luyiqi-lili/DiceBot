@@ -149,6 +149,9 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-20", "2026-06-21"]);
+const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
+
 export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
   const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
   const threadId =
@@ -234,9 +237,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
+    const duringVioletAnniversary = VIOLET_ANNIVERSARY_PRAY_DATES.has(today);
     const todayD = new Date();
     const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
-    const gain = duringEvent ? randomInt(11, 20) : randomInt(8, 12);
+    const gain = duringVioletAnniversary ? VIOLET_ANNIVERSARY_PRAY_REWARD : duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     // 祈祷：从国库支付（允许国库为负）到用户账户
     const payoutSuccess = await takeFromTreasury(env, doNs, userId, gain, "祈祷", true);
@@ -255,9 +259,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     await doPutRaw(doNs, prayKey, today);
 
     const newBal = await getBalance(doNs, userId);
+    const rewardText = duringVioletAnniversary
+      ? `💜 ${userName}，紫罗兰周年庆签到成功！莉莉把今天的奖励换成了 ${gain} 💰，当前余额 ${newBal} 💰。`
+      : `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`;
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`,
+      text: rewardText,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
