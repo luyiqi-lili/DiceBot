@@ -107,12 +107,13 @@ export async function callTelegramApi(env: EnvLike, method: string, body: any) {
 	}
 }
 
-// 解析命令文本（例如 "/roll 1d6+1" 或 "@Bot roll 1d6"）
+// 解析命令文本（例如 "/roll 1d6+1"、".r" 或 "@Bot roll 1d6"）
 // 这个函数做了几个增强：
 // 1. 保持原有对 "/cmd"、"/cmd@Bot"、"@Bot cmd" 的支持
 // 2. 额外识别像 "/rd10"、"/r2d10" 这类快捷写法 —— 将视作命令名 "r" 并把后缀作为第一个参数
 // 例如: "/rd10" -> command: "r", args: ["d10"]; "/r2d10" -> command: "r", args: ["2d10"]
-// 3. 对大小写不敏感地处理 bot username 比对
+// 3. 额外识别 ".r" 作为骰点命令别名
+// 4. 对大小写不敏感地处理 bot username 比对
 function parseCommandFromText(text: string, botUsername?: string) {
 	log('解析命令');
 	const tokens = text.trim().split(/\s+/);
@@ -120,6 +121,10 @@ function parseCommandFromText(text: string, botUsername?: string) {
 	if (tokens.length === 0) return { isCommand: false };
 
 	const first = tokens[0];
+
+	if (first.toLowerCase() === '.r') {
+		return { isCommand: true, command: 'r', args: tokens.slice(1) };
+	}
 
 	// 辅助：把像 "coin_check_more" -> { command: "coin", suffix: "check_more" }
 	const splitUnderscore = (namePart: string) => {
@@ -166,6 +171,10 @@ function parseCommandFromText(text: string, botUsername?: string) {
 	if (botUsername && first.toLowerCase() === `@${botUsername.toLowerCase()}`) {
 		const second = tokens[1] || '';
 		if (!second) return { isCommand: false };
+
+		if (second.toLowerCase() === '.r') {
+			return { isCommand: true, command: 'r', args: tokens.slice(2) };
+		}
 
 		if (second.startsWith('/')) {
 			const [name] = second.slice(1).split('@');

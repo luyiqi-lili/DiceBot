@@ -1,6 +1,6 @@
 /**
  * @file commands/roll.ts
- * @description 掷骰命令处理器（/roll /r /rd /rh）。
+ * @description 掷骰命令处理器（/roll /r /.r /rd /rh）。
  *   支持多种骰子表达式格式：
  *   - 默认 1d100
  *   - NdS（如 2d6）
@@ -28,6 +28,7 @@ function extractInput(parsedMessage: ParsedUpdate): string {
   // 移除开头的 @Bot 或 /command 或带 @ 的命令
   text = text.replace(/^@?\w+\s*/i, "");
   text = text.replace(/^\/(?:r|roll|rh|rd)\b/i, "");
+  text = text.replace(/^\.(?:r)\b/i, "");
   return text.trim();
 }
 

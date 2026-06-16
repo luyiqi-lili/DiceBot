@@ -17,6 +17,13 @@ describe('/roll', () => {
 		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('点');
 		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
 	});
+	it('.r 默认骰点', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ command: 'r', text: '.r', args: [] }), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('点');
+		expect(api.sendMessage.mock.calls[0]?.[1]).not.toContain('无效');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
 	it('2d6', async () => {
 		const api = makeApi();
 		await handleRoll(makeMsg({ args: ['2d6'] }), {} as any, api as any);
