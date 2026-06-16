@@ -24,6 +24,22 @@ describe('/roll', () => {
 		expect(api.sendMessage.mock.calls[0]?.[1]).not.toContain('无效');
 		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
 	});
+	it('.rd10 按 1d10 掷骰', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ command: 'r', text: '.rd10', args: ['d10'] }), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('/roll 1d10');
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('1d10');
+		expect(api.sendMessage.mock.calls[0]?.[1]).not.toContain('无效');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
+	it('.r2d10 按 2d10 掷骰', async () => {
+		const api = makeApi();
+		await handleRoll(makeMsg({ command: 'r', text: '.r2d10', args: ['2d10'] }), {} as any, api as any);
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('/roll 2d10');
+		expect(api.sendMessage.mock.calls[0]?.[1]).toContain('2d10');
+		expect(api.sendMessage.mock.calls[0]?.[1]).not.toContain('无效');
+		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
+	});
 	it('2d6', async () => {
 		const api = makeApi();
 		await handleRoll(makeMsg({ args: ['2d6'] }), {} as any, api as any);

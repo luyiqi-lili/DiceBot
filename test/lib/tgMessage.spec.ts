@@ -142,6 +142,42 @@ describe('TgMessage.parseUpdate — message 类型', () => {
 		expect(parsed.args).toEqual(['2d6']);
 	});
 
+	it('解析点号快捷骰点命令 .rd10', () => {
+		const update = {
+			update_id: 43,
+			message: {
+				message_id: 133,
+				from: { id: 114, first_name: 'Ria' },
+				chat: { id: -100999 },
+				text: '.rd10',
+				date: 1700000033,
+			},
+		};
+
+		const parsed = TgMessage.parseUpdate(update, 'MyBot');
+		expect(parsed.isCommand).toBe(true);
+		expect(parsed.command).toBe('r');
+		expect(parsed.args).toEqual(['d10']);
+	});
+
+	it('解析点号快捷骰点命令 .r2d10', () => {
+		const update = {
+			update_id: 44,
+			message: {
+				message_id: 134,
+				from: { id: 115, first_name: 'Rui' },
+				chat: { id: -100999 },
+				text: '.r2d10',
+				date: 1700000034,
+			},
+		};
+
+		const parsed = TgMessage.parseUpdate(update, 'MyBot');
+		expect(parsed.isCommand).toBe(true);
+		expect(parsed.command).toBe('r');
+		expect(parsed.args).toEqual(['2d10']);
+	});
+
 	it('解析带 @Bot 的命令 @MyBot /roll 1d100', () => {
 		const update = {
 			update_id: 5,

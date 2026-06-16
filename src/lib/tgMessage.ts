@@ -112,7 +112,7 @@ export async function callTelegramApi(env: EnvLike, method: string, body: any) {
 // 1. 保持原有对 "/cmd"、"/cmd@Bot"、"@Bot cmd" 的支持
 // 2. 额外识别像 "/rd10"、"/r2d10" 这类快捷写法 —— 将视作命令名 "r" 并把后缀作为第一个参数
 // 例如: "/rd10" -> command: "r", args: ["d10"]; "/r2d10" -> command: "r", args: ["2d10"]
-// 3. 额外识别 ".r" 作为骰点命令别名
+// 3. 额外识别 ".r"、".rd10"、".r2d10" 作为骰点命令别名
 // 4. 对大小写不敏感地处理 bot username 比对
 function parseCommandFromText(text: string, botUsername?: string) {
 	log('解析命令');
@@ -122,10 +122,6 @@ function parseCommandFromText(text: string, botUsername?: string) {
 
 	const first = tokens[0];
 
-	if (first.toLowerCase() === '.r') {
-		return { isCommand: true, command: 'r', args: tokens.slice(1) };
-	}
-
 	// 辅助：把像 "coin_check_more" -> { command: "coin", suffix: "check_more" }
 	const splitUnderscore = (namePart: string) => {
 		const idx = namePart.indexOf('_');
@@ -134,6 +130,23 @@ function parseCommandFromText(text: string, botUsername?: string) {
 		const suffix = namePart.slice(idx + 1);
 		return { cmd, suffix };
 	};
+
+	const parseDotRollShortcut = (token: string, rest: string[]) => {
+		if (token.toLowerCase() === '.r') {
+			return { isCommand: true, command: 'r', args: rest };
+		}
+		if (/^\.r(?:\d|d)/i.test(token)) {
+			const suffix = token.slice(2);
+			const args: string[] = [];
+			if (suffix) args.push(suffix);
+			args.push(...rest);
+			return { isCommand: true, command: 'r', args };
+		}
+		return null;
+	};
+
+	const firstDotRoll = parseDotRollShortcut(first, tokens.slice(1));
+	if (firstDotRoll) return firstDotRoll;
 
 	// 1. 以斜线开头的常规命令，例如 "/roll"、"/roll@Bot"、"/rd10"、"/r2d10"、"/coin_check"
 	if (first.startsWith('/')) {
@@ -172,9 +185,8 @@ function parseCommandFromText(text: string, botUsername?: string) {
 		const second = tokens[1] || '';
 		if (!second) return { isCommand: false };
 
-		if (second.toLowerCase() === '.r') {
-			return { isCommand: true, command: 'r', args: tokens.slice(2) };
-		}
+		const secondDotRoll = parseDotRollShortcut(second, tokens.slice(2));
+		if (secondDotRoll) return secondDotRoll;
 
 		if (second.startsWith('/')) {
 			const [name] = second.slice(1).split('@');
