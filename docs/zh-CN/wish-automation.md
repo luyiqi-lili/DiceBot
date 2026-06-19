@@ -91,6 +91,12 @@ executor 需要：
 
 验证命令：`WISH_VERIFY_CMD`，默认是 wish 相关测试。
 
+重试参数：
+
+- `WISH_RETRY_ATTEMPTS`、`WISH_RETRY_DELAY`、`WISH_CONNECT_TIMEOUT` 和 `WISH_MAX_TIME` 用于调整 API 请求重试。
+- `WISH_EXEC_ATTEMPTS` 控制 Codex 执行尝试次数，默认是 `3`。
+- `WISH_EXEC_RETRY_DELAY` 控制 Codex 执行失败后的重试间隔，默认是 `30` 秒。
+
 ## Cron 示例
 
 ```cron
@@ -105,10 +111,13 @@ executor 需要：
 
 - 工作区脏时拒绝运行。
 - 每次只 claim 一个任务。
+- 会重试临时 API 失败，包括 claim task 和 status update。
+- 会对同一个已 claim 的任务重试失败的 Codex 执行。
+- 每次 Codex 执行失败后会先清理生成变更，再进入下一次尝试。
 - 失败后可清理生成变更。
 - 验证失败会回报 task failed。
 - 只有执行和验证成功后才 push。
 
 ## 测试
 
-相关测试：`test/commands/wish.spec.ts`、`test/lib/wishCore.spec.ts`、`test/lib/wishApi.spec.ts`、`test/scripts/wish-digest-format.sh`、`test/scripts/wish-execute-cleanup.sh`。
+相关测试：`test/commands/wish.spec.ts`、`test/lib/wishCore.spec.ts`、`test/lib/wishApi.spec.ts`、`test/scripts/wish-digest-format.sh`、`test/scripts/wish-execute-cleanup.sh`、`test/scripts/wish-execute-retry.sh`。

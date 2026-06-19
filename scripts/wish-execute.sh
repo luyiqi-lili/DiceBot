@@ -13,10 +13,19 @@ source "${SCRIPT_DIR}/wish-net.sh"
 : "${EXTERNAL_API_KEY:?EXTERNAL_API_KEY is required}"
 
 VERIFY_CMD="${WISH_VERIFY_CMD:-npm test -- test/lib/wishCore.spec.ts test/commands/wish.spec.ts test/lib/wishApi.spec.ts}"
+EXEC_ATTEMPTS="${WISH_EXEC_ATTEMPTS:-3}"
+EXEC_RETRY_DELAY="${WISH_EXEC_RETRY_DELAY:-30}"
 CLEANUP_ON_EXIT=0
 
 has_worktree_changes() {
 	! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]
+}
+
+reset_generated_changes() {
+	if has_worktree_changes; then
+		git reset --hard HEAD >/dev/null 2>&1 || true
+		git clean -fd >/dev/null 2>&1 || true
+	fi
 }
 
 cleanup_failed_changes() {
@@ -24,11 +33,8 @@ cleanup_failed_changes() {
 	if [ "$CLEANUP_ON_EXIT" != "1" ] || [ "$exit_code" -eq 0 ]; then
 		return
 	fi
-	if has_worktree_changes; then
-		echo "Cleaning generated changes from failed wish task ${TASK_ID:-unknown}." >&2
-		git reset --hard HEAD >/dev/null 2>&1 || true
-		git clean -fd >/dev/null 2>&1 || true
-	fi
+	echo "Cleaning generated changes from failed wish task ${TASK_ID:-unknown}." >&2
+	reset_generated_changes
 }
 
 trap cleanup_failed_changes EXIT
@@ -54,7 +60,7 @@ if has_worktree_changes; then
 	exit 1
 fi
 
-CLAIM_JSON=$(curl_once -X POST \
+CLAIM_JSON=$(curl_retry -X POST \
 	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 	"${WORKER_BASE_URL%/}/api/wish/approved/claim")
 
@@ -105,7 +111,25 @@ PROMPT=$(cat <<EOF
 EOF
 )
 
-if ! codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"; then
+EXEC_ATTEMPT=1
+CODEX_OK=0
+while [ "$EXEC_ATTEMPT" -le "$EXEC_ATTEMPTS" ]; do
+	if codex exec --dangerously-bypass-approvals-and-sandbox "$PROMPT"; then
+		CODEX_OK=1
+		break
+	fi
+
+	reset_generated_changes
+	if [ "$EXEC_ATTEMPT" -ge "$EXEC_ATTEMPTS" ]; then
+		break
+	fi
+
+	echo "Codex execution failed, retrying ${EXEC_ATTEMPT}/${EXEC_ATTEMPTS}..." >&2
+	EXEC_ATTEMPT=$((EXEC_ATTEMPT + 1))
+	sleep "$EXEC_RETRY_DELAY"
+done
+
+if [ "$CODEX_OK" != "1" ]; then
 	requeue_task "莉莉这轮施法没成功，已经把愿望放回队列，下一轮会重新试。"
 	exit 1
 fi

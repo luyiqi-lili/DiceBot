@@ -104,6 +104,12 @@ Verification command:
 
 - `WISH_VERIFY_CMD`, defaulting to wish-related tests.
 
+Retry controls:
+
+- `WISH_RETRY_ATTEMPTS`, `WISH_RETRY_DELAY`, `WISH_CONNECT_TIMEOUT`, and `WISH_MAX_TIME` tune API request retries.
+- `WISH_EXEC_ATTEMPTS` controls Codex execution attempts, defaulting to `3`.
+- `WISH_EXEC_RETRY_DELAY` controls the delay between failed Codex execution attempts, defaulting to `30` seconds.
+
 ## Cron Examples
 
 Digest every 10 minutes:
@@ -130,6 +136,9 @@ Daily digest:
 
 - refuses to run if the working tree is dirty
 - claims one task per run
+- retries transient API failures, including task claim and status updates
+- retries failed Codex execution attempts for the same claimed task
+- cleans generated changes between failed Codex execution attempts
 - cleans generated changes after failed execution
 - reports failed verification as task failure
 - pushes only after successful execution and verification
@@ -143,3 +152,4 @@ Relevant tests:
 - `test/lib/wishApi.spec.ts`
 - `test/scripts/wish-digest-format.sh`
 - `test/scripts/wish-execute-cleanup.sh`
+- `test/scripts/wish-execute-retry.sh`

@@ -8,6 +8,8 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 REPO_DIR="${TMP_DIR}/repo"
 REMOTE_DIR="${TMP_DIR}/remote.git"
 BIN_DIR="${TMP_DIR}/bin"
+CLAIM_COUNT="${TMP_DIR}/claim-count"
+CODEX_COUNT="${TMP_DIR}/codex-count"
 STATUS_LOG="${TMP_DIR}/status.json"
 STATUS_COUNT="${TMP_DIR}/status-count"
 
@@ -28,13 +30,20 @@ git -C "$REPO_DIR" push -q -u origin main
 cat >"${BIN_DIR}/curl" <<'STUB'
 #!/bin/bash
 if printf '%s\n' "$@" | grep -q '/api/wish/approved/claim'; then
+	count=$(cat "$WISH_CLAIM_COUNT" 2>/dev/null || printf '0')
+	count=$((count + 1))
+	printf '%s' "$count" > "$WISH_CLAIM_COUNT"
+	if [ "$count" -eq 1 ]; then
+		echo "simulated claim timeout" >&2
+		exit 28
+	fi
 	printf '{"task":{"id":1,"title":"兼容命令","body":"增加中文命令","wish_ids_json":"[1]"}}\n'
 elif printf '%s\n' "$@" | grep -q '/api/wish/tasks/1/status'; then
 	count=$(cat "$WISH_STATUS_COUNT" 2>/dev/null || printf '0')
 	count=$((count + 1))
 	printf '%s' "$count" > "$WISH_STATUS_COUNT"
 	if [ "$count" -eq 1 ]; then
-		echo "simulated Cloudflare timeout" >&2
+		echo "simulated status timeout" >&2
 		exit 28
 	fi
 	while [ "$#" -gt 0 ]; do
@@ -54,50 +63,66 @@ chmod +x "${BIN_DIR}/curl"
 
 cat >"${BIN_DIR}/codex" <<'STUB'
 #!/bin/bash
-printf 'changed\n' >> tracked.txt
-printf 'generated\n' > generated.txt
-exit 1
+count=$(cat "$WISH_CODEX_COUNT" 2>/dev/null || printf '0')
+count=$((count + 1))
+printf '%s' "$count" > "$WISH_CODEX_COUNT"
+
+if [ "$count" -eq 1 ]; then
+	printf 'failed attempt\n' >> tracked.txt
+	printf 'generated from failed attempt\n' > generated.txt
+	exit 1
+fi
+
+printf 'retry success\n' > tracked.txt
+exit 0
 STUB
 chmod +x "${BIN_DIR}/codex"
 
-set +e
 (
 	cd "$REPO_DIR"
 	PATH="${BIN_DIR}:$PATH" \
 	WORKER_BASE_URL="https://worker.test" \
 	EXTERNAL_API_KEY="test-key" \
+	WISH_CLAIM_COUNT="$CLAIM_COUNT" \
+	WISH_CODEX_COUNT="$CODEX_COUNT" \
 	WISH_STATUS_LOG="$STATUS_LOG" \
 	WISH_STATUS_COUNT="$STATUS_COUNT" \
 	WISH_RETRY_DELAY="0" \
-	WISH_EXEC_ATTEMPTS="2" \
 	WISH_EXEC_RETRY_DELAY="0" \
 	BOT_TOKEN="" \
 	CHAT_ID="" \
 	TOPIC_ID="" \
+	WISH_VERIFY_CMD="test \"\$(cat tracked.txt)\" = \"retry success\"" \
 	bash scripts/wish-execute.sh
 )
-EXIT_CODE=$?
-set -e
 
-if [ "$EXIT_CODE" -eq 0 ]; then
-	echo "Expected wish-execute.sh to fail when codex fails." >&2
+if [ "$(cat "$CLAIM_COUNT")" -ne 2 ]; then
+	echo "Expected claim request to retry once after a transient failure." >&2
 	exit 1
 fi
 
-STATUS=$(git -C "$REPO_DIR" status --short)
-if [ -n "$STATUS" ]; then
-	echo "Expected failed execution to clean generated changes, got:" >&2
-	echo "$STATUS" >&2
-	exit 1
-fi
-
-TASK_STATUS=$(jq -r '.status' "$STATUS_LOG")
-if [ "$TASK_STATUS" != "approved" ]; then
-	echo "Expected failed execution to requeue task as approved, got: ${TASK_STATUS}" >&2
+if [ "$(cat "$CODEX_COUNT")" -ne 2 ]; then
+	echo "Expected codex execution to retry once after a failed attempt." >&2
 	exit 1
 fi
 
 if [ "$(cat "$STATUS_COUNT")" -ne 2 ]; then
-	echo "Expected task status update to retry once after a transient failure." >&2
+	echo "Expected final status update to retry once after a transient failure." >&2
+	exit 1
+fi
+
+if [ "$(git -C "$REPO_DIR" show HEAD:tracked.txt)" != "retry success" ]; then
+	echo "Expected committed tracked file to contain only successful retry output." >&2
+	exit 1
+fi
+
+if git -C "$REPO_DIR" ls-tree -r --name-only HEAD | grep -qx 'generated.txt'; then
+	echo "Expected generated failed-attempt file to be cleaned before retry." >&2
+	exit 1
+fi
+
+TASK_STATUS=$(jq -r '.status' "$STATUS_LOG")
+if [ "$TASK_STATUS" != "done" ]; then
+	echo "Expected successful retry to mark task done, got: ${TASK_STATUS}" >&2
 	exit 1
 fi
