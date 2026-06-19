@@ -49,11 +49,11 @@ English source: [../commands.md](../commands.md)
 
 | 命令 | 说明 |
 |------|------|
-| `/fish <bait>` | 花费鱼饵并创建拉杆按钮 |
-| `/fish check` | 查看今日钓鱼记录 |
-| `/fish add <name> <value>` | 花费 `FISH_ADD_COST` 向 `FISH_KV` 添加鱼 |
-| `/fish list [page]` | 管理员列表，每页 20 条 |
-| `/fish remove <index>` | 管理员按列表序号删除 |
+| `/f <bait>` | 花费鱼饵并创建拉杆按钮 |
+| `/f check` | 查看今日钓鱼记录 |
+| `/f add <name> <value>` | 花费 `FISH_ADD_COST` 向 `FISH_KV` 添加鱼 |
+| `/f list [page]` | 管理员列表，每页 20 条 |
+| `/f remove <index>` | 管理员按列表序号删除 |
 
 钓鱼管理员当前是用户 `8080375150`。
 

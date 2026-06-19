@@ -52,7 +52,7 @@ function formatFishCatalogPage(fishList: Array<{ name: string; value: number; ho
 		`<blockquote expandable><b>鱼种列表 ${page}/${totalPages}</b>（共 ${fishList.length} 条）\n` +
 		(lines.length ? lines.join('\n') : '暂无鱼种') +
 		`\n</blockquote>` +
-		`删除：<code>/fish remove 序号</code>；翻页：<code>/fish list 页码</code>`
+		`删除：<code>/f remove 序号</code>；翻页：<code>/f list 页码</code>`
 	);
 }
 
@@ -364,7 +364,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	}
 
 	// 只在普通消息/命令时处理发起
-	const isCommand = !!parsedMessage.isCommand && parsedMessage.command === 'fish';
+	const isCommand = !!parsedMessage.isCommand && (parsedMessage.command === 'f' || parsedMessage.command === 'fish');
 	if (!isCommand) {
 		// 非本命令，忽略（或者返回帮助提示）
 		// 这里我们选择不发送任何消息（由上层命令分发系统决定）
@@ -416,7 +416,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 		if (!Number.isInteger(index) || index < 1) {
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
-				text: `❌ 用法：<code>/fish remove 序号</code>，序号来自 <code>/fish list</code>。`,
+				text: `❌ 用法：<code>/f remove 序号</code>，序号来自 <code>/f list</code>。`,
 				parse_mode: 'HTML',
 				message_thread_id: threadId,
 			});
@@ -454,7 +454,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 		if (!name || !Number.isInteger(value)) {
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
-				text: `❌ 用法：<code>/fish add 名称 价值</code>，价值必须是 ${MIN_USER_FISH_VALUE} 到 ${MAX_USER_FISH_VALUE} 的整数。添加一条鱼需要 ${FISH_ADD_COST}c。`,
+				text: `❌ 用法：<code>/f add 名称 价值</code>，价值必须是 ${MIN_USER_FISH_VALUE} 到 ${MAX_USER_FISH_VALUE} 的整数。添加一条鱼需要 ${FISH_ADD_COST}c。`,
 				parse_mode: 'HTML',
 				message_thread_id: threadId,
 			});
@@ -515,7 +515,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 		return;
 	}
 
-	// 新增：/fish check [YYYYMMDD|YYYY-MM-DD]
+	// 新增：/f check [YYYYMMDD|YYYY-MM-DD]
 	if (args[0] === 'check') {
 		const dateArg = args[1];
 		let date = nowDateYMD();
@@ -528,7 +528,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 				// 非法格式，回复提示
 				await TgMessage.sendText(env, {
 					chat_id: parsedMessage.chatId!,
-					text: `❌ 日期格式错误。请使用 /fish check 或 /fish check YYYYMMDD（例如 /fish check 20250830）`,
+					text: `❌ 日期格式不太对哦。请使用 /f check 或 /f check YYYYMMDD（例如 /f check 20250830）`,
 					parse_mode: 'HTML',
 					message_thread_id: parsedMessage.threadId,
 				});

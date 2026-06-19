@@ -37,6 +37,32 @@ describe('DiceBot Worker — fish command routing', () => {
 		vi.clearAllMocks();
 	});
 
+	it('/f 分发到 fish 处理器', async () => {
+		const parsedMessage = {
+			type: 'message',
+			chatId: -1002848481881,
+			threadId: 66,
+			isCommand: true,
+			command: 'f',
+			args: ['3'],
+			message: { message_id: 1, chat: { id: -1002848481881 }, text: '/f 3' },
+			from: { id: 12345, first_name: 'F' },
+		};
+		mocks.parseUpdate.mockReturnValue(parsedMessage);
+
+		const request = new IncomingRequest('http://example.com', {
+			method: 'POST',
+			body: JSON.stringify({ update_id: 1 }),
+		});
+		const ctx = createExecutionContext();
+
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(200);
+		expect(mocks.handleFish).toHaveBeenCalledWith(parsedMessage, env);
+	});
+
 	it('/钓鱼 不再分发到 fish 处理器', async () => {
 		const parsedMessage = {
 			type: 'message',

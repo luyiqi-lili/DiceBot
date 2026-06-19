@@ -42,4 +42,4 @@ Security note: inline score handling currently logs `env.TOKEN`. Remove or redac
 
 ## Fish Web Game
 
-`src/web/fish/index.ts` owns the web fish game behavior. It is separate from the Telegram `/fish` command flow but shares the same Worker and Telegram score infrastructure.
+`src/web/fish/index.ts` owns the web fish game behavior. It is separate from the Telegram `/f` command flow but shares the same Worker and Telegram score infrastructure.

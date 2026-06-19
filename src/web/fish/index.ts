@@ -46,7 +46,7 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
         // 获取余额
         const balance = await coinGetBalance(env.COIN_DO, userId);
         
-        // 获取今日钓鱼记录（与 /fish 命令共用同一 KV key）
+        // 获取今日钓鱼记录（与 /f 命令共用同一 KV key）
         const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userId);
 
         // 计算可用钓鱼次数
@@ -104,7 +104,7 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
             }, 400);
         }
         
-        // 检查今日钓鱼次数（与 /fish 命令共用 KV）
+        // 检查今日钓鱼次数（与 /f 命令共用 KV）
         const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
         if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             return jsonResponse({ 
@@ -192,7 +192,7 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
         const rawScore = elapsedSeconds * strength;
         const score = Math.floor(rawScore);
         
-        // 获取今日钓鱼记录（与 /fish 命令共用 KV）
+        // 获取今日钓鱼记录（与 /f 命令共用 KV）
         const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
         if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             await env.FISHING_RECORD_KV.delete(castKey); // 清理抛竿记录
@@ -227,7 +227,7 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
             }
         }
         
-        // 更新钓鱼记录（与 /fish 命令共用 KV）
+        // 更新钓鱼记录（与 /f 命令共用 KV）
         fishingRecord.results.push(result as any);
         fishingRecord.count += 1;
         await setFishingRecord(env.FISHING_RECORD_KV, userIdStr, fishingRecord);

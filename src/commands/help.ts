@@ -33,10 +33,10 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/rose send</code> — 回复某人送花 🌷
 
 <b>🎣 娱乐</b>
- <code>/fish X</code> — 花费 X 鱼饵钓鱼
- <code>/fish check</code> — 查看今日钓鱼情况
- <code>/fish add 名称 价值</code> — 花费 10c 添加鱼（价值 1-13）
- <code>/fish list</code> / <code>/fish remove 序号</code> — 管理鱼种（管理员）
+ <code>/f X</code> — 花费 X 鱼饵钓鱼
+ <code>/f check</code> — 查看今日钓鱼情况
+ <code>/f add 名称 价值</code> — 花费 10c 添加鱼（价值 1-13）
+ <code>/f list</code> / <code>/f remove 序号</code> — 管理鱼种（管理员）
  <code>/wish 想法</code> — 提交功能愿望
  <code>/fate</code> — 塔罗占卜（抽3张牌）
  <code>/em</code> / <code>/me</code> / <code>/emote</code> — 动作指令，如 /em 开心地跳了起来
@@ -94,9 +94,9 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },
         { text: "/rose send", switch_inline_query_current_chat: `/rose send` },
-        { text: "/fish", switch_inline_query_current_chat: `/fish 3` },
-        { text: "/fish add", switch_inline_query_current_chat: `/fish add 🐟新鱼 1` },
-        { text: "/fish list", switch_inline_query_current_chat: `/fish list` },
+        { text: "/f", switch_inline_query_current_chat: `/f 3` },
+        { text: "/f add", switch_inline_query_current_chat: `/f add 🐟新鱼 1` },
+        { text: "/f list", switch_inline_query_current_chat: `/f list` },
         { text: "/wish", switch_inline_query_current_chat: `/wish ` },
       ],
       [

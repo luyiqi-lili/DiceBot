@@ -52,7 +52,7 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 - 骰子与游戏：`/roll`、`/r`、`/rd`、`/rh`、`/groll`、`/21`、`/duel`。
 - 经济：`/coin`、`/lottery`、`/congrats`、`/恭喜发财`。
 - 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/trans`、`/ask`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`、`/report`。
-- 钓鱼：`/fish`、`/fish check`、`/fish add`、`/fish list`、`/fish remove`。
+- 钓鱼：`/f`、`/f check`、`/f add`、`/f list`、`/f remove`。
 - 好感度：`/rose`、`/rose send`、`/rose check`。
 - Wish 自动化：`/wish`；管理员回复汇总消息批准任务。
 - DND：`/dnd`、`/new`、`/char`、`/skill`、`/skills`、`/rest`、`/gm`、`/item`、`/attack`、`/atk`、`/cast`、`/lvup`、`/level`。

@@ -49,11 +49,11 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 
 | Command | Handler | Notes |
 |---------|---------|-------|
-| `/fish <bait>` | `handleFish` | Spend bait and create pull callback |
-| `/fish check` | `handleFish` | Daily fishing record |
-| `/fish add <name> <value>` | `handleFish` | Spend `FISH_ADD_COST` to add a fish to `FISH_KV` |
-| `/fish list [page]` | `handleFish` | Admin list, 20 per page |
-| `/fish remove <index>` | `handleFish` | Admin removal by list index |
+| `/f <bait>` | `handleFish` | Spend bait and create pull callback |
+| `/f check` | `handleFish` | Daily fishing record |
+| `/f add <name> <value>` | `handleFish` | Spend `FISH_ADD_COST` to add a fish to `FISH_KV` |
+| `/f list [page]` | `handleFish` | Admin list, 20 per page |
+| `/f remove <index>` | `handleFish` | Admin removal by list index |
 
 Fish admin is currently user `8080375150`.
 

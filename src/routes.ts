@@ -78,6 +78,7 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	help:     { module: './commands/help', handler: 'handleHelp' },
 
 	/* ── 钓鱼 ── */
+	f:        { module: './commands/fish', handler: 'handleFish' },
 	fish:     { module: './commands/fish', handler: 'handleFish' },
 
 	/* ── 愿望池 ── */

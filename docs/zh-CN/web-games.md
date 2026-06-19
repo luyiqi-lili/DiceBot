@@ -42,4 +42,4 @@ Web 路由在 Telegram webhook 解析之前处理，入口是 `src/web/router.ts
 
 ## Fish Web Game
 
-`src/web/fish/index.ts` 实现 Web 钓鱼游戏。它与 Telegram `/fish` 命令流程分离，但共用同一个 Worker 和 Telegram 分数基础设施。
+`src/web/fish/index.ts` 实现 Web 钓鱼游戏。它与 Telegram `/f` 命令流程分离，但共用同一个 Worker 和 Telegram 分数基础设施。

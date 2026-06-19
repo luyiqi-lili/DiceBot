@@ -56,7 +56,7 @@ Main command groups:
 - Dice and party games: `/roll`, `/r`, `/rd`, `/rh`, `/groll`, `/21`, `/duel`.
 - Economy: `/coin`, `/lottery`, `/congrats`, `/恭喜发财`.
 - Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/trans`, `/ask`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/report`.
-- Fish: `/fish`, `/fish check`, `/fish add`, `/fish list`, `/fish remove`.
+- Fish: `/f`, `/f check`, `/f add`, `/f list`, `/f remove`.
 - Affection: `/rose`, `/rose send`, `/rose check`.
 - Wish automation: `/wish`; admin replies to digest messages approve tasks.
 - DND: `/dnd`, `/new`, `/char`, `/skill`, `/skills`, `/rest`, `/gm`, `/item`, `/attack`, `/atk`, `/cast`, `/lvup`, `/level`.
