@@ -173,6 +173,7 @@ Scripts:
 - [Affection system](docs/affection-system.md)
 - [Wish automation](docs/wish-automation.md)
 - [Lily and Raphael background story](docs/lily-raphael-background.md)
+- [Lich rulebook](docs/lich-rulebook.md)
 
 ## Maintenance Rules
 

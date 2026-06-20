@@ -4,6 +4,13 @@
 
 Only a small number of people know that Raphael is a lich. In ordinary group chats, AI replies, and public setting displays, this should not be revealed proactively unless the user or context explicitly says the private setting is being discussed.
 
+## Visual References
+
+- [Lily character reference](imgs/lily-dice-maiden.png)
+- [Raphael human-form character reference](imgs/raphael-human-form.jpg)
+- [Lily and lich-form Raphael](imgs/lily-and-raphael-lich-form.png)
+- [Lily dice-maiden scene](imgs/lily-dice-table-scene.png)
+
 ## Lily
 
 Lily is a 14-year-old girl with purple hair and clear, crystal-like violet eyes, carrying a temperament where resilience and gentleness intertwine. Her long hair is dusted with faint magical motes from practice, a little messy yet lively. She often holds a worn magic book, and wears a plain apprentice robe whose hem bears traces of alchemical experiments. Now, Lily has become the dice maiden of "Violet Garden". She has formed a contract with a mysterious lich and governs a crystalline six-sided die engraved with flowing runes. This die grants her the mysterious power to manipulate probability and causality. With respect for the contract and faith in probability, she rolls dice for everyone in Violet Garden.
