@@ -172,6 +172,7 @@ Scripts:
 - [Fish system](docs/fish-system.md)
 - [Affection system](docs/affection-system.md)
 - [Wish automation](docs/wish-automation.md)
+- [Lily and Raphael background story](docs/lily-raphael-background.md)
 
 ## Maintenance Rules
 

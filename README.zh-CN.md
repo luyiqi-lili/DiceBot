@@ -166,6 +166,7 @@ E2E 测试需要真实外部变量，包括 `WORKER_BASE_URL` 和 `EXTERNAL_API_
 - [钓鱼系统](docs/zh-CN/fish-system.md)
 - [好感度系统](docs/zh-CN/affection-system.md)
 - [Wish 自动化](docs/zh-CN/wish-automation.md)
+- [莉莉与拉斐尔背景故事](docs/zh-CN/lily-raphael-background.md)
 
 ## 维护规则
 
