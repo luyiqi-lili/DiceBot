@@ -151,6 +151,18 @@ function randomInt(min: number, max: number): number {
 
 const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21", "2026-06-29"]);
 const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
+const DAILY_PRAY_FORTUNES = [
+  "今日运势：小吉\n适合把想做的小事往前推一步。",
+  "今日运势：平稳\n慢慢来就很好，别把日程塞得太满。",
+  "今日运势：好运\n可能会遇到一点顺手的小惊喜。",
+  "今日运势：提醒\n重要的事多看一眼，莉莉觉得这样更安心。",
+  "今日运势：元气\n适合整理心情，也适合奖励自己一点点。",
+  "今日运势：守护\n今天遇到麻烦也别急，先喝口水再处理。"
+];
+
+function randomDailyPrayFortune(): string {
+  return DAILY_PRAY_FORTUNES[randomInt(0, DAILY_PRAY_FORTUNES.length - 1)];
+}
 
 export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
   const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
@@ -259,12 +271,13 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     await doPutRaw(doNs, prayKey, today);
 
     const newBal = await getBalance(doNs, userId);
+    const fortuneText = randomDailyPrayFortune();
     const rewardText = duringVioletAnniversary
       ? `💜 ${userName}，紫罗兰周年庆签到成功！莉莉把今天的奖励换成了 ${gain} 💰，当前余额 ${newBal} 💰。`
       : `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`;
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: rewardText,
+      text: `${rewardText}\n\n🔮 ${fortuneText}`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });

@@ -79,6 +79,19 @@ describe('pray', () => {
 		expect(gain).toBeGreaterThanOrEqual(8);
 		expect(gain).toBeLessThanOrEqual(12);
 	});
+	it('完成每日祈祷后追加今日运势', async () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-06-22T12:00:00.000Z'));
+		vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0);
+		const env = { COIN_DO: makeCoinDo() } as any;
+
+		await handleCoin(makeAllowedPrayParsed(), env);
+
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).toContain('你祈祷获得了 8 💰');
+		expect(text).toContain('今日运势：小吉');
+		expect(text).toContain('适合把想做的小事往前推一步');
+	});
 });
 describe('send', () => {
 	beforeEach(() => vi.clearAllMocks());
