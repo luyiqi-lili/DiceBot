@@ -14,6 +14,7 @@ import {
 	FishingRecord,
 } from "../../lib/fishCore";
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../../lib/coinService";
+import { getVerifiedWebGameUserId } from "../../lib/telegramAuth";
 
 // 最大钓鱼次数 - 统一使用 fishCore 的常量
 // 记录类型 FishingRecord 由 fishCore 导出
@@ -36,11 +37,10 @@ export async function handleFishWeb(request: Request, env: Env): Promise<Respons
  */
 export async function handleFishData(request: Request, env: Env): Promise<Response> {
     try {
-        const url = new URL(request.url);
-        const userId = url.searchParams.get('user_id');
+        const userId = await getVerifiedWebGameUserId(request, env, 'fish');
         
         if (!userId) {
-            return jsonResponse({ ok: false, error: '缺少用户ID' }, 400);
+            return jsonResponse({ ok: false, error: '未通过 Telegram 游戏认证' }, 401);
         }
 
         // 获取余额
@@ -85,10 +85,11 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
 export async function handleFishCast(request: Request, env: Env): Promise<Response> {
     try {
         const body: any = await request.json();
-        const { userId, baitCost = 1 } = body;
+        const { baitCost = 1 } = body;
+        const userId = await getVerifiedWebGameUserId(request, env, 'fish', body);
         
         if (!userId) {
-            return jsonResponse({ ok: false, error: '缺少用户ID' }, 400);
+            return jsonResponse({ ok: false, error: '未通过 Telegram 游戏认证' }, 401);
         }
         
         const userIdStr = String(userId);
@@ -161,9 +162,14 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
 export async function handleFishPull(request: Request, env: Env): Promise<Response> {
     try {
         const body: any = await request.json();
-        const { userId, castId } = body;
+        const { castId } = body;
+        const userId = await getVerifiedWebGameUserId(request, env, 'fish', body);
         
-        if (!userId || !castId) {
+        if (!userId) {
+            return jsonResponse({ ok: false, error: '未通过 Telegram 游戏认证' }, 401);
+        }
+
+        if (!castId) {
             return jsonResponse({ ok: false, error: '缺少必要参数' }, 400);
         }
         

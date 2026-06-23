@@ -27,4 +27,18 @@ describe('COMMAND_ROUTES', () => {
 			deleteMsg: false,
 		});
 	});
+
+	it('DND 命令元数据与静态 import switch 保持同步', () => {
+		expect(COMMAND_ROUTES.dnd).toMatchObject({ module: './commands/dndHelp', handler: 'handleDndHelp' });
+		expect(COMMAND_ROUTES.new).toMatchObject({ module: './commands/dndNew', handler: 'handleDndNew' });
+		expect(COMMAND_ROUTES.char).toMatchObject({ module: './commands/dndChar', handler: 'handleDndChar' });
+		expect(COMMAND_ROUTES.skill).toMatchObject({ module: './commands/dndSkill', handler: 'handleDndSkill' });
+		expect(COMMAND_ROUTES.skills).toMatchObject({ module: './commands/dndSkills', handler: 'handleDndSkills' });
+		expect(COMMAND_ROUTES.rest).toMatchObject({ module: './commands/dndRest', handler: 'handleDndRest' });
+		expect(COMMAND_ROUTES.attack).toMatchObject({ module: './commands/dndAttack', handler: 'handleDndAttack' });
+		expect(COMMAND_ROUTES.atk).toMatchObject({ module: './commands/dndAttack', handler: 'handleDndAttack' });
+		expect(COMMAND_ROUTES.cast).toMatchObject({ module: './commands/dndCast', handler: 'handleDndCast' });
+		expect(COMMAND_ROUTES.lvup).toMatchObject({ module: './commands/dndUpgrade', handler: 'handleDndLvUp' });
+		expect(COMMAND_ROUTES.level).toMatchObject({ module: './commands/dndUpgrade', handler: 'handleDndLevel' });
+	});
 });

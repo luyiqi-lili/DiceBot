@@ -52,6 +52,7 @@ describe('DiceBot Worker — fish command routing', () => {
 
 		const request = new IncomingRequest('http://example.com', {
 			method: 'POST',
+			headers: { 'CF-Connecting-IP': '149.154.160.1' },
 			body: JSON.stringify({ update_id: 1 }),
 		});
 		const ctx = createExecutionContext();
@@ -78,6 +79,7 @@ describe('DiceBot Worker — fish command routing', () => {
 
 		const request = new IncomingRequest('http://example.com', {
 			method: 'POST',
+			headers: { 'CF-Connecting-IP': '149.154.160.1' },
 			body: JSON.stringify({ update_id: 1 }),
 		});
 		const ctx = createExecutionContext();

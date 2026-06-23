@@ -21,6 +21,7 @@ describe('DiceBot Worker — 基础请求处理', () => {
 		// 但 POST 会先尝试解析 JSON
 		const request = new IncomingRequest('http://example.com', {
 			method: 'POST',
+			headers: { 'CF-Connecting-IP': '149.154.160.1' },
 			body: 'not json',
 		});
 		const ctx = createExecutionContext();
@@ -28,6 +29,27 @@ describe('DiceBot Worker — 基础请求处理', () => {
 		await waitOnExecutionContext(ctx);
 		// 非法的 JSON 会返回 400
 		expect(response.status).toBe(400);
+	});
+
+	it('拒绝非 Telegram 来源的 webhook POST', async () => {
+		const request = new IncomingRequest('http://example.com', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CF-Connecting-IP': '203.0.113.10',
+			},
+			body: JSON.stringify({ message: { chat: { id: -1002742074355 }, text: '/help' } }),
+		});
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+		expect(response.status).toBe(403);
+	});
+
+	it('拒绝未提供 API key 的外部 API 请求', async () => {
+		const response = await worker.fetch(new IncomingRequest('http://example.com/api/health'), env, createExecutionContext());
+
+		expect(response.status).toBe(401);
 	});
 
 	it('Web 页面 /web/hello 返回 HTML 页面', async () => {

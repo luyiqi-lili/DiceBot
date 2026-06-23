@@ -13,6 +13,7 @@ import { handleBackup } from './lib/backup';
 
 import { COMMAND_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
+import { createWebGameAuth, isTelegramWebhookRequest } from './lib/telegramAuth';
 
 /**
  * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
@@ -43,6 +44,7 @@ export type Env = {
 	DEEPSEEK_API_KEYS?: string;
 	DEEPSEEK_MODEL?: string;
 	DEEPSEEK_BASE_URL?: string;
+	TELEGRAM_WEBHOOK_SECRET?: string;
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
@@ -55,7 +57,7 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 	const path = url.pathname;
 
 	const apiKey = request.headers.get('X-API-Key') || url.searchParams.get('api_key');
-	if (env.EXTERNAL_API_KEY && apiKey !== env.EXTERNAL_API_KEY) {
+	if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
 		return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 			status: 401,
 			headers: { 'Content-Type': 'application/json' },
@@ -193,10 +195,16 @@ export default {
 			return handleExternalAPI(request, env);
 		}
 
+		if (request.method === 'POST' && !isTelegramWebhookRequest(request, env)) {
+			console.warn('index: 拒绝非 Telegram 来源 webhook 请求', {
+				ip: request.headers.get('CF-Connecting-IP') ?? '',
+			});
+			return new Response('Forbidden', { status: 403 });
+		}
+
 		console.log('index: 收到请求', {
 			method: request.method,
 			url: request.url,
-			headers: Object.fromEntries(request.headers),
 		});
 
 		// 2. 非 POST 存活检查
@@ -263,8 +271,11 @@ export default {
 					if (game === 'hello') {
 						const userId = callbackQuery.from.id;
 						const userName = callbackQuery.from.first_name || 'User';
+						const authTs = Math.floor(Date.now() / 1000);
 						const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/hello');
 						gameUrl.searchParams.set('user_id', userId.toString());
+						gameUrl.searchParams.set('auth_ts', authTs.toString());
+						gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'hello', issuedAt: authTs }));
 						gameUrl.searchParams.set('username', encodeURIComponent(userName));
 						gameUrl.searchParams.set('user_last_name', encodeURIComponent(callbackQuery.from.last_name || ''));
 						gameUrl.searchParams.set('user_username', callbackQuery.from.username || '');
@@ -282,8 +293,11 @@ export default {
 					if (game === 'fish') {
 						const userId = callbackQuery.from.id;
 						const userName = callbackQuery.from.first_name || 'User';
+						const authTs = Math.floor(Date.now() / 1000);
 						const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/fish');
 						gameUrl.searchParams.set('user_id', userId.toString());
+						gameUrl.searchParams.set('auth_ts', authTs.toString());
+						gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'fish', issuedAt: authTs }));
 						gameUrl.searchParams.set('username', encodeURIComponent(userName));
 						if (callbackQuery.inline_message_id) {
 							gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id);

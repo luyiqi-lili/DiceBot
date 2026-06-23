@@ -393,6 +393,8 @@
             // 从URL获取用户信息
             const urlParams = new URLSearchParams(window.location.search);
             gameData.userId = urlParams.get('user_id') || 'unknown';
+            gameData.auth = urlParams.get('auth') || '';
+            gameData.authTs = urlParams.get('auth_ts') || '';
             
             // 更新状态
             updateStatus('正在加载游戏数据...');
@@ -421,7 +423,12 @@
             try {
                 updateStatus('加载用户数据...');
                 
-                const response = await fetch(`/web/fish/data?user_id=${gameData.userId}`);
+                const params = new URLSearchParams({
+                    user_id: gameData.userId,
+                    auth: gameData.auth,
+                    auth_ts: gameData.authTs
+                });
+                const response = await fetch(`/web/fish/data?${params.toString()}`);
                 const result = await response.json();
                 
                 if (result.ok) {
@@ -487,6 +494,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: gameData.userId,
+                        auth: gameData.auth,
+                        auth_ts: gameData.authTs,
                         baitCost: baitCost
                     })
                 });
@@ -538,6 +547,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         userId: gameData.userId,
+                        auth: gameData.auth,
+                        auth_ts: gameData.authTs,
                         castId: gameData.castData.castId
                     })
                 });

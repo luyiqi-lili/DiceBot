@@ -112,7 +112,18 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	rule:     { module: './commands/rule', handler: 'handleRule' },
 
 	/* ── DND GM（不自动删除命令消息）── */
+	dnd:      { module: './commands/dndHelp', handler: 'handleDndHelp' },
+	new:      { module: './commands/dndNew', handler: 'handleDndNew' },
+	char:     { module: './commands/dndChar', handler: 'handleDndChar' },
+	skill:    { module: './commands/dndSkill', handler: 'handleDndSkill' },
+	skills:   { module: './commands/dndSkills', handler: 'handleDndSkills' },
+	rest:     { module: './commands/dndRest', handler: 'handleDndRest' },
 	gm:       { module: './commands/dndGm', handler: 'handleDndGm', deleteMsg: false },
+	attack:   { module: './commands/dndAttack', handler: 'handleDndAttack' },
+	atk:      { module: './commands/dndAttack', handler: 'handleDndAttack' },
+	cast:     { module: './commands/dndCast', handler: 'handleDndCast' },
+	lvup:     { module: './commands/dndUpgrade', handler: 'handleDndLvUp' },
+	level:    { module: './commands/dndUpgrade', handler: 'handleDndLevel' },
 };
 
 // ── Callback 注册表 ───────────────────────────────────────
@@ -124,4 +135,8 @@ export const CALLBACK_ROUTES: Record<string, CallbackRoute> = {
 	fish:     { module: './commands/fish', handler: 'handleFishCallback' },
 	groll:    { module: './commands/groll', handler: 'handleGrollCallback' },
 	lottery:  { module: './commands/lottery', handler: 'handleLotteryCallback' },
+	dnd_reroll:  { module: './commands/dndNew', handler: 'handleDndRerollCallback' },
+	dnd_confirm: { module: './commands/dndNew', handler: 'handleDndConfirmCallback' },
+	item_action: { module: './commands/item', handler: 'handleItemCallback' },
+	lu:          { module: './commands/dndUpgrade', handler: 'handleLvUpCallback' },
 };

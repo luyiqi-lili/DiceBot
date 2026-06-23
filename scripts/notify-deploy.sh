@@ -9,12 +9,21 @@
 
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -f "${ROOT_DIR}/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${ROOT_DIR}/.env"
+    set +a
+fi
+
 ENV="${1:-unknown}"
 COMMIT_SHA="${2:-HEAD}"
 COMMIT_MSG="${3:-}"
 
 # Telegram 配置
-BOT_TOKEN="8445100282:AAHoInj0dea-Accx2sAk1utpZJY8f_V_aTk"
+BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-}}"
+: "${BOT_TOKEN:?BOT_TOKEN or TOKEN is required}"
 CHAT_ID="-1002970430696"
 TOPIC_ID="89"
 
