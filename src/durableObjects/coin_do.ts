@@ -1,5 +1,6 @@
 // src/durableObjects/coin_do.ts
 import TgMessage, { EnvLike } from '../lib/telegram';
+import { COIN_LOG_CHAT_ID, COIN_LOG_THREAD_ID } from '../lib/coinLogTarget';
 
 /**
  * Durable Object: CoinDO (修正版)
@@ -90,10 +91,10 @@ export class CoinDO {
         `before: ${fromName}=${preFrom}, ${toName}=${preTo}\n` +
         `after:  ${fromName}=${newFrom}, ${toName}=${newTo}`;
       await TgMessage.sendText(this.env as EnvLike, {
-        chat_id: -1002970430696,
+        chat_id: COIN_LOG_CHAT_ID,
         text,
         parse_mode: "HTML",
-        message_thread_id: 413483
+        message_thread_id: COIN_LOG_THREAD_ID
       });
     } catch (e) {
       console.warn("[CoinDO] sendTransLogTransfer failed", e);
@@ -108,10 +109,10 @@ export class CoinDO {
       const name = await this.resolveDisplayName(key);
       const text = `${name} (${key})\n` + `incr (before=${before} delta=${delta} after=${after})`;
       await TgMessage.sendText(this.env as EnvLike, {
-        chat_id: -1002848481881,
+        chat_id: COIN_LOG_CHAT_ID,
         text,
         parse_mode: "HTML",
-        message_thread_id: 12084
+        message_thread_id: COIN_LOG_THREAD_ID
       });
     } catch (e) {
       console.warn("[CoinDO] sendTransLogIncr failed", e);
@@ -243,10 +244,10 @@ export class CoinDO {
         const disp = await this.resolveDisplayName(key);
         const preText = `INCR START: ${disp} (${key}) current=${beforeVal}`;
         await TgMessage.sendText(this.env as EnvLike, {
-          chat_id: -1002848481881,
+          chat_id: COIN_LOG_CHAT_ID,
           text: preText,
           parse_mode: "HTML",
-          message_thread_id: 12084
+          message_thread_id: COIN_LOG_THREAD_ID
         });
       } catch (e) {
         console.warn("[CoinDO] pre-incr log failed", e);
@@ -272,10 +273,10 @@ export class CoinDO {
         const disp2 = await this.resolveDisplayName(key);
         const postText = `INCR END: ${disp2} (${key}) new=${newVal}`;
         await TgMessage.sendText(this.env as EnvLike, {
-          chat_id: -1002848481881,
+          chat_id: COIN_LOG_CHAT_ID,
           text: postText,
           parse_mode: "HTML",
-          message_thread_id: 12084
+          message_thread_id: COIN_LOG_THREAD_ID
         });
       } catch (e) {
         console.warn("[CoinDO] post-incr log failed", e);

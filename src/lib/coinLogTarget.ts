@@ -1,0 +1,2 @@
+export const COIN_LOG_CHAT_ID = -1002661676227;
+export const COIN_LOG_THREAD_ID = 3677;

@@ -1,5 +1,6 @@
 // lib/coinService.ts
 import TgMessage, { EnvLike } from '../lib/telegram';
+import { COIN_LOG_CHAT_ID, COIN_LOG_THREAD_ID } from './coinLogTarget';
 
 /**
  * coinService (DO-based)
@@ -87,9 +88,10 @@ export async function transfer(
     try {
       if (envOrNull) {
         TgMessage.sendText(envOrNull, {
-          chat_id: -1002848481881,
+          chat_id: COIN_LOG_CHAT_ID,
           text: `⚠️ coin transfer failed: ${String(e?.message ?? e)}\nfrom=${from} to=${to} amount=${amount}`,
-          parse_mode: "HTML"
+          parse_mode: "HTML",
+          message_thread_id: COIN_LOG_THREAD_ID
         }).catch(() => { });
       }
     } catch { /* ignore */ }
