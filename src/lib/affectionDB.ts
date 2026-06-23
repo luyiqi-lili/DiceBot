@@ -28,6 +28,14 @@ async function readAffectionMapFromKV(
   }
 }
 
+async function writeAffectionMapToKV(
+  kv: KVNamespace,
+  sourceId: number,
+  map: Record<string, { firstName: string; value: number }>
+): Promise<void> {
+  await kv.put(`affection:${sourceId}`, JSON.stringify(map));
+}
+
 async function writeMapToDB(
   db: D1Database,
   sourceId: number,
@@ -122,6 +130,62 @@ export async function writeAffectionMap(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[affectionDB] writeAffectionMap DB 写入失败', e);
+    return { ok: false, error: msg };
+  }
+}
+
+/**
+ * 原子增加某 source 对 target 的好感度。
+ */
+export async function incrementAffection(
+  db: D1Database | undefined,
+  kv: KVNamespace,
+  sourceId: number,
+  targetId: number,
+  firstName: string,
+  delta: number
+): Promise<{ ok: boolean; value?: number; error?: string }> {
+  if (!Number.isFinite(delta) || Math.floor(delta) !== delta || delta <= 0) {
+    return { ok: false, error: 'invalid delta' };
+  }
+
+  if (db) {
+    try {
+      await ensureDB(db);
+      const row = await db
+        .prepare(
+          `INSERT INTO affections (source_id, target_id, first_name, value, updated_at)
+           VALUES (?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(source_id, target_id) DO UPDATE SET
+             first_name = excluded.first_name,
+             value = affections.value + excluded.value,
+             updated_at = datetime('now')
+           RETURNING value`
+        )
+        .bind(sourceId, targetId, firstName, delta)
+        .first<{ value: number }>();
+
+      if (row) {
+        return { ok: true, value: Number(row.value || 0) };
+      }
+      return { ok: false, error: 'increment returned no row' };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[affectionDB] incrementAffection DB 写入失败', e);
+      return { ok: false, error: msg };
+    }
+  }
+
+  try {
+    const map = await readAffectionMapFromKV(kv, sourceId);
+    const key = String(targetId);
+    const next = Number(map[key]?.value || 0) + delta;
+    map[key] = { firstName, value: next };
+    await writeAffectionMapToKV(kv, sourceId, map);
+    return { ok: true, value: next };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[affectionDB] incrementAffection KV 写入失败', e);
     return { ok: false, error: msg };
   }
 }
@@ -264,6 +328,46 @@ export async function getRoseSendDate(
 }
 
 /**
+ * 原子占用用户当天的免费送花次数。
+ * 返回 true 表示本次成功占用免费次数；false 表示今天已经占用过。
+ */
+export async function claimDailyFreeRoseSend(
+  db: D1Database | undefined,
+  kv: KVNamespace,
+  userId: number,
+  date: string
+): Promise<boolean> {
+  if (db) {
+    try {
+      await ensureDB(db);
+      const row = await db
+        .prepare(
+          `INSERT INTO rose_sends (user_id, send_date, updated_at)
+           VALUES (?, ?, datetime('now'))
+           ON CONFLICT(user_id) DO UPDATE SET
+             send_date = excluded.send_date,
+             updated_at = datetime('now')
+           WHERE rose_sends.send_date != excluded.send_date
+           RETURNING user_id`
+        )
+        .bind(userId, date)
+        .first<{ user_id: number }>();
+
+      return Boolean(row);
+    } catch (e) {
+      console.error('[affectionDB] claimDailyFreeRoseSend DB 写入失败', e);
+      return false;
+    }
+  }
+
+  const sendKey = `rose_send:${userId}`;
+  const lastSendDate = await kv.get(sendKey);
+  if (lastSendDate === date) return false;
+  await kv.put(sendKey, date);
+  return true;
+}
+
+/**
  * 记录用户免费送花日期。
  * 仅写入数据库，不再回写 KV。
  */
@@ -290,7 +394,9 @@ export default {
   initAffectionTables,
   readAffectionMap,
   writeAffectionMap,
+  incrementAffection,
   getAffectionRanking,
   getRoseSendDate,
+  claimDailyFreeRoseSend,
   setRoseSendDate,
 };

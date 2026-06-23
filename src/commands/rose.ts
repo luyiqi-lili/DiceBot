@@ -19,10 +19,9 @@ import {
 
 import {
   readAffectionMap,
-  writeAffectionMap,
+  incrementAffection,
   getAffectionRanking,
-  getRoseSendDate,
-  setRoseSendDate,
+  claimDailyFreeRoseSend,
 } from "../lib/affectionDB";
 
 type RoseEnv = Env;
@@ -153,23 +152,13 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   const targetId = Number(target.id);
   const targetName = (await TgMessage.fetchChatMember(env, chatId, target.id)).first_name
 
-  // 读取当前好感地图（优先数据库，回退 KV）
-  const map = await readAffectionMap(env.DB!, env.AFFECTION_KV, fromId);
-  const key = String(targetId);
-  const rec = map[key] ?? { firstName: targetName, value: 0 };
-  let score = Number(rec.value || 0);
-
   if (isSend) {
-    // 检查今天是否已免费送花
-    const lastSendDate = await getRoseSendDate(env.DB, env.AFFECTION_KV, fromId);
     const todayUTC = nowUTCDateYMD();
+    const isFreeSend = await claimDailyFreeRoseSend(env.DB, env.AFFECTION_KV, fromId, todayUTC);
 
-    if (lastSendDate !== todayUTC) {
-      // 首次免费送花
-      score += 160;
-      map[key] = { firstName: targetName, value: score };
-      const writeResult = await writeAffectionMap(env.DB!, env.AFFECTION_KV, fromId, map);
-      if (!writeResult.ok) {
+    if (isFreeSend) {
+      const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, fromId, targetId, targetName, 160);
+      if (!incrementResult.ok) {
         await TgMessage.sendText(env, {
           chat_id: chatId,
           text: `❌ 好感度记录失败，请稍后重试。`,
@@ -179,13 +168,11 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
         });
         return;
       }
-      // 记录已送花（当天）
-      await setRoseSendDate(env.DB!, env.AFFECTION_KV, fromId, todayUTC);
 
-      const emoji = scoreToEmoji(score);
+      const emoji = scoreToEmoji(incrementResult.value || 0);
       await TgMessage.sendText(env, {
         chat_id: chatId,
-        text: `${fromName} 已向 ${targetName} 送出一朵 🌷，目前好感度为 ${emoji || String(score)}。`,
+        text: `${fromName} 已向 ${targetName} 送出一朵 🌷，目前好感度为 ${emoji || String(incrementResult.value || 0)}。`,
         parse_mode: "HTML",
         message_thread_id: threadId
       });
@@ -222,11 +209,8 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       return;
     }
 
-    // 记录好感度变化
-    score += 160;
-    map[key] = { firstName: targetName, value: score };
-    const writeResult = await writeAffectionMap(env.DB!, env.AFFECTION_KV, fromId, map);
-    if (!writeResult.ok) {
+    const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, fromId, targetId, targetName, 160);
+    if (!incrementResult.ok) {
       // coin 已扣除，但好感度写入失败：提示用户联系管理员
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -240,12 +224,12 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     // 获取新的余额显示
     const newBal = await getBalance(env.COIN_DO, String(fromId));
-    const emoji = scoreToEmoji(score);
+    const emoji = scoreToEmoji(incrementResult.value || 0);
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text:
-        `${fromName} 支付 ${amount} 💰 向 ${targetName} 额外送出了一朵 🌷，目前好感度为 ${emoji || String(score)}，` +
+        `${fromName} 支付 ${amount} 💰 向 ${targetName} 额外送出了一朵 🌷，目前好感度为 ${emoji || String(incrementResult.value || 0)}，` +
         `你当前余额 ${newBal} 💰。`,
       parse_mode: "HTML",
       message_thread_id: threadId
@@ -253,6 +237,12 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     return;
   }
+
+  // 读取当前好感地图（优先数据库，回退 KV）
+  const map = await readAffectionMap(env.DB!, env.AFFECTION_KV, fromId);
+  const key = String(targetId);
+  const rec = map[key] ?? { firstName: targetName, value: 0 };
+  const score = Number(rec.value || 0);
 
   // 非 send：查询当前好感度
   if (score < 10) {
