@@ -9,7 +9,7 @@
  */
 
 import { Env } from '../index';
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { deleteMarkup, escapeHtml } from "../lib/util";
 
 import {

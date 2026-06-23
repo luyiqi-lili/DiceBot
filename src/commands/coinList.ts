@@ -4,7 +4,7 @@
  *   从 coin.ts 中提取以减小主文件体积（1224 → ~700 行）
  */
 
-import TgMessage, { EnvLike } from "../lib/tgMessage";
+import TgMessage, { EnvLike } from '../lib/telegram';
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { ADMIN_UIDS_CHECK } from "../lib/liveConfig";
 import {

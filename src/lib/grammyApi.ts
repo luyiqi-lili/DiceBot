@@ -1,5 +1,5 @@
 import { Api } from 'grammy';
-import type { EnvLike } from './tgMessage';
+import type { EnvLike } from './telegram';
 
 export type GrammyApiLike = {
 	sendMessage(chatId: number | string, text: string, options?: Record<string, unknown>): Promise<unknown>;

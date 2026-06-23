@@ -1,5 +1,5 @@
 import type { Env } from '../index';
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { approveWishSummaryItems, createWish, isMeaningfulWish, WISH_ADMIN_UID } from '../lib/wishCore';
 import { escapeHtml } from '../lib/util';
 

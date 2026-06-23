@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 
 /**
  * 重构的 help handler

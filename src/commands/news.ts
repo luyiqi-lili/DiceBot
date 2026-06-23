@@ -1,5 +1,5 @@
 // commands/news.ts
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import {escapeHtml}  from "../lib/util";
 
 import type { Env } from '../index';

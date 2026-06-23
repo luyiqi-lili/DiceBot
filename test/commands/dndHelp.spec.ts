@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 
-import TgMessage from '../../src/lib/tgMessage';
+import TgMessage from '../../src/lib/telegram';
 import { handleDndHelp } from '../../src/commands/dndHelp';
 
 /** 构造假的 D1 DB */

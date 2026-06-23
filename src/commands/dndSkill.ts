@@ -4,7 +4,7 @@
  *   支持回复目标进行 PVP 对抗检定，bot 回复挂在目标消息上，原始 *skill 消息删除。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import { callAIChat, hasAIChatProvider } from '../lib/aiClient';
 import type { Env } from '../index';

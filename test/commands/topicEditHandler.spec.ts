@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
-import TgMessage from '../../src/lib/tgMessage';
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+import TgMessage from '../../src/lib/telegram';
 
 function makeParsed(o: any = {}): any {
 	return { type: 'topic_edited', chatId: -1002742074355, threadId: 184, from: { id: 1 }, message: { message_id: 1, chat: { id: -1002742074355 }, message_thread_id: 184, forum_topic_edited: { name: '新标题 ❤️' } }, forumTopicEdited: { name: '新标题 ❤️' }, ...o };

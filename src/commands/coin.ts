@@ -5,7 +5,7 @@
  *   支持费率计算（ease-in-out 曲线）、转账回滚等高级功能。
  */
 
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import type { Env } from "../index";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { handleCoinList } from "./coinList";

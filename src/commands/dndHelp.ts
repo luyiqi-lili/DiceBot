@@ -3,7 +3,7 @@
  * @description /dnd — DND 跑团帮助命令。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml } from '../lib/util';
 import type { Env } from '../index';
 import {

@@ -5,7 +5,7 @@
  *   只有被回复者本人可以点击按钮完成转账。
  */
 
-import TgMessage, { ParsedUpdate, EnvLike } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { deleteMarkup, escapeHtml } from '../lib/util';
 import { getBalance, transfer } from '../lib/coinService';
 

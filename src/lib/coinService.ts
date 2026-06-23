@@ -1,5 +1,5 @@
 // lib/coinService.ts
-import TgMessage, { EnvLike } from "../lib/tgMessage";
+import TgMessage, { EnvLike } from '../lib/telegram';
 
 /**
  * coinService (DO-based)

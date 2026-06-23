@@ -6,7 +6,7 @@
 
 */
 
-import TgMessage from "../lib/tgMessage";
+import TgMessage from '../lib/telegram';
 import type { Env } from "../index";
 import { getTreasury,sumAllUserBalances } from "../lib/coinService";
  

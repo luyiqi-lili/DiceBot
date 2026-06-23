@@ -1,5 +1,5 @@
 // commands/21.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 
 /**
  * 21 点游戏处理模块（重构版）

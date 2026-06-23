@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { buildLilyInlineSuggestionSystemPrompt } from "../data/lilyPersona";
 import { callAIChat } from "../lib/aiClient";
 import type { Env } from '../index';

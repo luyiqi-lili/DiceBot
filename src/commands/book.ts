@@ -1,5 +1,5 @@
 // commands/book.ts
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { deleteMarkup } from "../lib/util";
 import type { Env } from '../index';
 

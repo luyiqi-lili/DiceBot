@@ -1,5 +1,5 @@
 // commands/duel.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { escapeHtml } from "../lib/util";
 
 /**

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 
 vi.mock('../../src/lib/wishCore', () => ({
 	WISH_ADMIN_UID: 8080375150,
@@ -9,7 +9,7 @@ vi.mock('../../src/lib/wishCore', () => ({
 	approveWishSummaryItems: vi.fn().mockResolvedValue([{ id: 7, item_number: 1, title: '新增签到' }]),
 }));
 
-import TgMessage from '../../src/lib/tgMessage';
+import TgMessage from '../../src/lib/telegram';
 import { handleWish, handleWishApproval } from '../../src/commands/wish';
 import * as wishCore from '../../src/lib/wishCore';
 

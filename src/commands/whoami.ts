@@ -1,5 +1,5 @@
 // commands/whoami.ts
-import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import { escapeHtml, deleteMarkup } from "../lib/util";
 
