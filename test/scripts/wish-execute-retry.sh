@@ -12,6 +12,7 @@ CLAIM_COUNT="${TMP_DIR}/claim-count"
 CODEX_COUNT="${TMP_DIR}/codex-count"
 STATUS_LOG="${TMP_DIR}/status.json"
 STATUS_COUNT="${TMP_DIR}/status-count"
+TELEGRAM_LOG="${TMP_DIR}/telegram.json"
 
 mkdir -p "$REPO_DIR/scripts" "$BIN_DIR"
 cp "${ROOT_DIR}/scripts/wish-execute.sh" "${REPO_DIR}/scripts/wish-execute.sh"
@@ -37,7 +38,7 @@ if printf '%s\n' "$@" | grep -q '/api/wish/approved/claim'; then
 		echo "simulated claim timeout" >&2
 		exit 28
 	fi
-	printf '{"task":{"id":1,"title":"兼容命令","body":"增加中文命令","wish_ids_json":"[1]"}}\n'
+	printf '%s\n' '{"task":{"id":1,"title":"兼容命令","body":"增加中文命令","wish_ids_json":"[1]","wishers_json":"[{\"userId\":\"12345\",\"firstName\":\"Alice & Bob\"}]"}}'
 elif printf '%s\n' "$@" | grep -q '/api/wish/tasks/1/status'; then
 	count=$(cat "$WISH_STATUS_COUNT" 2>/dev/null || printf '0')
 	count=$((count + 1))
@@ -50,6 +51,16 @@ elif printf '%s\n' "$@" | grep -q '/api/wish/tasks/1/status'; then
 		if [ "$1" = "--data-binary" ]; then
 			shift
 			printf '%s' "$1" > "$WISH_STATUS_LOG"
+			break
+		fi
+		shift
+	done
+	printf '{"ok":true}\n'
+elif printf '%s\n' "$@" | grep -q 'api.telegram.org/bottest-token/sendMessage'; then
+	while [ "$#" -gt 0 ]; do
+		if [ "$1" = "-d" ]; then
+			shift
+			printf '%s' "$1" > "$WISH_TELEGRAM_LOG"
 			break
 		fi
 		shift
@@ -87,11 +98,12 @@ chmod +x "${BIN_DIR}/codex"
 	WISH_CODEX_COUNT="$CODEX_COUNT" \
 	WISH_STATUS_LOG="$STATUS_LOG" \
 	WISH_STATUS_COUNT="$STATUS_COUNT" \
+	WISH_TELEGRAM_LOG="$TELEGRAM_LOG" \
 	WISH_RETRY_DELAY="0" \
 	WISH_EXEC_RETRY_DELAY="0" \
-	BOT_TOKEN="" \
-	CHAT_ID="" \
-	TOPIC_ID="" \
+	BOT_TOKEN="test-token" \
+	CHAT_ID="-1001" \
+	TOPIC_ID="89" \
 	WISH_VERIFY_CMD="test \"\$(cat tracked.txt)\" = \"retry success\"" \
 	bash scripts/wish-execute.sh
 )
@@ -124,5 +136,16 @@ fi
 TASK_STATUS=$(jq -r '.status' "$STATUS_LOG")
 if [ "$TASK_STATUS" != "done" ]; then
 	echo "Expected successful retry to mark task done, got: ${TASK_STATUS}" >&2
+	exit 1
+fi
+
+TELEGRAM_TEXT=$(jq -r '.text' "$TELEGRAM_LOG")
+if ! printf '%s' "$TELEGRAM_TEXT" | grep -q '<a href="tg://user?id=12345">Alice &amp; Bob</a>'; then
+	echo "Expected completion notification to mention the wisher, got: ${TELEGRAM_TEXT}" >&2
+	exit 1
+fi
+
+if [ "$(jq -r '.parse_mode' "$TELEGRAM_LOG")" != "HTML" ]; then
+	echo "Expected completion notification to use HTML parse mode." >&2
 	exit 1
 fi

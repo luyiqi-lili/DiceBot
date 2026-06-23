@@ -41,18 +41,52 @@ trap cleanup_failed_changes EXIT
 
 notify_telegram() {
 	local text="$1"
+	local parse_mode="${2:-}"
 	if [ -z "${BOT_TOKEN:-}" ] || [ -z "${CHAT_ID:-}" ] || [ -z "${TOPIC_ID:-}" ]; then
 		return 0
 	fi
 
-	curl_once -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-		-H "Content-Type: application/json" \
-		-d "$(jq -n \
+	local payload
+	if [ -n "$parse_mode" ]; then
+		payload=$(jq -n \
+			--arg chat_id "$CHAT_ID" \
+			--arg text "$text" \
+			--arg parse_mode "$parse_mode" \
+			--argjson message_thread_id "$TOPIC_ID" \
+			'{chat_id: $chat_id, text: $text, parse_mode: $parse_mode, message_thread_id: $message_thread_id}')
+	else
+		payload=$(jq -n \
 			--arg chat_id "$CHAT_ID" \
 			--arg text "$text" \
 			--argjson message_thread_id "$TOPIC_ID" \
-			'{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id}')" \
+			'{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id}')
+	fi
+
+	curl_once -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+		-H "Content-Type: application/json" \
+		-d "$payload" \
 		>/dev/null || true
+}
+
+wish_mentions_html() {
+	if [ -z "${WISHERS_JSON:-}" ] || [ "$WISHERS_JSON" = "null" ]; then
+		return 0
+	fi
+
+	printf '%s' "$WISHERS_JSON" | jq -r '
+		def h: tostring
+			| gsub("&"; "&amp;")
+			| gsub("<"; "&lt;")
+			| gsub(">"; "&gt;")
+			| gsub("\""; "&quot;");
+		[
+			.[]?
+			| select(.userId != null and (.userId | tostring | length > 0))
+			| "<a href=\"tg://user?id=\(.userId | h)\">\((.firstName // ("用户" + (.userId | tostring))) | h)</a>"
+		]
+		| unique
+		| join(" ")
+	' 2>/dev/null || true
 }
 
 if has_worktree_changes; then
@@ -74,6 +108,7 @@ CLEANUP_ON_EXIT=1
 TITLE=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.title')
 BODY=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.body')
 WISH_IDS=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.wish_ids_json')
+WISHERS_JSON=$(printf '%s' "$CLAIM_JSON" | jq -c '.task.wishers_json | fromjson? // []')
 
 finish_task() {
 	local status="$1"
@@ -84,6 +119,26 @@ finish_task() {
 		-H "X-API-Key: ${EXTERNAL_API_KEY}" \
 		-H "Content-Type: application/json" \
 		--data-binary "$payload" >/dev/null
+
+	if [ "$status" = "done" ]; then
+		local mentions
+		mentions=$(wish_mentions_html)
+		if [ -n "$mentions" ]; then
+			local html
+			html=$(jq -nr \
+				--arg task_id "$TASK_ID" \
+				--arg result "$text" \
+				--arg mentions "$mentions" \
+				'def h: tostring
+					| gsub("&"; "&amp;")
+					| gsub("<"; "&lt;")
+					| gsub(">"; "&gt;");
+				"骰娘莉莉的愿望小工坊 #\($task_id | h)：\($result | h)\n\($mentions)"')
+			notify_telegram "$html" "HTML"
+			return
+		fi
+	fi
+
 	notify_telegram "骰娘莉莉的愿望小工坊 #${TASK_ID}：${text}"
 }
 

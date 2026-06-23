@@ -38,6 +38,7 @@ type Task = {
 	status: string;
 	approved_by: string | null;
 	result_text: string | null;
+	wishers_json?: string;
 	updated_at?: string;
 };
 
@@ -171,6 +172,14 @@ class MemoryWishDB {
 				if (sql.includes('SELECT * FROM wishes WHERE status = "pending"')) {
 					return { results: db.wishes.filter(w => w.status === 'pending').map(w => ({ ...w })) };
 				}
+				if (sql.includes('SELECT id, user_id, first_name FROM wishes WHERE id IN')) {
+					const ids = this.binds.map(Number);
+					return {
+						results: db.wishes
+							.filter(w => ids.includes(w.id))
+							.map(w => ({ id: w.id, user_id: w.user_id, first_name: w.first_name })),
+					};
+				}
 				if (sql.includes('SELECT * FROM wish_tasks WHERE summary_id = ?')) {
 					const [summaryId] = this.binds;
 					return { results: db.tasks.filter(t => t.summary_id === Number(summaryId)).map(t => ({ ...t })) };
@@ -250,6 +259,7 @@ describe('wishCore', () => {
 
 	it('approves tasks by summary message number, then claims one approved task', async () => {
 		const db = new MemoryWishDB();
+		await createWish(db as any, { chatId: -1001, threadId: 89, userId: 1, firstName: 'Alice', body: '加签到' });
 		await createWishSummary(db as any, {
 			messageId: 500,
 			chatId: -1001,
@@ -268,6 +278,9 @@ describe('wishCore', () => {
 
 		expect(approved.map(t => t.title)).toEqual(['每日签到奖励']);
 		expect(claimed).toMatchObject({ title: '每日签到奖励', status: 'approved' });
+		expect(JSON.parse(claimed!.wishers_json ?? '[]')).toEqual([
+			{ userId: '1', firstName: 'Alice' },
+		]);
 		expect(db.tasks[0]).toMatchObject({ status: 'done', result_text: 'pushed abc123' });
 	});
 

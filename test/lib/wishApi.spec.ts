@@ -75,6 +75,14 @@ class MemoryWishDB {
 			},
 			async all() {
 				if (sql.includes('SELECT * FROM wishes WHERE status = "pending"')) return { results: db.wishes.filter(w => w.status === 'pending').map(w => ({ ...w })) };
+				if (sql.includes('SELECT id, user_id, first_name FROM wishes WHERE id IN')) {
+					const ids = this.binds.map(Number);
+					return {
+						results: db.wishes
+							.filter(w => ids.includes(w.id))
+							.map(w => ({ id: w.id, user_id: w.user_id, first_name: w.first_name })),
+					};
+				}
 				throw new Error(`unexpected all SQL: ${sql}`);
 			},
 		};
@@ -117,9 +125,11 @@ describe('wishApi', () => {
 			method: 'POST',
 			body: JSON.stringify({ status: 'done', resultText: 'pushed abc123' }),
 		}), { DB: db } as any, '/api/wish/tasks/1/status');
+		const claimedTask = (await json(claimResp)).task;
 
 		expect(summaryResp.status).toBe(200);
-		expect((await json(claimResp)).task.title).toBe('新增签到');
+		expect(claimedTask.title).toBe('新增签到');
+		expect(JSON.parse(claimedTask.wishers_json)).toEqual([{ userId: '1', firstName: 'A' }]);
 		expect(statusResp.status).toBe(200);
 		expect(db.tasks[0]).toMatchObject({ status: 'done', result_text: 'pushed abc123' });
 	});

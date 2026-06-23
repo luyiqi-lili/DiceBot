@@ -38,6 +38,7 @@ export interface WishTaskRecord {
 	approved_by: string | null;
 	approved_at?: string | null;
 	result_text: string | null;
+	wishers_json?: string;
 	created_at?: string;
 	updated_at?: string;
 }
@@ -47,6 +48,11 @@ export interface WishSummaryItem {
 	title: string;
 	body: string;
 	wishIds: number[];
+}
+
+export interface WishMention {
+	userId: string;
+	firstName: string;
 }
 
 const MEANINGLESS_WORDS = new Set([
@@ -121,6 +127,42 @@ export async function ensureWishTables(db: D1Database): Promise<void> {
 
 function lastRowId(result: any): number {
 	return Number(result?.meta?.last_row_id ?? result?.lastRowId ?? result?.last_row_id ?? 0);
+}
+
+function parseWishIds(raw: string | null | undefined): number[] {
+	try {
+		const ids = JSON.parse(String(raw ?? '[]'));
+		if (!Array.isArray(ids)) return [];
+		return Array.from(new Set(ids.map(id => Number(id)).filter(id => Number.isInteger(id) && id > 0)));
+	} catch {
+		return [];
+	}
+}
+
+async function getWishMentionsForTask(db: D1Database, task: WishTaskRecord): Promise<WishMention[]> {
+	const wishIds = parseWishIds(task.wish_ids_json);
+	if (!wishIds.length) return [];
+
+	const placeholders = wishIds.map(() => '?').join(', ');
+	const result = await db.prepare(`
+		SELECT id, user_id, first_name FROM wishes WHERE id IN (${placeholders})
+	`).bind(...wishIds).all<Pick<WishRecord, 'id' | 'user_id' | 'first_name'>>();
+	const rows = (result.results ?? []) as Pick<WishRecord, 'id' | 'user_id' | 'first_name'>[];
+	const byId = new Map(rows.map(row => [Number(row.id), row]));
+	const seen = new Set<string>();
+	const mentions: WishMention[] = [];
+
+	for (const wishId of wishIds) {
+		const row = byId.get(wishId);
+		const userId = String(row?.user_id ?? '');
+		if (!userId || seen.has(userId)) continue;
+		seen.add(userId);
+		mentions.push({
+			userId,
+			firstName: String(row?.first_name ?? ''),
+		});
+	}
+	return mentions;
 }
 
 export async function createWish(
@@ -283,9 +325,11 @@ export async function claimApprovedWishTask(db: D1Database): Promise<WishTaskRec
 		SELECT * FROM wish_tasks WHERE status = "approved" ORDER BY approved_at ASC, id ASC LIMIT 1
 	`).first<WishTaskRecord>();
 	if (!task) return null;
+	const wishers = await getWishMentionsForTask(db, task);
 	await db.prepare(`
 		UPDATE wish_tasks SET status = "in_progress", updated_at = datetime('now') WHERE id = ?
 	`).bind(task.id).run();
+	task.wishers_json = JSON.stringify(wishers);
 	return task;
 }
 

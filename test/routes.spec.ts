@@ -19,4 +19,12 @@ describe('COMMAND_ROUTES', () => {
 			handler: 'handleAsk',
 		});
 	});
+
+	it('/wish 不删除用户原始许愿消息', () => {
+		expect(COMMAND_ROUTES.wish).toMatchObject({
+			module: './commands/wish',
+			handler: 'handleWish',
+			deleteMsg: false,
+		});
+	});
 });
