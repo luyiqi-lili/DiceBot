@@ -54,7 +54,7 @@ jobs:
               echo "::error::DEV_BOT_TOKEN secret 未配置，dev Worker 无法写入独立 bot token。"
               exit 1
             fi
-            printf '%s' "$DEV_BOT_TOKEN" | wrangler secret put TOKEN -e dev --name "$WORKER_NAME"
+            printf '%s' "$DEV_BOT_TOKEN" | wrangler secret put TOKEN --name "$WORKER_NAME"
             echo "ENV=dev" >> $GITHUB_ENV
             echo "WORKER_NAME=$WORKER_NAME" >> $GITHUB_ENV
           fi
