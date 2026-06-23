@@ -8,7 +8,7 @@
  *   callback_data 极小化（~15字节），避免超 64 字节限制。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {

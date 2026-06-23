@@ -3,7 +3,7 @@
  * @description /skills — 列出本群所有可用技能及当前角色的调整值，熟练项带 ✔ 标记。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {

@@ -10,7 +10,7 @@
  *   - /rh 隐藏掷骰（结果发私聊）
  */
 
-import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import {escapeHtml}  from "../lib/util";
 

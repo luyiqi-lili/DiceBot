@@ -1,5 +1,5 @@
 import type { Env } from '../index';
-import TgMessage, { callTelegramApi } from '../lib/tgMessage';
+import TgMessage, { callTelegramApi } from '../lib/telegram';
 
 /**
  * 分数提交请求体的类型定义

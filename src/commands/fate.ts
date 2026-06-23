@@ -6,7 +6,7 @@
  *   - 解析：回复已抽牌的消息，调用 AI 服务进行牌义解读（消耗 5 💰）
  */
 
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { MAJOR_ARCANA } from "../lib/liveConfig";
 import { buildLilyFateSystemPrompt } from "../data/lilyPersona";
 import { escapeHtml } from "../lib/util";

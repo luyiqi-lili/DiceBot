@@ -5,7 +5,7 @@
  *   超级管理员 (8080375150) 天然拥有所有 GM 权限。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {

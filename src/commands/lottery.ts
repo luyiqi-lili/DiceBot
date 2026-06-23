@@ -6,7 +6,7 @@
  *   开奖匹配精确号码（50%）和前两位（30%），剩余累积到下一期。
  */
 
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { Env } from '../index';
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { LOTTERY_ADMIN_UIDS } from "../lib/liveConfig";

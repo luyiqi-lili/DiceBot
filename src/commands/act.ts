@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml } from "../lib/util";
 
 /**

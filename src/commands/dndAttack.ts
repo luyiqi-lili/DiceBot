@@ -4,7 +4,7 @@
  *   武器熟练 → D20，否则 D10。防御方 D20+主属性对抗。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {

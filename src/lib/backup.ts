@@ -9,7 +9,7 @@
  */
 
 import { backupConfig, deleteUids } from './liveConfig';
-import TgMessage, { ParsedUpdate, EnvLike } from './tgMessage';
+import TgMessage, { ParsedUpdate, EnvLike } from './telegram';
  
 // 备份配置类型定义（如果 liveConfig 中已有可不重复定义）
 export type BackupTarget = { chat_id: number; threadId?: number };

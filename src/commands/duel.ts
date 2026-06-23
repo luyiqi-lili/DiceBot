@@ -1,5 +1,5 @@
 // commands/duel.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { escapeHtml } from "../lib/util";
 
 /**
@@ -91,7 +91,7 @@ export async function handleDuel(parsed: ParsedUpdate, env: EnvLike) {
     return;
   }
 
-  if (targetId === env.BOT_USERNAME) {
+  if (targetUser.is_bot) {
     await TgMessage.sendText(env, {
       chat_id,
       text: "你不能与机器人决斗！",

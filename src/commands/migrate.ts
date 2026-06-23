@@ -1,5 +1,5 @@
 // commands/migrate.ts
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 
 type Env = {
     TOKEN: string;

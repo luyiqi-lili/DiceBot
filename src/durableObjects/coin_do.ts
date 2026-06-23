@@ -1,5 +1,5 @@
 // src/durableObjects/coin_do.ts
-import TgMessage, { EnvLike } from "../lib/tgMessage";
+import TgMessage, { EnvLike } from '../lib/telegram';
 
 /**
  * Durable Object: CoinDO (修正版)

@@ -30,7 +30,7 @@ export const mockCoinService = {
 	TREASURY_KEY: '__treasury__',
 };
 
-/** extractCmdContext 纯函数实现 — 保持与 src/lib/tgMessage 一致 */
+/** extractCmdContext 纯函数实现 — 保持与 src/lib/telegram 一致 */
 export function mockExtractCmdContext(parsed: any) {
 	return {
 		chatId: parsed.chatId ?? parsed.message?.chat?.id ?? 0,

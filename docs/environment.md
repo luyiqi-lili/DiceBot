@@ -21,7 +21,7 @@ Chinese translation: [zh-CN/environment.md](zh-CN/environment.md)
 
 | Env | Worker name | Bot username | D1 | Cron |
 |-----|-------------|--------------|----|------|
-| `dev` | `telegram-bot-dev` | `lili_DevDiceBot` | not bound in config | none active |
+| `dev` | `telegram-bot-dev` | `lili_DevDiceBot` | `DB` -> `dicebot-dev-db` | none active |
 | `prod` | `telegram-bot` | `lili_DiceBot` | `DB` -> `dicebot-db` | `59 * * * *` |
 
 The `Env` TypeScript type lives in `src/index.ts`.

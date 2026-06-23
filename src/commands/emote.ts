@@ -1,5 +1,5 @@
 // commands/emote.ts
-import type { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import type { ParsedUpdate, EnvLike } from '../lib/telegram';
 import { fetchChatMemberWithGrammy, GrammyApiLike, sendTextWithGrammy } from "../lib/grammyApi";
 import { deleteMarkup } from "../lib/util";
 

@@ -5,7 +5,8 @@
  *   同时导出 DurableObject 类以供 wrangler 绑定。
  */
 
-import TgMessage from './lib/tgMessage';
+import { Bot, webhookCallback, type Context } from 'grammy';
+import TgMessage, { parsedUpdateFromContext, type ParsedUpdate } from './lib/telegram';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from './commands/like';
 import { runCoinCheck } from './cron/cron';
@@ -175,6 +176,195 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 	}
 }
 
+async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: ExecutionContext): Promise<void> {
+	const parsedMessage = parsedUpdateFromContext(botCtx, env.BOT_USERNAME);
+
+	if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
+		console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
+		return;
+	}
+
+	console.log('index:parsedMessage.type', parsedMessage.type);
+
+	switch (parsedMessage.type) {
+		case 'inline_query': {
+			console.log('index: 检测到 inline_query，进入 AI 辅助逻辑');
+			try {
+				const { handleInlineAI } = await import('./commands/aiAssistInline');
+				await handleInlineAI(parsedMessage, env);
+			} catch (e) {
+				console.error('❌ handleInlineAI 失败', e);
+			}
+			return;
+		}
+
+		case 'topic_edited': {
+			console.log('index: 检测到 topic_edited');
+			try {
+				const { handleTopicEdited } = await import('./commands/topicEditHandler');
+				await handleTopicEdited(parsedMessage, env);
+			} catch (e) {
+				console.error('❌ handleTopicEdited 失败', e);
+			}
+			return;
+		}
+
+		case 'callback_query': {
+			const callbackQuery = parsedMessage.callbackQuery;
+			const callbackData = parsedMessage.callbackData;
+			console.log('index: callbackData', typeof callbackData, callbackData);
+
+			if (callbackQuery.game_short_name) {
+				const game = callbackQuery.game_short_name;
+				console.log('index: game_short_name', game);
+				if (game === 'hello') {
+					const userId = callbackQuery.from.id;
+					const userName = callbackQuery.from.first_name || 'User';
+					const authTs = Math.floor(Date.now() / 1000);
+					const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/hello');
+					gameUrl.searchParams.set('user_id', userId.toString());
+					gameUrl.searchParams.set('auth_ts', authTs.toString());
+					gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'hello', issuedAt: authTs }));
+					gameUrl.searchParams.set('username', encodeURIComponent(userName));
+					gameUrl.searchParams.set('user_last_name', encodeURIComponent(callbackQuery.from.last_name || ''));
+					gameUrl.searchParams.set('user_username', callbackQuery.from.username || '');
+					gameUrl.searchParams.set('start_param', callbackQuery.start_param);
+					gameUrl.searchParams.set('chat_id', parsedMessage.chatId?.toString() || '');
+					gameUrl.searchParams.set('message_id', callbackQuery.message?.message_id?.toString() || '');
+					gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id || '');
+					await botCtx.api.answerCallbackQuery(callbackQuery.id, { url: gameUrl.toString() });
+					return;
+				}
+				if (game === 'fish') {
+					const userId = callbackQuery.from.id;
+					const userName = callbackQuery.from.first_name || 'User';
+					const authTs = Math.floor(Date.now() / 1000);
+					const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/fish');
+					gameUrl.searchParams.set('user_id', userId.toString());
+					gameUrl.searchParams.set('auth_ts', authTs.toString());
+					gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'fish', issuedAt: authTs }));
+					gameUrl.searchParams.set('username', encodeURIComponent(userName));
+					if (callbackQuery.inline_message_id) {
+						gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id);
+					}
+					await botCtx.api.answerCallbackQuery(callbackQuery.id, { url: gameUrl.toString() });
+					return;
+				}
+			}
+
+			if (typeof callbackData === 'object' && callbackData.type) {
+				const cbType = callbackData.type;
+				console.log('index: callbackData.type', cbType);
+
+				if (cbType === 'delete_message') {
+					await botCtx.api.deleteMessage(callbackQuery.message.chat.id, callbackQuery.message.message_id);
+					await botCtx.api.answerCallbackQuery(callbackQuery.id, { text: '消息已删除', show_alert: true });
+					return;
+				}
+
+				const handler = await loadCallback(cbType);
+				if (handler) {
+					console.log(`➡️ 处理 ${cbType} 回调`);
+					await handler(parsedMessage.callbackQuery, callbackData, env);
+					return;
+				}
+
+				console.log('ℹ️ 未知 callback type，忽略', callbackData);
+			}
+			return;
+		}
+
+		case 'message': {
+			console.log('main:isCommand', parsedMessage.isCommand);
+			if (parsedMessage.isCommand) {
+				console.log('main:command', parsedMessage.command);
+				executionCtx.waitUntil(incrementUsageCount(parsedMessage, env));
+
+				const cmd = parsedMessage.command;
+				if (cmd) {
+					const handler = await loadCommand(cmd);
+					if (handler) {
+						console.log(`index: 检测到 /${cmd} 命令`);
+						await handler(parsedMessage, env);
+						const route = COMMAND_ROUTES[cmd];
+						if (!route || route.deleteMsg !== false) {
+							executionCtx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
+						}
+						console.log(`index: /${cmd} 处理完成`);
+						return;
+					}
+
+					console.log('index: 未知命令，发送默认帮助提示');
+					const { handleDefaultHelp } = await import('./commands/help');
+					await handleDefaultHelp(parsedMessage, env);
+					return;
+				}
+			} else {
+				const { handleWishApproval } = await import('./commands/wish');
+				const wishHandled = await handleWishApproval(parsedMessage, env);
+				if (wishHandled) return;
+
+				const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
+				if (rawText.startsWith('*') && !rawText.startsWith('**')) {
+					const starName = rawText.slice(1).trim();
+					if (starName) {
+						const chatId = parsedMessage.chatId!;
+						const threadId = parsedMessage.threadId;
+						const userId = String(parsedMessage.from?.id ?? '');
+						const opts: any = {};
+						if (parsedMessage.isReply && parsedMessage.replyToMessage?.from && !parsedMessage.replyToMessage.from.is_bot) {
+							opts.replyToMessageId = parsedMessage.replyToMessage.message_id;
+							opts.targetUserId = String(parsedMessage.replyToMessage.from.id);
+							opts.targetName = parsedMessage.replyToMessage.from.first_name || opts.targetUserId;
+						}
+						opts.deleteMsgId = parsedMessage.message?.message_id;
+
+						const { getEquippedWeapon } = await import('./lib/itemCore');
+						const weapon = await getEquippedWeapon(env, String(chatId), userId);
+						if (weapon && weapon.damage && (weapon.name === starName || starName === '攻击' || starName === '')) {
+							const { performAttack } = await import('./commands/dndAttack');
+							await performAttack(env, chatId, threadId, userId, starName, opts);
+						} else {
+							const starSkill = env.DB ? await env.DB.prepare(
+								`SELECT damage, mana_cost FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
+							).bind(String(chatId), starName).first<{ damage: string; mana_cost: number }>() : null;
+							if (starSkill && (starSkill.damage || starSkill.mana_cost > 0)) {
+								const { performCast } = await import('./commands/dndCast');
+								await performCast(env, chatId, threadId, userId, starName, opts);
+							} else {
+								const { performSkillCheck } = await import('./commands/dndSkill');
+								await performSkillCheck(env, chatId, threadId, userId, starName, opts);
+							}
+						}
+					}
+				}
+				await handleBackup(parsedMessage, env);
+			}
+		}
+	}
+}
+
+function createTelegramBot(env: Env, executionCtx: ExecutionContext): Bot {
+	const botId = Number(String(env.TOKEN).split(':')[0]) || 0;
+	const bot = new Bot(env.TOKEN, {
+		botInfo: {
+			id: botId,
+			is_bot: true,
+			first_name: env.BOT_USERNAME || 'Bot',
+			username: env.BOT_USERNAME || 'Bot',
+			can_join_groups: true,
+			can_read_all_group_messages: false,
+			supports_inline_queries: true,
+			can_connect_to_business: false,
+			has_main_web_app: false,
+		} as any,
+	});
+	bot.use(async (ctx) => {
+		await handleTelegramContext(ctx, env, executionCtx);
+	});
+	return bot;
+}
+
 /** Worker 入口：Cron Trigger + HTTP Fetch */
 export default {
 	async scheduled(controller, env, ctx) {
@@ -202,10 +392,7 @@ export default {
 			return new Response('Forbidden', { status: 403 });
 		}
 
-		console.log('index: 收到请求', {
-			method: request.method,
-			url: request.url,
-		});
+		console.log('index: 收到请求', { method: request.method, url: request.url });
 
 		// 2. 非 POST 存活检查
 		if (request.method !== 'POST') {
@@ -213,200 +400,12 @@ export default {
 			return new Response('I am alive', { status: 200 });
 		}
 
-		// 3. 解析请求
-		let parsedMessage;
 		try {
-			parsedMessage = TgMessage.parseUpdate(await request.json(), env.BOT_USERNAME);
-			console.log('index: 解析请求 JSON 成功');
+			const bot = createTelegramBot(env, ctx);
+			return await webhookCallback(bot, 'cloudflare-mod')(request);
 		} catch (e) {
 			console.error('index: 无法解析 JSON', e);
 			return new Response('Bad Request', { status: 400 });
 		}
-
-		// 4. 白名单群组检查
-		if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
-			console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
-			return new Response('OK', { status: 200 });
-		}
-
-		// 5. 事件分发
-		console.log('index:parsedMessage.type', parsedMessage.type);
-
-		switch (parsedMessage.type) {
-			// inline_query
-			case 'inline_query': {
-				console.log('index: 检测到 inline_query，进入 AI 辅助逻辑');
-				try {
-					const { handleInlineAI } = await import('./commands/aiAssistInline');
-					await handleInlineAI(parsedMessage, env);
-				} catch (e) {
-					console.error('❌ handleInlineAI 失败', e);
-				}
-				return new Response('OK', { status: 200 });
-			}
-
-			// topic_edited
-			case 'topic_edited': {
-				console.log('index: 检测到 topic_edited');
-				try {
-					const { handleTopicEdited } = await import('./commands/topicEditHandler');
-					const editResponse = await handleTopicEdited(parsedMessage, env);
-					if (editResponse) return editResponse;
-				} catch (e) {
-					console.error('❌ handleTopicEdited 失败', e);
-				}
-				return new Response('OK', { status: 200 });
-			}
-
-			// callback_query
-			case 'callback_query': {
-				const callbackQuery = parsedMessage.callbackQuery;
-				const callbackData = parsedMessage.callbackData;
-				console.log('index: callbackData', typeof callbackData, callbackData);
-
-				// game_short_name 游戏启动（hello / fish 网页游戏）
-				if (callbackQuery.game_short_name) {
-					const game = callbackQuery.game_short_name;
-					console.log('index: game_short_name', game);
-					if (game === 'hello') {
-						const userId = callbackQuery.from.id;
-						const userName = callbackQuery.from.first_name || 'User';
-						const authTs = Math.floor(Date.now() / 1000);
-						const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/hello');
-						gameUrl.searchParams.set('user_id', userId.toString());
-						gameUrl.searchParams.set('auth_ts', authTs.toString());
-						gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'hello', issuedAt: authTs }));
-						gameUrl.searchParams.set('username', encodeURIComponent(userName));
-						gameUrl.searchParams.set('user_last_name', encodeURIComponent(callbackQuery.from.last_name || ''));
-						gameUrl.searchParams.set('user_username', callbackQuery.from.username || '');
-						gameUrl.searchParams.set('start_param', callbackQuery.start_param);
-						gameUrl.searchParams.set('chat_id', parsedMessage.chatId?.toString() || '');
-						gameUrl.searchParams.set('message_id', callbackQuery.message?.message_id?.toString() || '');
-						gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id || '');
-						await fetch(`https://api.telegram.org/bot${env.TOKEN}/answerCallbackQuery`, {
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({ callback_query_id: callbackQuery.id, url: gameUrl.toString() }),
-						});
-						return new Response('ok');
-					}
-					if (game === 'fish') {
-						const userId = callbackQuery.from.id;
-						const userName = callbackQuery.from.first_name || 'User';
-						const authTs = Math.floor(Date.now() / 1000);
-						const gameUrl = new URL('https://telegram-bot.luyiqi-lili.workers.dev/web/fish');
-						gameUrl.searchParams.set('user_id', userId.toString());
-						gameUrl.searchParams.set('auth_ts', authTs.toString());
-						gameUrl.searchParams.set('auth', await createWebGameAuth(env, { userId: userId.toString(), game: 'fish', issuedAt: authTs }));
-						gameUrl.searchParams.set('username', encodeURIComponent(userName));
-						if (callbackQuery.inline_message_id) {
-							gameUrl.searchParams.set('inline_message_id', callbackQuery.inline_message_id);
-						}
-						await TgMessage.answerCallbackQuery(env, callbackQuery.id, { url: gameUrl.toString() });
-						return new Response('ok');
-					}
-				}
-
-				// JSON 格式 callback — 静态 import 分发
-				if (typeof callbackData === 'object' && callbackData.type) {
-					const cbType = callbackData.type;
-					console.log('index: callbackData.type', cbType);
-
-					// delete_message 内联
-					if (cbType === 'delete_message') {
-						await TgMessage.deleteMessage(env, callbackQuery.message.chat.id, callbackQuery.message.message_id);
-						await TgMessage.answerCallbackQuery(env, callbackQuery.id, { text: '消息已删除', show_alert: true });
-						return new Response('OK', { status: 200 });
-					}
-
-					const handler = await loadCallback(cbType);
-					if (handler) {
-						console.log(`➡️ 处理 ${cbType} 回调`);
-						await handler(parsedMessage.callbackQuery, callbackData, env);
-						return new Response('OK', { status: 200 });
-					}
-
-					console.log('ℹ️ 未知 callback type，忽略', callbackData);
-					return new Response('OK', { status: 200 });
-				}
-			}
-
-			// message
-			case 'message': {
-				console.log('main:isCommand', parsedMessage.isCommand);
-				if (parsedMessage.isCommand) {
-					console.log('main:command', parsedMessage.command);
-					ctx.waitUntil(incrementUsageCount(parsedMessage, env));
-
-					const cmd = parsedMessage.command;
-					if (cmd) {
-						const handler = await loadCommand(cmd);
-						if (handler) {
-							console.log(`index: 检测到 /${cmd} 命令`);
-							await handler(parsedMessage, env);
-							const route = COMMAND_ROUTES[cmd];
-							if (!route || route.deleteMsg !== false) {
-								ctx.waitUntil(TgMessage.deleteMessageWithDelay(env, parsedMessage.message.chat.id, parsedMessage.message.message_id));
-							}
-							console.log(`index: /${cmd} 处理完成`);
-							return new Response('OK', { status: 200 });
-						}
-
-						// 未知命令 → 默认帮助
-						console.log('index: 未知命令，发送默认帮助提示');
-						const { handleDefaultHelp } = await import('./commands/help');
-						await handleDefaultHelp(parsedMessage, env);
-						return new Response('OK', { status: 200 });
-					}
-				} else {
-					const { handleWishApproval } = await import('./commands/wish');
-					const wishHandled = await handleWishApproval(parsedMessage, env);
-					if (wishHandled) {
-						return new Response('OK', { status: 200 });
-					}
-
-					// *技能名 / *武器名 → 优先武器，降级技能
-					const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
-					if (rawText.startsWith('*') && !rawText.startsWith('**')) {
-						const starName = rawText.slice(1).trim();
-						if (starName) {
-							const chatId = parsedMessage.chatId!;
-							const threadId = parsedMessage.threadId;
-							const userId = String(parsedMessage.from?.id ?? '');
-							const opts: any = {};
-							if (parsedMessage.isReply && parsedMessage.replyToMessage?.from && !parsedMessage.replyToMessage.from.is_bot) {
-								opts.replyToMessageId = parsedMessage.replyToMessage.message_id;
-								opts.targetUserId = String(parsedMessage.replyToMessage.from.id);
-								opts.targetName = parsedMessage.replyToMessage.from.first_name || opts.targetUserId;
-							}
-							opts.deleteMsgId = parsedMessage.message?.message_id;
-
-							// 优先级: 武器 > 魔法 > 技能
-							const { getEquippedWeapon } = await import('./lib/itemCore');
-							const weapon = await getEquippedWeapon(env, String(chatId), userId);
-							if (weapon && weapon.damage && (weapon.name === starName || starName === '攻击' || starName === '')) {
-								const { performAttack } = await import('./commands/dndAttack');
-								await performAttack(env, chatId, threadId, userId, starName, opts);
-							} else {
-								// 检查是否是有 damage/mana 的魔法
-								const starSkill = env.DB ? await env.DB.prepare(
-									`SELECT damage, mana_cost FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
-								).bind(String(chatId), starName).first<{ damage: string; mana_cost: number }>() : null;
-								if (starSkill && (starSkill.damage || starSkill.mana_cost > 0)) {
-									const { performCast } = await import('./commands/dndCast');
-									await performCast(env, chatId, threadId, userId, starName, opts);
-								} else {
-									const { performSkillCheck } = await import('./commands/dndSkill');
-									await performSkillCheck(env, chatId, threadId, userId, starName, opts);
-								}
-							}
-						}
-					}
-					await handleBackup(parsedMessage, env);
-				}
-			}
-		}
-
-		return new Response('OK', { status: 200 });
 	},
 } satisfies ExportedHandler<Env>;

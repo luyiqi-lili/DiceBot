@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 vi.mock('../../src/lib/coinService', () => import('../helpers/mocks').then(m => m.mockCoinService));
-import TgMessage from '../../src/lib/tgMessage';
+import TgMessage from '../../src/lib/telegram';
 import * as coinService from '../../src/lib/coinService';
 import { handleFish } from '../../src/commands/fish';
 import { FISH_ADD_COST, FISH_CATALOG_KEY } from '../../src/lib/fishCatalog';

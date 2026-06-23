@@ -1,5 +1,5 @@
 // commands/groll.ts
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 
 /**
  * Group roll (groll) 重构版

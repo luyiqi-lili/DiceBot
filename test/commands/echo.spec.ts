@@ -4,9 +4,9 @@ const aiClient = vi.hoisted(() => ({
 	callAIChat: vi.fn(),
 }));
 
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 vi.mock('../../src/lib/aiClient', () => aiClient);
-import TgMessage from '../../src/lib/tgMessage';
+import TgMessage from '../../src/lib/telegram';
 
 function makeMsg(o: any = {}): any {
 	return { type: 'message', chatId: -100999, from: { id: 1, first_name: 'Echo' }, isCommand: true, command: 'echo', args: ['今天天气不错'], message: { message_id: 1, chat: { id: -100999 } }, ...o };

@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, EnvLike } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike } from '../lib/telegram';
 
 // 规则类型定义
 export interface GroupRule {

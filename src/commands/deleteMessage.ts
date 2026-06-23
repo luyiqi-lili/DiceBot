@@ -6,17 +6,13 @@
  */
 
 import type { Env } from "../index";
+import Telegram from "../lib/telegram";
 
 /** 处理 delete_message 回调查看 → 删除 Telegram 消息并 answerCallbackQuery */
 export async function handleDeleteMessage(cq: any, env: Env) {
   const chatId = cq.message.chat.id;
   const messageId = cq.message.message_id;
-  // 调用 deleteMessage API
-  await fetch(`https://api.telegram.org/bot${env.TOKEN}/deleteMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, message_id: messageId })
-  });
+  await Telegram.deleteMessage(env, chatId, messageId);
   // 返回 answerCallbackQuery，移除按钮加载状态并提示
   return {
     method: "answerCallbackQuery",

@@ -5,7 +5,7 @@
  *   使用 AI 服务进行翻译。
  *   支持自定义目标语言，默认为简体中文。
  */
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { buildLilyTranslationSystemPrompt } from '../data/lilyPersona';
 import { escapeHtml } from '../lib/util';
 import { callAIChat } from '../lib/aiClient';

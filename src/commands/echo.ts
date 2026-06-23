@@ -1,4 +1,4 @@
-import TgMessage, { ParsedUpdate, extractCmdContext } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/telegram';
 import { attitudeResponses } from "../lib/liveConfig";
 import { callAIChat } from "../lib/aiClient";
 import {escapeHtml}  from "../lib/util";

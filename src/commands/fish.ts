@@ -1,5 +1,5 @@
 import { Env } from '../index';
-import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate, extractCmdContext } from '../lib/telegram';
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from '../lib/coinService';
 import { getCastDesc } from '../lib/liveConfig';
 import {

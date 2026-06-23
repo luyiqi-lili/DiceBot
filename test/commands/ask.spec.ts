@@ -4,10 +4,10 @@ const aiClient = vi.hoisted(() => ({
 	callAIChat: vi.fn(),
 }));
 
-vi.mock('../../src/lib/tgMessage', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
+vi.mock('../../src/lib/telegram', () => import('../helpers/mocks').then(m => m.mockTgMessageModule));
 vi.mock('../../src/lib/aiClient', () => aiClient);
 
-import TgMessage from '../../src/lib/tgMessage';
+import TgMessage from '../../src/lib/telegram';
 import { handleAsk } from '../../src/commands/ask';
 
 function makeMsg(o: any = {}): any {

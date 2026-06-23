@@ -24,8 +24,8 @@ COMMIT_MSG="${3:-}"
 # Telegram 配置
 BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-}}"
 : "${BOT_TOKEN:?BOT_TOKEN or TOKEN is required}"
-CHAT_ID="-1002970430696"
-TOPIC_ID="89"
+CHAT_ID="${CHAT_ID:--1002970430696}"
+TOPIC_ID="${TOPIC_ID:-89}"
 
 # CI 环境中自动获取 git 信息
 if [ -n "${GITHUB_SHA:-}" ]; then

@@ -33,19 +33,55 @@ jobs:
         run: wrangler whoami
   
       - name: 部署到 Workers
+        env:
+          DEV_BOT_TOKEN: ${{ secrets.DEV_BOT_TOKEN }}
         run: |
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             wrangler deploy -e prod
             echo "ENV=prod" >> $GITHUB_ENV
+            echo "WORKER_NAME=telegram-bot" >> $GITHUB_ENV
           else
-            wrangler deploy -e dev
+            BRANCH_SLUG="$(printf '%s' "${GITHUB_REF_NAME}" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g' \
+              | cut -c1-40)"
+            if [ -z "$BRANCH_SLUG" ]; then
+              BRANCH_SLUG="branch-${GITHUB_SHA::7}"
+            fi
+            WORKER_NAME="telegram-bot-dev-${BRANCH_SLUG}"
+            wrangler deploy -e dev --name "$WORKER_NAME"
+            if [ -z "${DEV_BOT_TOKEN:-}" ]; then
+              echo "::error::DEV_BOT_TOKEN secret 未配置，dev Worker 无法写入独立 bot token。"
+              exit 1
+            fi
+            printf '%s' "$DEV_BOT_TOKEN" | wrangler secret put TOKEN --name "$WORKER_NAME"
+            WORKER_URL="https://${WORKER_NAME}.luyiqi-lili.workers.dev"
+            curl -fsS -X POST "https://api.telegram.org/bot${DEV_BOT_TOKEN}/setWebhook" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg url "$WORKER_URL" '{url: $url, drop_pending_updates: false}')" \
+              > /dev/null
             echo "ENV=dev" >> $GITHUB_ENV
+            echo "WORKER_NAME=$WORKER_NAME" >> $GITHUB_ENV
           fi
 
       - name: 发送部署通知到 Telegram
         if: success()
+        env:
+          DEV_BOT_TOKEN: ${{ secrets.DEV_BOT_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
         run: |
+          if [ "${ENV:-}" = "dev" ]; then
+            BOT_TOKEN="${DEV_BOT_TOKEN:-}"
+            CHAT_ID="-1002661676227"
+            TOPIC_ID="2"
+            export BOT_TOKEN CHAT_ID TOPIC_ID
+          fi
+          if [ -z "${BOT_TOKEN:-${TOKEN:-}}" ]; then
+            echo "跳过 Telegram 部署通知：BOT_TOKEN/TOKEN secret 未配置。"
+            exit 0
+          fi
           bash scripts/notify-deploy.sh \
-            "${{ env.ENV }}" \
+            "${ENV:-unknown}" \
             "${{ github.sha }}" \
             "${{ github.event.head_commit.message }}"

@@ -1,5 +1,5 @@
 // commands/topicEditHandler.ts
-import TgMessage, { ParsedUpdate } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import type { Env } from '../index';
 import {escapeHtml}  from "../lib/util";
 

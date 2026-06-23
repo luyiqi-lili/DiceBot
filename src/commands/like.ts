@@ -5,7 +5,7 @@
  *   同时导出 incrementUsageCount 供 index.ts 在每次用户交互时自增计数。
  */
 
-import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from "../lib/tgMessage";
+import TgMessage, { ParsedUpdate, EnvLike, extractCmdContext } from '../lib/telegram';
 import type { Env } from "../index";
 import { likeTextMapFriend } from "../lib/liveConfig";
 import { escapeHtml } from "../lib/util";

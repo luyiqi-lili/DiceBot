@@ -3,7 +3,7 @@
  * @description /ask 命令。回复一条文本消息时，让莉莉用 AI 评论内容真假和合理性。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { buildLilyAskSystemPrompt } from '../data/lilyPersona';
 import { callAIChat } from '../lib/aiClient';
 import { escapeHtml } from '../lib/util';

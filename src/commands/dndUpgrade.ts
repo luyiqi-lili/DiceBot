@@ -3,7 +3,7 @@
  * @description /lvup — 升级系统：消耗 XP 升一级，获得一次属性+1/学技能选择权。
  */
 
-import TgMessage, { ParsedUpdate } from '../lib/tgMessage';
+import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
 import type { Env } from '../index';
 import {

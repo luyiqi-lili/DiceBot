@@ -4,7 +4,7 @@
  *   将 index.ts 中的巨型 switch-case 重构为数据驱动的路由表，
  *   新增命令时只需在此文件中添加一行配置，index.ts 无需改动。
  *
- *   命令名称来自 tgMessage.ts parseCommandFromText 的解析结果（不含斜线）。
+ *   命令名称来自 grammY Context 兼容层的命令解析结果（不含斜线）。
  *   同义命令通过多个 key 指向同一个 route 实现。
  */
 
