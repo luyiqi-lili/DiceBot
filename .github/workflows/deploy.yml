@@ -37,9 +37,19 @@ jobs:
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             wrangler deploy -e prod
             echo "ENV=prod" >> $GITHUB_ENV
+            echo "WORKER_NAME=telegram-bot" >> $GITHUB_ENV
           else
-            wrangler deploy -e dev
+            BRANCH_SLUG="$(printf '%s' "${GITHUB_REF_NAME}" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//; s/-+/-/g' \
+              | cut -c1-40)"
+            if [ -z "$BRANCH_SLUG" ]; then
+              BRANCH_SLUG="branch-${GITHUB_SHA::7}"
+            fi
+            WORKER_NAME="telegram-bot-dev-${BRANCH_SLUG}"
+            wrangler deploy -e dev --name "$WORKER_NAME"
             echo "ENV=dev" >> $GITHUB_ENV
+            echo "WORKER_NAME=$WORKER_NAME" >> $GITHUB_ENV
           fi
 
       - name: 发送部署通知到 Telegram
