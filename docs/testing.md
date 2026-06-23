@@ -17,6 +17,8 @@ test/
 
 ## Unit Tests
 
+Use Node.js 22 or newer for local commands that invoke Wrangler. CI currently runs on Node.js 24.x.
+
 Run all unit tests:
 
 ```bash
@@ -52,6 +54,7 @@ Shell tests live in `test/scripts/`:
 
 - `test/scripts/wish-digest-format.sh`
 - `test/scripts/wish-execute-cleanup.sh`
+- `test/scripts/wish-execute-retry.sh`
 
 They validate local wish automation formatting and cleanup behavior.
 
@@ -63,13 +66,7 @@ Run:
 npx tsc --noEmit
 ```
 
-Current known failures are in existing production files:
-
-- `src/commands/act.ts`
-- `src/commands/dndAttack.ts`
-- `src/lib/coinService.ts`
-
-These are not documentation failures, but they block claiming the project type-checks cleanly.
+The current codebase is expected to pass this check.
 
 ## Dependency Audit
 
@@ -79,7 +76,7 @@ Run:
 npm audit --audit-level=low
 ```
 
-Current audit status includes vulnerabilities in the toolchain/dependency graph. Review `npm audit` output before release work involving dependency updates.
+The current dependency graph is expected to pass this check.
 
 ## Documentation Verification
 

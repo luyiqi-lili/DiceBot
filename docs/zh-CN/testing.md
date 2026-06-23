@@ -17,6 +17,8 @@ test/
 
 ## 单元测试
 
+本地执行会调用 Wrangler 的命令时，请使用 Node.js 22 或更新版本。CI 当前使用 Node.js 24.x。
+
 运行全部单元测试：
 
 ```bash
@@ -48,6 +50,7 @@ E2E 会调用真实外部 API，应显式运行。
 
 - `test/scripts/wish-digest-format.sh`
 - `test/scripts/wish-execute-cleanup.sh`
+- `test/scripts/wish-execute-retry.sh`
 
 用于验证本地 wish 自动化格式和清理行为。
 
@@ -57,13 +60,7 @@ E2E 会调用真实外部 API，应显式运行。
 npx tsc --noEmit
 ```
 
-当前既有失败位于：
-
-- `src/commands/act.ts`
-- `src/commands/dndAttack.ts`
-- `src/lib/coinService.ts`
-
-这些不是文档失败，但会阻止声明项目类型检查干净。
+当前代码库预期通过该检查。
 
 ## 依赖审计
 
@@ -71,7 +68,7 @@ npx tsc --noEmit
 npm audit --audit-level=low
 ```
 
-当前依赖图仍存在漏洞。涉及依赖升级或发布前应查看 `npm audit` 输出。
+当前依赖图预期通过该检查。
 
 ## 文档验证
 

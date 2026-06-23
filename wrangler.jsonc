@@ -10,7 +10,6 @@
 	],
 	"env": {
 		"dev": {
-			"$schema": "node_modules/wrangler/config-schema.json",
 			"name": "telegram-bot-dev",
 			"main": "src/index.ts",
 			"compatibility_date": "2025-06-28",
@@ -95,7 +94,6 @@
 			}
 		},
 		"prod": {
-			"$schema": "node_modules/wrangler/config-schema.json",
 			"name": "telegram-bot",
 			"main": "src/index.ts",
 			"compatibility_date": "2025-06-28",

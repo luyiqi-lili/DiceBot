@@ -13,8 +13,8 @@ This README is the entry point. Detailed manuals live in `docs/`.
 - Command dispatch: static `import()` switch in `src/index.ts`.
 - Route metadata: `src/routes.ts`, mainly for `deleteMsg`.
 - Unit tests: `npm test -- --run`.
-- Type check: `npx tsc --noEmit` currently fails in existing production files.
-- Dependency audit: `npm audit --audit-level=low` currently reports vulnerabilities.
+- Type check: `npx tsc --noEmit`.
+- Dependency audit: `npm audit --audit-level=low`.
 
 Known operational risks:
 
@@ -109,6 +109,8 @@ Install dependencies:
 ```bash
 npm install
 ```
+
+Use Node.js 22 or newer. CI currently runs on Node.js 24.x.
 
 Generate Worker types when bindings change:
 

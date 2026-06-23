@@ -11,8 +11,8 @@ DiceBot 是运行在 Cloudflare Workers 上的 Telegram 群组机器人，提供
 - 命令分发：`src/index.ts` 中的静态 `import()` switch。
 - 路由元数据：`src/routes.ts`，主要用于 `deleteMsg`。
 - 单元测试：`npm test -- --run`。
-- 类型检查：`npx tsc --noEmit` 当前在既有生产文件中失败。
-- 依赖审计：`npm audit --audit-level=low` 当前仍报告漏洞。
+- 类型检查：`npx tsc --noEmit`。
+- 依赖审计：`npm audit --audit-level=low`。
 
 已知运行风险：
 
@@ -105,6 +105,8 @@ wrangler.jsonc              Cloudflare 环境绑定和部署配置
 ```bash
 npm install
 ```
+
+使用 Node.js 22 或更新版本。CI 当前使用 Node.js 24.x。
 
 绑定变化后生成 Worker 类型：
 
