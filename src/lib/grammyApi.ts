@@ -1,5 +1,5 @@
 import { Api } from 'grammy';
-import type { EnvLike } from './telegram';
+import { getTelegramApiClientOptions, type EnvLike } from './telegram';
 
 export type GrammyApiLike = {
 	sendMessage(chatId: number | string, text: string, options?: Record<string, unknown>): Promise<unknown>;
@@ -18,7 +18,7 @@ export type SendTextPayload = {
 
 function getApi(env: EnvLike, api?: GrammyApiLike): GrammyApiLike {
 	if (api) return api;
-	return new Api(env.TOKEN) as unknown as GrammyApiLike;
+	return new Api(env.TOKEN, getTelegramApiClientOptions(env)) as unknown as GrammyApiLike;
 }
 
 export async function sendTextWithGrammy(env: EnvLike, payload: SendTextPayload, api?: GrammyApiLike): Promise<unknown> {

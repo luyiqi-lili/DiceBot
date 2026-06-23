@@ -1,7 +1,7 @@
 import { Api, type Context } from 'grammy';
 import { GrammyError } from 'grammy';
 
-export type EnvLike = { TOKEN: string; BOT_USERNAME?: string };
+export type EnvLike = { TOKEN: string; BOT_USERNAME?: string; TELEGRAM_API_BASE_URL?: string };
 export type CallbackJson = { type: string; [k: string]: any };
 
 export type ParsedUpdate = {
@@ -41,8 +41,13 @@ function log(prefix: string, ...args: any[]) {
 	console.log(`[telegram] ${prefix}`, ...args);
 }
 
+export function getTelegramApiClientOptions(env: EnvLike) {
+	const apiRoot = env.TELEGRAM_API_BASE_URL?.trim().replace(/\/+$/, '');
+	return apiRoot ? { apiRoot } : undefined;
+}
+
 function getApi(env: EnvLike): Api {
-	return new Api(env.TOKEN);
+	return new Api(env.TOKEN, getTelegramApiClientOptions(env));
 }
 
 function parseCommandFromText(text: string, botUsername?: string): CommandParseResult {

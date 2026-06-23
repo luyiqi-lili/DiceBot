@@ -6,7 +6,7 @@
  */
 
 import { Bot, webhookCallback, type Context } from 'grammy';
-import TgMessage, { parsedUpdateFromContext, type ParsedUpdate } from './lib/telegram';
+import TgMessage, { getTelegramApiClientOptions, parsedUpdateFromContext, type ParsedUpdate } from './lib/telegram';
 import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from './commands/like';
 import { runCoinCheck } from './cron/cron';
@@ -46,6 +46,7 @@ export type Env = {
 	DEEPSEEK_MODEL?: string;
 	DEEPSEEK_BASE_URL?: string;
 	TELEGRAM_WEBHOOK_SECRET?: string;
+	TELEGRAM_API_BASE_URL?: string;
 };
 export { CoinDO } from './durableObjects/coin_do';
 export { LotteryDO } from './durableObjects/lottery_do';
@@ -347,6 +348,7 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 function createTelegramBot(env: Env, executionCtx: ExecutionContext): Bot {
 	const botId = Number(String(env.TOKEN).split(':')[0]) || 0;
 	const bot = new Bot(env.TOKEN, {
+		client: getTelegramApiClientOptions(env),
 		botInfo: {
 			id: botId,
 			is_bot: true,
