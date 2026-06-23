@@ -11,6 +11,7 @@
 		"start": "wrangler dev",
 		"test": "vitest",
 		"test:e2e": "vitest --config vitest.e2e.config.mts",
+		"test:e2e:local": "RUN_E2E_LOCAL_WRANGLER=1 vitest --config vitest.e2e.config.mts test/e2e/local-telegram-webhook.spec.ts --run",
 		"cf-typegen": "wrangler types --env-file /dev/null"
 	},
 	"devDependencies": {
