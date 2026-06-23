@@ -3,11 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
 	handleFish: vi.fn(async () => undefined),
+	handleEcho: vi.fn(async () => undefined),
 	incrementUsageCount: vi.fn(async () => undefined),
 }));
 
 vi.mock('../src/commands/fish', () => ({
 	handleFish: mocks.handleFish,
+}));
+
+vi.mock('../src/commands/echo', () => ({
+	handleEcho: mocks.handleEcho,
 }));
 
 vi.mock('../src/commands/like', () => ({
@@ -19,10 +24,11 @@ import worker from '../src/index';
 const IncomingRequest = Request<unknown, IncomingRequestCfProperties>;
 const ALLOWED_CHAT_ID = -1002848481881;
 
-function makeEnv() {
+function makeEnv(overrides: Record<string, unknown> = {}) {
 	return Object.assign(Object.create(env), {
 		TOKEN: 'test-token',
 		BOT_USERNAME: 'DiceBot',
+		...overrides,
 	});
 }
 
@@ -39,7 +45,7 @@ function commandUpdate(text: string) {
 	};
 }
 
-async function postUpdate(text: string) {
+async function postUpdate(text: string, testEnv = makeEnv()) {
 	const request = new IncomingRequest('http://example.com', {
 		method: 'POST',
 		headers: {
@@ -49,7 +55,7 @@ async function postUpdate(text: string) {
 		body: JSON.stringify(commandUpdate(text)),
 	});
 	const ctx = createExecutionContext();
-	const response = await worker.fetch(request, makeEnv() as any, ctx);
+	const response = await worker.fetch(request, testEnv as any, ctx);
 	return { response, ctx };
 }
 
@@ -79,5 +85,24 @@ describe('DiceBot Worker — fish command routing', () => {
 
 		expect(response.status).toBe(200);
 		expect(mocks.handleFish).not.toHaveBeenCalled();
+	});
+
+	it('@dev bot 后面的 /echo 会按用户看到的命令触发 echo', async () => {
+		const { response } = await postUpdate(
+			'@lili_DevDiceBot /echo 今天很不错',
+			makeEnv({ BOT_USERNAME: 'lili_DevDiceBot' }),
+		);
+
+		expect(response.status).toBe(200);
+		expect(mocks.handleEcho).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'message',
+				chatId: ALLOWED_CHAT_ID,
+				isCommand: true,
+				command: 'echo',
+				args: ['今天很不错'],
+			}),
+			expect.anything(),
+		);
 	});
 });

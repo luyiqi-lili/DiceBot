@@ -55,6 +55,11 @@ jobs:
               exit 1
             fi
             printf '%s' "$DEV_BOT_TOKEN" | wrangler secret put TOKEN --name "$WORKER_NAME"
+            WORKER_URL="https://${WORKER_NAME}.luyiqi-lili.workers.dev"
+            curl -fsS -X POST "https://api.telegram.org/bot${DEV_BOT_TOKEN}/setWebhook" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg url "$WORKER_URL" '{url: $url, drop_pending_updates: false}')" \
+              > /dev/null
             echo "ENV=dev" >> $GITHUB_ENV
             echo "WORKER_NAME=$WORKER_NAME" >> $GITHUB_ENV
           fi
