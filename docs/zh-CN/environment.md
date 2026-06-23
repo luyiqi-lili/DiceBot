@@ -17,7 +17,7 @@ English source: [../environment.md](../environment.md)
 
 | Env | Worker name | Bot username | D1 | Cron |
 |-----|-------------|--------------|----|------|
-| `dev` | `telegram-bot-dev` | `lili_DevDiceBot` | 配置中未绑定 | 无活跃 cron |
+| `dev` | `telegram-bot-dev` | `lili_DevDiceBot` | `DB` -> `dicebot-dev-db` | 无活跃 cron |
 | `prod` | `telegram-bot` | `lili_DiceBot` | `DB` -> `dicebot-db` | `59 * * * *` |
 
 `Env` TypeScript 类型定义在 `src/index.ts`。

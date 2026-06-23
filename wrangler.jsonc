@@ -74,6 +74,13 @@
 					}
 				]
 			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "dicebot-dev-db",
+					"database_id": "46dc896f-55ba-4de8-9b89-120e8e1f297c"
+				}
+			],
 			"migrations": [
 				{
 					"tag": "v1",
