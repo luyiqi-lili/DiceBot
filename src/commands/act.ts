@@ -285,7 +285,7 @@ async function doShow(parsed: ParsedUpdate, env: Env, idArg?: string, pageArg?: 
   try {
     const q = await env.DB!.prepare(
       `SELECT id, content FROM act_sessions WHERE id = ? AND chat_id = ? AND thread_id IS ?`
-    ).bind(idArg, chatId, threadId).all();
+    ).bind(idArg, chatId, threadId).all<{ id: string; content: string | null }>();
 
     const row = (q && q.results && q.results[0]) || null;
     if (!row) {
@@ -297,7 +297,7 @@ async function doShow(parsed: ParsedUpdate, env: Env, idArg?: string, pageArg?: 
       return;
     }
 
-    const content: string = row.content || "";
+    const content = row.content || "";
     if (!content) {
       await TgMessage.sendText(env, {
         chat_id: chatId,

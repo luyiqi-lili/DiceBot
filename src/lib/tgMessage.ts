@@ -73,6 +73,10 @@ export type ParsedUpdate = {
 	inlineQueryId?: string;
 	offset?: string;
 };
+type CommandParseResult =
+	| { isCommand: true; command: string; args: string[] }
+	| { isCommand: false; command?: undefined; args?: undefined };
+
 interface TelegramApiResponse<T = any> {
 	ok: boolean;
 	result?: T;
@@ -114,7 +118,7 @@ export async function callTelegramApi(env: EnvLike, method: string, body: any) {
 // 例如: "/rd10" -> command: "r", args: ["d10"]; "/r2d10" -> command: "r", args: ["2d10"]
 // 3. 额外识别 ".r"、".rd10"、".r2d10" 作为骰点命令别名
 // 4. 对大小写不敏感地处理 bot username 比对
-function parseCommandFromText(text: string, botUsername?: string) {
+function parseCommandFromText(text: string, botUsername?: string): CommandParseResult {
 	log('解析命令');
 	const tokens = text.trim().split(/\s+/);
 	log('分割字符', tokens);
@@ -131,7 +135,7 @@ function parseCommandFromText(text: string, botUsername?: string) {
 		return { cmd, suffix };
 	};
 
-	const parseDotRollShortcut = (token: string, rest: string[]) => {
+	const parseDotRollShortcut = (token: string, rest: string[]): CommandParseResult | null => {
 		if (token.toLowerCase() === '.r') {
 			return { isCommand: true, command: 'r', args: rest };
 		}
@@ -337,8 +341,13 @@ const TgMessage = {
 			if (parsed.text) {
 				const cmd = parseCommandFromText(parsed.text, botUsername);
 				parsed.isCommand = !!cmd.isCommand;
-				parsed.command = cmd.command;
-				parsed.args = cmd.args || [];
+				if (cmd.isCommand) {
+					parsed.command = cmd.command;
+					parsed.args = cmd.args;
+				} else {
+					parsed.command = undefined;
+					parsed.args = [];
+				}
 			} else {
 				parsed.isCommand = false;
 			}

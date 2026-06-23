@@ -86,7 +86,7 @@ export async function performAttack(
 
       if (hit) {
         const dmg = rollWeaponDamage(weapon.damage, attrs, weaponEquipBonus);
-        const newHp = Math.max(0, targetChar.hp_current - dmg.total);
+        const newHp = Math.max(0, tgtChar.hp_current - dmg.total);
         await env.DB.prepare(
           `UPDATE dnd_characters SET hp_current = ?, updated_at = datetime('now') WHERE chat_id = ? AND user_id = ?`
         ).bind(newHp, String(chatId), opts.targetUserId).run();

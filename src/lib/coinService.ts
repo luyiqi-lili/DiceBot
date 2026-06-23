@@ -19,6 +19,9 @@ import TgMessage, { EnvLike } from "../lib/tgMessage";
 
 export const TREASURY_KEY = "__treasury__";
 
+type TransferResult = { ok: boolean; reason?: string; fromNew?: number; toNew?: number };
+type BalanceListResponse = { keys?: Array<{ name?: string }>; cursor?: string };
+
 function getDOStub(doNs: DurableObjectNamespace, name = "coins") {
   if (!doNs) throw new Error("Durable Object namespace (doNs) is required");
   const id = doNs.idFromName(name);
@@ -52,7 +55,7 @@ export async function transfer(
   amount: number,
   allowNegativeTreasury = false,
   name = "coins"
-): Promise<{ ok: boolean; reason?: string; fromNew?: number; toNew?: number }> {
+): Promise<TransferResult> {
   try {
     if (!doNs) throw new Error("doNs required");
     const stub = getDOStub(doNs, name);
@@ -64,16 +67,21 @@ export async function transfer(
       headers: { "Content-Type": "application/json" }
     });
 
-    const json = await res.json().catch(async () => {
+    const json = await res.json().catch(async (): Promise<TransferResult> => {
       const txt = await res.text().catch(() => "");
       return { ok: false, reason: `invalid response: ${txt}` };
-    });
+    }) as Partial<TransferResult> | null;
 
-    if (!json || typeof json.ok === "undefined") {
+    if (!json || typeof json.ok !== "boolean") {
       return { ok: false, reason: "invalid_response" };
     }
 
-    return json as { ok: boolean; reason?: string; fromNew?: number; toNew?: number };
+    return {
+      ok: json.ok,
+      reason: json.reason,
+      fromNew: json.fromNew,
+      toNew: json.toNew
+    };
   } catch (e: any) {
     console.error("[coinService] transfer failed", e);
     try {
@@ -96,7 +104,7 @@ export async function addToTreasury(
   amount: number,
   event?: string,
   name = "coins"
-): Promise<{ ok: boolean; reason?: string; fromNew?: number; toNew?: number }> {
+): Promise<TransferResult> {
   return await transfer(envOrNull, doNs, from, TREASURY_KEY, amount, false, name);
 }
 
@@ -108,7 +116,7 @@ export async function takeFromTreasury(
   event?: string,
   allowNegativeTreasury = false,
   name = "coins"
-): Promise<{ ok: boolean; reason?: string; fromNew?: number; toNew?: number }> {
+): Promise<TransferResult> {
   return await transfer(envOrNull, doNs, TREASURY_KEY, to, amount, allowNegativeTreasury, name);
 }
 
@@ -136,9 +144,10 @@ export async function sumAllUserBalances(doNs: DurableObjectNamespace, name = "c
         console.warn("[coinService] sumAllUserBalances: list failed:", txt);
         break;
       }
-      const json = await res.json().catch(() => ({ keys: [], cursor: "" }));
-      const keys: Array<{ name: string }> = json.keys || [];
+      const json = await res.json().catch(() => ({ keys: [], cursor: "" })) as BalanceListResponse;
+      const keys = json.keys || [];
       for (const k of keys) {
+        if (typeof k.name !== "string") continue;
         const nameKey = k.name;
         if (nameKey === TREASURY_KEY) continue;
         if (nameKey.includes("||")) continue;
