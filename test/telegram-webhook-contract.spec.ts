@@ -120,6 +120,16 @@ describe('Telegram webhook user-facing contract', () => {
 		});
 	});
 
+	it('acknowledges webhook updates when a Telegram API call fails', async () => {
+		fetchMock.mockRejectedValueOnce(new Error('Telegram API unavailable'));
+
+		const { response } = await postTelegramUpdate(messageUpdate('/help'));
+
+		expect(response.status).toBe(200);
+		const sendMessage = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(sendMessage?.body.text).toContain('可用命令');
+	});
+
 	it('hello game callback answers with a signed game URL', async () => {
 		const { response } = await postTelegramUpdate({
 			update_id: 1002,

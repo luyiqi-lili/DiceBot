@@ -414,11 +414,16 @@ export default {
 		}
 
 		try {
+			await request.clone().json();
 			const bot = createTelegramBot(env, ctx);
 			return await webhookCallback(bot, 'cloudflare-mod')(request);
 		} catch (e) {
-			console.error('index: 无法解析 JSON', e);
-			return new Response('Bad Request', { status: 400 });
+			if (e instanceof SyntaxError) {
+				console.error('index: 无法解析 JSON', e);
+				return new Response('Bad Request', { status: 400 });
+			}
+			console.error('index: Telegram webhook 处理失败，已确认 update 避免重试堆积', e);
+			return new Response('OK', { status: 200 });
 		}
 	},
 } satisfies ExportedHandler<Env>;
