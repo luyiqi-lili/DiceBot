@@ -150,4 +150,26 @@ describe('Telegram webhook user-facing contract', () => {
 		expect(response.status).toBe(200);
 		expect(telegramCalls(fetchMock)).toHaveLength(0);
 	});
+
+	it('handles Business private messages with a business_connection_id', async () => {
+		const { response } = await postTelegramUpdate({
+			update_id: 1003,
+			business_message: {
+				message_id: 55,
+				business_connection_id: 'bc_live',
+				date: 1,
+				chat: { id: 98765, type: 'private', first_name: 'Customer' },
+				from: { id: 98765, is_bot: false, first_name: 'Customer' },
+				text: '你好',
+			},
+		});
+
+		expect(response.status).toBe(200);
+		const sendMessage = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(sendMessage?.body).toMatchObject({
+			chat_id: 98765,
+			business_connection_id: 'bc_live',
+		});
+		expect(sendMessage?.body.text).toContain('秘书模式已接入');
+	});
 });

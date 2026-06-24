@@ -180,6 +180,17 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: ExecutionContext): Promise<void> {
 	const parsedMessage = parsedUpdateFromContext(botCtx, env.BOT_USERNAME);
 
+	if (
+		parsedMessage.type === 'business_connection'
+		|| parsedMessage.type === 'business_message'
+		|| parsedMessage.type === 'edited_business_message'
+		|| parsedMessage.type === 'deleted_business_messages'
+	) {
+		const { handleBusinessSecretary } = await import('./commands/businessSecretary');
+		await handleBusinessSecretary(parsedMessage, env);
+		return;
+	}
+
 	if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
 		console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
 		return;
@@ -357,7 +368,7 @@ function createTelegramBot(env: Env, executionCtx: ExecutionContext): Bot {
 			can_join_groups: true,
 			can_read_all_group_messages: false,
 			supports_inline_queries: true,
-			can_connect_to_business: false,
+			can_connect_to_business: true,
 			has_main_web_app: false,
 		} as any,
 	});

@@ -24,6 +24,9 @@ export type ParsedUpdate = {
 	inlineQuery?: any;
 	inlineQueryId?: string;
 	offset?: string;
+	businessConnection?: any;
+	businessConnectionId?: string;
+	deletedBusinessMessages?: any;
 };
 
 type CommandParseResult =
@@ -119,6 +122,25 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		args: [],
 	};
 
+	if ((ctx as any).businessConnection) {
+		const businessConnection = (ctx as any).businessConnection;
+		parsed.type = 'business_connection';
+		parsed.businessConnection = businessConnection;
+		parsed.businessConnectionId = businessConnection.id;
+		parsed.chatId = businessConnection.user_chat_id ?? 0;
+		parsed.from = businessConnection.user;
+		return parsed;
+	}
+
+	if ((ctx as any).deletedBusinessMessages) {
+		const deletedBusinessMessages = (ctx as any).deletedBusinessMessages;
+		parsed.type = 'deleted_business_messages';
+		parsed.deletedBusinessMessages = deletedBusinessMessages;
+		parsed.businessConnectionId = deletedBusinessMessages.business_connection_id;
+		parsed.chatId = deletedBusinessMessages.chat?.id ?? 0;
+		return parsed;
+	}
+
 	if (ctx.callbackQuery) {
 		const callbackQuery = ctx.callbackQuery as any;
 		parsed.type = 'callback_query';
@@ -148,9 +170,18 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		return parsed;
 	}
 
-	const message = (ctx.message ?? ctx.channelPost ?? ctx.editedMessage) as any;
+	const businessMessage = ((ctx as any).businessMessage ?? (ctx as any).editedBusinessMessage) as any;
+	const message = (ctx.message ?? ctx.channelPost ?? ctx.editedMessage ?? businessMessage) as any;
 	if (message) {
-		parsed.type = ctx.editedMessage ? 'edited_message' : ctx.channelPost ? 'channel_post' : 'message';
+		parsed.type = (ctx as any).editedBusinessMessage
+			? 'edited_business_message'
+			: (ctx as any).businessMessage
+				? 'business_message'
+				: ctx.editedMessage
+					? 'edited_message'
+					: ctx.channelPost
+						? 'channel_post'
+						: 'message';
 		parsed.message = message;
 		parsed.chatId = message.chat?.id ?? 0;
 		parsed.threadId = message.message_thread_id ?? message.reply_to_message?.message_thread_id;
@@ -159,6 +190,7 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		parsed.textPreview = parsed.text?.slice(0, 80);
 		parsed.isReply = Boolean(message.reply_to_message);
 		parsed.replyToMessage = message.reply_to_message;
+		parsed.businessConnectionId = message.business_connection_id;
 		if (message.forum_topic_edited) {
 			parsed.type = 'topic_edited';
 			parsed.forumTopicEdited = message.forum_topic_edited;
@@ -218,6 +250,7 @@ const Telegram = {
 			message_thread_id?: number;
 			reply_to_message_id?: number;
 			disable_web_page_preview?: boolean;
+			business_connection_id?: string;
 		},
 	) {
 		const { chat_id, text, ...other } = opts;
