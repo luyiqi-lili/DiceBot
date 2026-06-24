@@ -27,6 +27,7 @@ import {
 type RoseEnv = Env;
 
 function scoreToEmoji(score: number): string {
+  if (score > 0 && score < 10) return "🌱";
   if (score < 10) return "";
   let units = Math.floor(score / 10);
   const emojis = ["🌱", "🍃", "🌷", "🌹", "💓", "💖", "💝", "❤️‍🔥","💍"];
@@ -245,7 +246,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   const score = Number(rec.value || 0);
 
   // 非 send：查询当前好感度
-  if (score < 10) {
+  if (score <= 0) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `${fromName} 对 ${targetName} 的好感度不够高，快多互动吧！`,

@@ -36,6 +36,19 @@ describe('/rose', () => {
 		await handleRose(makeMsg({ isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
 		expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalled();
 	});
+	it('回复查询时 1 点好感显示一颗小草', async () => {
+		vi.mocked(readAffectionMap).mockResolvedValue({ '2': { firstName: 'MockUser', value: 1 } });
+		await handleRose(makeMsg({ isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).toContain('好感度为 🌱');
+		expect(text).not.toContain('不够高');
+	});
+	it('回复查询时 13 点好感显示一颗小草', async () => {
+		vi.mocked(readAffectionMap).mockResolvedValue({ '2': { firstName: 'MockUser', value: 13 } });
+		await handleRose(makeMsg({ isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).toContain('好感度为 🌱');
+	});
 	it('check', async () => {
 		vi.mocked(getAffectionRanking).mockResolvedValue([]);
 		await handleRose(makeMsg({ args: ['check'], isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
