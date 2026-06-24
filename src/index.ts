@@ -11,6 +11,7 @@ import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from './commands/like';
 import { runCoinCheck } from './cron/cron';
 import { handleBackup } from './lib/backup';
+import { recordReactionAffection, recordReplyAffection } from './lib/affectionInteractions';
 
 import { COMMAND_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
@@ -242,6 +243,11 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 			return;
 		}
 
+		case 'message_reaction': {
+			await recordReactionAffection(parsedMessage, env);
+			return;
+		}
+
 		case 'callback_query': {
 			const callbackQuery = parsedMessage.callbackQuery;
 			const callbackData = parsedMessage.callbackData;
@@ -308,6 +314,7 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 		}
 
 		case 'message': {
+			await recordReplyAffection(parsedMessage, env);
 			console.log('main:isCommand', parsedMessage.isCommand);
 			if (parsedMessage.isCommand) {
 				console.log('main:command', parsedMessage.command);

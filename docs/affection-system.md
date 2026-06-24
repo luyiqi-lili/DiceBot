@@ -15,9 +15,20 @@ The affection system tracks directional affection between Telegram users.
 | D1 `affections` | primary directional affection records |
 | D1 `rose_sends` | daily free-send tracking |
 | `AFFECTION_KV` | fallback/migration source |
+| `AFFECTION_KV` reaction markers | one-time reaction counting keys |
 | `COIN_DO` | paid extra flower cost |
 
 `src/lib/affectionDB.ts` owns the D1/KV fallback logic.
+
+## Passive Interactions
+
+Non-command and command replies both count as passive interaction. When user A replies to user B's message, A's affection toward B increases by 1. Self replies and bot targets are ignored.
+
+Telegram reactions also count as passive interaction. Any reaction emoji counts, but each reacting user can increase affection only once per target message. If A reacts to B's message, cancels the reaction, and reacts to the same message again, the second reaction is ignored.
+
+Reaction updates do not include the original message author, so `src/lib/affectionInteractions.ts` resolves B from D1 `message_history` by `chat_id + message_id`. If the message is not in history or D1 is unavailable, the reaction is skipped silently.
+
+Telegram only sends `message_reaction` updates when the bot is an administrator and the webhook explicitly includes `"message_reaction"` in `allowed_updates`.
 
 ## Commands
 
@@ -49,9 +60,12 @@ If coin deduction succeeds but D1 write fails, the user is warned that payment w
 |------|---------|
 | `src/commands/rose.ts` | command behavior |
 | `src/lib/affectionDB.ts` | D1/KV migration and query helpers |
+| `src/lib/affectionInteractions.ts` | passive reply/reaction affection rules |
 
 ## Tests
 
 Relevant test:
 
 - `test/commands/rose.spec.ts`
+- `test/lib/affectionInteractions.spec.ts`
+- `test/index-affection-interactions.spec.ts`

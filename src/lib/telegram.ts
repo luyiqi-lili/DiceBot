@@ -24,6 +24,7 @@ export type ParsedUpdate = {
 	inlineQuery?: any;
 	inlineQueryId?: string;
 	offset?: string;
+	messageReaction?: any;
 	businessConnection?: any;
 	businessConnectionId?: string;
 	deletedBusinessMessages?: any;
@@ -145,6 +146,15 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		parsed.deletedBusinessMessages = deletedBusinessMessages;
 		parsed.businessConnectionId = deletedBusinessMessages.business_connection_id;
 		parsed.chatId = deletedBusinessMessages.chat?.id ?? 0;
+		return parsed;
+	}
+
+	const messageReaction = (ctx as any).messageReaction ?? update.message_reaction;
+	if (messageReaction) {
+		parsed.type = 'message_reaction';
+		parsed.messageReaction = messageReaction;
+		parsed.chatId = messageReaction.chat?.id ?? 0;
+		parsed.from = messageReaction.user;
 		return parsed;
 	}
 

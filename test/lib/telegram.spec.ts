@@ -59,6 +59,26 @@ describe('parsedUpdateFromContext business updates', () => {
 	});
 });
 
+describe('parsedUpdateFromContext message reactions', () => {
+	it('parses message_reaction updates', () => {
+		const messageReaction = {
+			chat: { id: -100999, type: 'supergroup', title: 'Dice' },
+			message_id: 42,
+			user: { id: 100, is_bot: false, first_name: 'Reactor' },
+			date: 1782270002,
+			old_reaction: [],
+			new_reaction: [{ type: 'emoji', emoji: '🔥' }],
+		};
+
+		const parsed = parsedUpdateFromContext({ update: { update_id: 5, message_reaction: messageReaction }, messageReaction } as any);
+
+		expect(parsed.type).toBe('message_reaction');
+		expect(parsed.chatId).toBe(-100999);
+		expect(parsed.from?.id).toBe(100);
+		expect(parsed.messageReaction).toBe(messageReaction);
+	});
+});
+
 describe('parsedUpdateFromContext forum topic replies', () => {
 	it('does not treat the implicit forum topic root reply as a user reply', () => {
 		const topicRoot = {
