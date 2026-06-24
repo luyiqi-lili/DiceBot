@@ -70,6 +70,10 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 		return handleCoinAPI(request, env, path);
 	}
 
+	if (path.startsWith('/api/lottery')) {
+		return handleLotteryAPI(request, env, path);
+	}
+
 	if (path.startsWith('/api/wish')) {
 		const { handleWishAPI } = await import('./lib/wishApi');
 		return handleWishAPI(request, env, path);
@@ -95,6 +99,23 @@ async function handleCoinAPI(request: Request, env: Env, path: string): Promise<
 	const stub = env.COIN_DO.get(id);
 
 	const doPath = path.replace('/api/coin', '');
+	const doUrl = new URL(request.url);
+	doUrl.pathname = doPath;
+
+	const doRequest = new Request(doUrl, {
+		method: request.method,
+		headers: request.headers,
+		body: request.body,
+	});
+
+	return await stub.fetch(doRequest);
+}
+
+async function handleLotteryAPI(request: Request, env: Env, path: string): Promise<Response> {
+	const id = env.LOTTERY_DO.idFromName('lottery');
+	const stub = env.LOTTERY_DO.get(id);
+
+	const doPath = path.replace('/api/lottery', '') || '/';
 	const doUrl = new URL(request.url);
 	doUrl.pathname = doPath;
 

@@ -25,6 +25,14 @@ interface DrawRequest {
   winningNumber: string;
 }
 
+interface RestoreRequest {
+  bookmark?: string;
+  timestamp?: string;
+  confirm?: string;
+}
+
+const RESTORE_CONFIRMATION = "RESTORE_LOTTERY_DO";
+
 export class LotteryDO {
   private state: DurableObjectState;
   private pool: number = 0;
@@ -235,6 +243,91 @@ export class LotteryDO {
     return this.lastWinner;
   }
 
+  private json(data: unknown, status = 200): Response {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  private async getRecoveryState(): Promise<{
+    pool: number;
+    tickets: Record<string, string[]>;
+    totalTicketCount: number;
+    totalPrizePool: number;
+    lastWinner: any;
+    currentBookmark?: string;
+    bookmarkError?: string;
+  }> {
+    const totalTicketCount = await this.getTotalTicketCount();
+    const result: {
+      pool: number;
+      tickets: Record<string, string[]>;
+      totalTicketCount: number;
+      totalPrizePool: number;
+      lastWinner: any;
+      currentBookmark?: string;
+      bookmarkError?: string;
+    } = {
+      pool: this.pool,
+      tickets: this.tickets,
+      totalTicketCount,
+      totalPrizePool: this.pool + totalTicketCount * 10,
+      lastWinner: this.lastWinner
+    };
+
+    try {
+      result.currentBookmark = await this.state.storage.getCurrentBookmark();
+    } catch (error: any) {
+      result.bookmarkError = error?.message || String(error);
+    }
+
+    return result;
+  }
+
+  private async getBookmarkForRequestTime(url: URL): Promise<Response> {
+    const rawTime = url.searchParams.get("time") || url.searchParams.get("timestamp");
+    if (!rawTime) return this.json({ error: "time query parameter is required" }, 400);
+
+    const timestamp = new Date(rawTime);
+    if (Number.isNaN(timestamp.getTime())) return this.json({ error: "invalid time" }, 400);
+
+    const bookmark = await this.state.storage.getBookmarkForTime(timestamp);
+    return this.json({ timestamp: timestamp.toISOString(), bookmark });
+  }
+
+  private async restoreFromRequest(request: Request): Promise<Response> {
+    const data = await request.json() as RestoreRequest;
+    if (data.confirm !== RESTORE_CONFIRMATION) {
+      return this.json({ error: `confirm must be ${RESTORE_CONFIRMATION}` }, 400);
+    }
+
+    let bookmark = data.bookmark;
+    let timestamp: string | undefined;
+    if (!bookmark) {
+      if (!data.timestamp) return this.json({ error: "bookmark or timestamp is required" }, 400);
+
+      const parsed = new Date(data.timestamp);
+      if (Number.isNaN(parsed.getTime())) return this.json({ error: "invalid timestamp" }, 400);
+
+      timestamp = parsed.toISOString();
+      bookmark = await this.state.storage.getBookmarkForTime(parsed);
+    }
+
+    const undoBookmark = await this.state.storage.onNextSessionRestoreBookmark(bookmark);
+    this.state.waitUntil(Promise.resolve().then(() => {
+      this.state.abort("LotteryDO PITR restore requested");
+    }));
+
+    return this.json({
+      success: true,
+      timestamp,
+      bookmark,
+      undoBookmark,
+      restartScheduled: true
+    });
+  }
+
   /**
    * HTTP请求处理
    */
@@ -244,6 +337,21 @@ export class LotteryDO {
     
     try {
       switch (path) {
+        case '/debug-state': {
+          return this.json(await this.getRecoveryState());
+        }
+
+        case '/pitr/bookmark': {
+          return await this.getBookmarkForRequestTime(url);
+        }
+
+        case '/pitr/restore': {
+          if (request.method !== 'POST') {
+            return this.json({ error: 'Method Not Allowed' }, 405);
+          }
+          return await this.restoreFromRequest(request);
+        }
+
         case '/add-ticket': {
           const data = await request.json() as SetTicketRequest;
           const result = await this.addTicket(data.userId, data.ticketNumber);
