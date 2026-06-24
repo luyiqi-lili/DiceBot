@@ -61,14 +61,19 @@ EOF
 )
 
 # 发送消息
-curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+TG_RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
     -H "Content-Type: application/json" \
     -d "$(jq -n \
         --arg chat_id "$CHAT_ID" \
         --arg text "$TEXT" \
         --argjson message_thread_id "$TOPIC_ID" \
         --arg parse_mode "HTML" \
-        '{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id, parse_mode: $parse_mode}')" \
-    > /dev/null 2>&1
+        '{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id, parse_mode: $parse_mode}')")
+
+if ! jq -e '.ok == true' >/dev/null <<<"$TG_RESPONSE"; then
+    DESCRIPTION=$(jq -r '.description // "unknown error"' <<<"$TG_RESPONSE")
+    echo "Telegram 通知发送失败: ${DESCRIPTION}" >&2
+    exit 1
+fi
 
 echo "✅ 通知已发送到 Telegram"
