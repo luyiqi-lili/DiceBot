@@ -22,8 +22,8 @@ COMMIT_SHA="${2:-HEAD}"
 COMMIT_MSG="${3:-}"
 
 # Telegram 配置
-BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-}}"
-: "${BOT_TOKEN:?BOT_TOKEN or TOKEN is required}"
+BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-${DEV_BOT_TOKEN:-}}}"
+: "${BOT_TOKEN:?BOT_TOKEN, TOKEN, or DEV_BOT_TOKEN is required}"
 CHAT_ID="${CHAT_ID:--1002970430696}"
 TOPIC_ID="${TOPIC_ID:-89}"
 
