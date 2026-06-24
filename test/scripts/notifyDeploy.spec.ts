@@ -5,7 +5,7 @@ import script from '../../scripts/notify-deploy.sh?raw';
 describe('notify-deploy.sh', () => {
 	it('reads the Telegram bot token from the environment', () => {
 		expect(script).not.toMatch(/BOT_TOKEN="\d+:[^"]+"/);
-		expect(script).toContain('${BOT_TOKEN:');
+		expect(script).toContain('BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-${DEV_BOT_TOKEN:-}}}"');
 	});
 
 	it('allows the deploy notification target to be configured from the environment', () => {

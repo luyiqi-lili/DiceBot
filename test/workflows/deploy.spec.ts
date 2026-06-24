@@ -13,4 +13,9 @@ describe('deploy workflow', () => {
 		expect(workflow).not.toMatch(/\d+:[A-Za-z0-9_-]{20,}/);
 		expect(workflow).toContain('DEV_BOT_TOKEN: ${{ secrets.DEV_BOT_TOKEN }}');
 	});
+
+	it('falls back to the configured deploy bot token for production notifications', () => {
+		expect(workflow).toContain('BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-${DEV_BOT_TOKEN:-}}}"');
+		expect(workflow).toContain('BOT_TOKEN/TOKEN/DEV_BOT_TOKEN secret 未配置');
+	});
 });
