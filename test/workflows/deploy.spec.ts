@@ -14,8 +14,9 @@ describe('deploy workflow', () => {
 		expect(workflow).toContain('DEV_BOT_TOKEN: ${{ secrets.DEV_BOT_TOKEN }}');
 	});
 
-	it('falls back to the configured deploy bot token for production notifications', () => {
-		expect(workflow).toContain('BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-${DEV_BOT_TOKEN:-}}}"');
-		expect(workflow).toContain('BOT_TOKEN/TOKEN/DEV_BOT_TOKEN secret 未配置');
+	it('does not use the dev bot token for production notifications', () => {
+		expect(workflow).toContain('BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-}}"');
+		expect(workflow).toContain('unset DEV_BOT_TOKEN');
+		expect(workflow).toContain('BOT_TOKEN/TOKEN secret 未配置');
 	});
 });
