@@ -56,4 +56,11 @@ describe('business secretary', () => {
 
 		expect(vi.mocked(TgMessage.sendText)).not.toHaveBeenCalled();
 	});
+
+	it('acknowledges the update even when Telegram rejects the business reply', async () => {
+		vi.mocked(TgMessage.sendText).mockRejectedValueOnce(new Error('Forbidden: can not reply'));
+
+		await expect(handleBusinessSecretary(makeBusinessMessage(), { TOKEN: 'token' } as any)).resolves.toBeUndefined();
+		expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalled();
+	});
 });

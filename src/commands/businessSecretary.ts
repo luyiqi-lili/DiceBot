@@ -44,11 +44,20 @@ export async function handleBusinessSecretary(parsed: ParsedUpdate, env: EnvLike
 		return;
 	}
 
-	await TgMessage.sendText(env, {
-		chat_id: parsed.chatId,
-		business_connection_id: parsed.businessConnectionId,
-		text: '秘书模式已接入。莉莉现在可以通过这个连接代账号回复；当前先启用安全确认回复，避免自动接管私人对话。',
-	});
+	try {
+		await TgMessage.sendText(env, {
+			chat_id: parsed.chatId,
+			business_connection_id: parsed.businessConnectionId,
+			text: '秘书模式已接入。莉莉现在可以通过这个连接代账号回复；当前先启用安全确认回复，避免自动接管私人对话。',
+		});
+	} catch (error: any) {
+		console.error('[business] secretary reply failed', {
+			chatId: parsed.chatId,
+			messageId: parsed.message?.message_id,
+			errorCode: error?.error_code ?? error?.error?.error_code,
+			description: error?.description ?? error?.error?.description ?? error?.message,
+		});
+	}
 }
 
 export default handleBusinessSecretary;

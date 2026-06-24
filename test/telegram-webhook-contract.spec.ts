@@ -172,4 +172,28 @@ describe('Telegram webhook user-facing contract', () => {
 		});
 		expect(sendMessage?.body.text).toContain('秘书模式已接入');
 	});
+
+	it('acknowledges Business messages even when Telegram rejects the secretary reply', async () => {
+		fetchMock.mockResolvedValueOnce({
+			ok: false,
+			status: 403,
+			json: async () => ({ ok: false, error_code: 403, description: 'Forbidden: can not reply' }),
+		});
+
+		const { response } = await postTelegramUpdate({
+			update_id: 1004,
+			business_message: {
+				message_id: 56,
+				business_connection_id: 'bc_denied',
+				date: 1,
+				chat: { id: 98766, type: 'private', first_name: 'Customer' },
+				from: { id: 98766, is_bot: false, first_name: 'Customer' },
+				text: '你好',
+			},
+		});
+
+		expect(response.status).toBe(200);
+		const sendMessage = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(sendMessage?.body.business_connection_id).toBe('bc_denied');
+	});
 });
