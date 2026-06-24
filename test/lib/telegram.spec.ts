@@ -58,3 +58,34 @@ describe('parsedUpdateFromContext business updates', () => {
 		expect(parsed.deletedBusinessMessages).toBe(deletedBusinessMessages);
 	});
 });
+
+describe('parsedUpdateFromContext forum topic replies', () => {
+	it('does not treat the implicit forum topic root reply as a user reply', () => {
+		const topicRoot = {
+			message_id: 89,
+			from: { id: 111, is_bot: false, first_name: 'Topic Creator' },
+			chat: { id: -100999, type: 'supergroup' },
+			date: 1782270000,
+			forum_topic_created: { name: 'Dice', icon_color: 0x6fb9f0 },
+		};
+		const message = {
+			message_id: 120,
+			message_thread_id: 89,
+			is_topic_message: true,
+			date: 1782270001,
+			chat: { id: -100999, type: 'supergroup' },
+			from: { id: 222, is_bot: false, first_name: 'Admin' },
+			text: '/coin check',
+			reply_to_message: topicRoot,
+		};
+
+		const parsed = parsedUpdateFromContext({ update: { update_id: 4, message }, message } as any, 'DiceBot');
+
+		expect(parsed.threadId).toBe(89);
+		expect(parsed.isCommand).toBe(true);
+		expect(parsed.command).toBe('coin');
+		expect(parsed.args).toEqual(['check']);
+		expect(parsed.isReply).toBe(false);
+		expect(parsed.replyToMessage).toBeUndefined();
+	});
+});

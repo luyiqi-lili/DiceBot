@@ -102,6 +102,31 @@ describe('send', () => {
 describe('check', () => {
 	beforeEach(() => vi.clearAllMocks());
 	it('管理员', async () => { vi.mocked(coinService.getTreasury).mockResolvedValue(5000); vi.mocked(coinService.sumAllUserBalances).mockResolvedValue(3000); await handleCoin(makeParsed({ args: ['check'], from: { id: 8080375150 } }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('5000'); });
+	it('论坛主题内直接发送 check 不查询主题创建人余额', async () => {
+		vi.mocked(coinService.getTreasury).mockResolvedValue(5000);
+		vi.mocked(coinService.sumAllUserBalances).mockResolvedValue(3000);
+		await handleCoin(makeParsed({
+			args: ['check'],
+			from: { id: 8080375150 },
+			threadId: 89,
+			isReply: false,
+			message: {
+				message_id: 120,
+				message_thread_id: 89,
+				is_topic_message: true,
+				from: { id: 8080375150 },
+				chat: { id: -100999 },
+				reply_to_message: {
+					message_id: 89,
+					from: { id: 111, first_name: 'Topic Creator' },
+					forum_topic_created: { name: 'Dice' },
+				},
+			},
+		}), MOCK_ENV);
+
+		expect(coinService.getBalance).not.toHaveBeenCalledWith(MOCK_ENV.COIN_DO, '111');
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('艾丽莎宝库：5000');
+	});
 	it('非管理员', async () => { await handleCoin(makeParsed({ args: ['check'] }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('权限'); });
 });
 describe('take', () => {

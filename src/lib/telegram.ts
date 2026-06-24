@@ -112,6 +112,13 @@ function parseCommandFromText(text: string, botUsername?: string): CommandParseR
 	return { isCommand: false };
 }
 
+function isImplicitForumTopicRootReply(message: any): boolean {
+	const replyToMessage = message?.reply_to_message;
+	if (!replyToMessage) return false;
+	if (!message?.is_topic_message || typeof message.message_thread_id !== 'number') return false;
+	return replyToMessage.message_id === message.message_thread_id;
+}
+
 export function parsedUpdateFromContext(ctx: Context, botUsername?: string): ParsedUpdate {
 	const update = ctx.update as any;
 	const parsed: ParsedUpdate = {
@@ -188,8 +195,9 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		parsed.from = message.from;
 		parsed.text = message.text ?? message.caption ?? '';
 		parsed.textPreview = parsed.text?.slice(0, 80);
-		parsed.isReply = Boolean(message.reply_to_message);
-		parsed.replyToMessage = message.reply_to_message;
+		const implicitForumTopicRootReply = isImplicitForumTopicRootReply(message);
+		parsed.isReply = Boolean(message.reply_to_message) && !implicitForumTopicRootReply;
+		parsed.replyToMessage = implicitForumTopicRootReply ? undefined : message.reply_to_message;
 		parsed.businessConnectionId = message.business_connection_id;
 		if (message.forum_topic_edited) {
 			parsed.type = 'topic_edited';
