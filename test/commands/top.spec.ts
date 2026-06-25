@@ -92,7 +92,7 @@ describe('/top', () => {
 
 	it('优先使用 D1 topic_metadata 中的当前主题名称', async () => {
 		const db = makeDb([
-			{ thread_id: 542052, topic_name: null, metadata_topic_name: '新房间', message_count: 3042 },
+			{ thread_id: 542052, topic_name: '旧房间', metadata_topic_name: '新房间', message_count: 3042 },
 		]);
 
 		await handleTop(makeParsed({ from: { id: 8080375150, first_name: 'Admin' } }), { DB: db } as any);
@@ -100,6 +100,18 @@ describe('/top', () => {
 		const reply = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1];
 		expect(reply?.text).toContain('消息最多的主题：<b>新房间</b>');
 		expect(reply?.text).toContain('1. 新房间：3042 条');
+	});
+
+	it('使用单次聚合查询，避免按主题回查 message_history', async () => {
+		const db = makeDb([
+			{ thread_id: 210, topic_name: '酒馆', metadata_topic_name: null, message_count: 9 },
+		]);
+
+		await handleTop(makeParsed({ from: { id: 8080375150, first_name: 'Admin' } }), { DB: db } as any);
+
+		const rankingSql = String(db.prepare.mock.calls.at(-1)?.[0] ?? '');
+		expect(rankingSql).toContain('MAX(NULLIF(mh.topic_name');
+		expect(rankingSql).not.toContain('SELECT mh2.topic_name');
 	});
 
 	it('没有最近消息时返回空数据提示', async () => {

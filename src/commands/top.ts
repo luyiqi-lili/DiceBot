@@ -22,7 +22,7 @@ function fallbackTopicName(threadId: number): string {
 function displayTopicName(chatId: number, row: TopicTopRow): string {
 	const topicName = String(row.topic_name ?? '').trim();
 	const metadataTopicName = String(row.metadata_topic_name ?? '').trim();
-	return topicName || metadataTopicName || getKnownTopicRoomName(chatId, row.thread_id) || fallbackTopicName(row.thread_id);
+	return metadataTopicName || topicName || getKnownTopicRoomName(chatId, row.thread_id) || fallbackTopicName(row.thread_id);
 }
 
 function normalizeRows(result: any): TopicTopRow[] {
@@ -57,6 +57,11 @@ async function ensureTopicMetadataTable(env: Env): Promise<void> {
 			last_event_message_id INTEGER,
 			PRIMARY KEY (chat_id, thread_id)
 		)
+	`).run();
+
+	await env.DB!.prepare(`
+		CREATE INDEX IF NOT EXISTS idx_message_history_top_window
+		ON message_history (chat_id, created_at, thread_id)
 	`).run();
 }
 
@@ -93,21 +98,12 @@ export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
 	try {
 		await ensureTopicMetadataTable(env);
 
-		const result = await env.DB.prepare(`
-			SELECT
-				mh.thread_id,
-				COALESCE((
-					SELECT mh2.topic_name
-					FROM message_history mh2
-					WHERE mh2.chat_id = mh.chat_id
-						AND mh2.thread_id = mh.thread_id
-						AND mh2.topic_name IS NOT NULL
-						AND mh2.topic_name != ''
-					ORDER BY mh2.created_at DESC
-					LIMIT 1
-				), '') AS topic_name,
-				tm.current_name AS metadata_topic_name,
-				COUNT(*) AS message_count
+			const result = await env.DB.prepare(`
+				SELECT
+					mh.thread_id,
+					MAX(NULLIF(mh.topic_name, '')) AS topic_name,
+					tm.current_name AS metadata_topic_name,
+					COUNT(*) AS message_count
 			FROM message_history mh
 			LEFT JOIN topic_metadata tm
 				ON tm.chat_id = mh.chat_id

@@ -173,6 +173,9 @@ CREATE TABLE IF NOT EXISTS message_history (
   created_at TEXT
 );
 
+CREATE INDEX IF NOT EXISTS idx_message_history_top_window
+ON message_history (chat_id, created_at, thread_id);
+
 CREATE TABLE IF NOT EXISTS topic_metadata (
   chat_id INTEGER NOT NULL,
   thread_id INTEGER NOT NULL,
