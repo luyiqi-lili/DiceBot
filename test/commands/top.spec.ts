@@ -19,10 +19,11 @@ function makeParsed(o: any = {}): any {
 }
 
 function makeDb(results: any[]) {
+	const run = vi.fn().mockResolvedValue({ success: true });
 	const all = vi.fn().mockResolvedValue({ results });
 	const bind = vi.fn(() => ({ all }));
-	const prepare = vi.fn(() => ({ bind }));
-	return { prepare, bind, all };
+	const prepare = vi.fn(() => ({ bind, run }));
+	return { prepare, bind, all, run };
 }
 
 describe('/top', () => {
@@ -87,6 +88,18 @@ describe('/top', () => {
 		expect(reply?.text).toContain('1. 酒馆：19238 条');
 		expect(reply?.text).toContain('2. 耀阳：2133 条');
 		expect(reply?.text).toContain('3. 电竞：1815 条');
+	});
+
+	it('优先使用 D1 topic_metadata 中的当前主题名称', async () => {
+		const db = makeDb([
+			{ thread_id: 542052, topic_name: null, metadata_topic_name: '新房间', message_count: 3042 },
+		]);
+
+		await handleTop(makeParsed({ from: { id: 8080375150, first_name: 'Admin' } }), { DB: db } as any);
+
+		const reply = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1];
+		expect(reply?.text).toContain('消息最多的主题：<b>新房间</b>');
+		expect(reply?.text).toContain('1. 新房间：3042 条');
 	});
 
 	it('没有最近消息时返回空数据提示', async () => {

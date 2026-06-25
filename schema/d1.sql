@@ -173,6 +173,28 @@ CREATE TABLE IF NOT EXISTS message_history (
   created_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS topic_metadata (
+  chat_id INTEGER NOT NULL,
+  thread_id INTEGER NOT NULL,
+  current_name TEXT NOT NULL DEFAULT '',
+  created_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_event_message_id INTEGER,
+  PRIMARY KEY (chat_id, thread_id)
+);
+
+CREATE TABLE IF NOT EXISTS topic_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  thread_id INTEGER NOT NULL,
+  event_type TEXT NOT NULL,
+  old_name TEXT,
+  new_name TEXT,
+  message_id INTEGER,
+  actor_user_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS rose_sends (
   user_id INTEGER PRIMARY KEY,
   send_date TEXT NOT NULL,

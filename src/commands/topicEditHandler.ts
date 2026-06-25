@@ -5,6 +5,81 @@ import {escapeHtml}  from "../lib/util";
 
 type TopicEnv = Env;
 
+function parseTopicKvRecord(value: unknown): { message_id: number | null; titles: Record<string, string> } | null {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value as any;
+}
+
+async function recordTopicEvent(
+  env: TopicEnv,
+  input: {
+    chatId: number;
+    threadId: number;
+    eventType: 'created' | 'edited';
+    oldName: string | null;
+    newName: string;
+    messageId: number | null;
+    actorUserId: number | null;
+  },
+): Promise<void> {
+  if (!env.DB) return;
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS topic_metadata (
+      chat_id INTEGER NOT NULL,
+      thread_id INTEGER NOT NULL,
+      current_name TEXT NOT NULL DEFAULT '',
+      created_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_event_message_id INTEGER,
+      PRIMARY KEY (chat_id, thread_id)
+    )
+  `).run();
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS topic_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_id INTEGER NOT NULL,
+      thread_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      old_name TEXT,
+      new_name TEXT,
+      message_id INTEGER,
+      actor_user_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `).run();
+
+  await env.DB.prepare(`
+    INSERT INTO topic_metadata (chat_id, thread_id, current_name, created_at, updated_at, last_event_message_id)
+    VALUES (?, ?, ?, datetime('now'), datetime('now'), ?)
+    ON CONFLICT(chat_id, thread_id) DO UPDATE SET
+      current_name = excluded.current_name,
+      updated_at = datetime('now'),
+      last_event_message_id = excluded.last_event_message_id
+  `).bind(input.chatId, input.threadId, input.newName, input.messageId).run();
+
+  await env.DB.prepare(`
+    INSERT INTO topic_events (chat_id, thread_id, event_type, old_name, new_name, message_id, actor_user_id, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+  `).bind(
+    input.chatId,
+    input.threadId,
+    input.eventType,
+    input.oldName,
+    input.newName,
+    input.messageId,
+    input.actorUserId,
+  ).run();
+}
+
 /**
  * 处理论坛话题标题编辑事件（forum_topic_edited）
  * - 接收 parsedMessage（ParsedUpdate）
@@ -25,15 +100,18 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
 
     const msg = parsedMessage.message;
 
-    const editInfo = msg.forum_topic_edited ?? parsedMessage.message.forum_topic_edited;
-    if (!editInfo) {
-      console.log("[topicEdit] 无 forum_topic_edited，跳过");
+    const createInfo = msg.forum_topic_created ?? parsedMessage.forumTopicCreated;
+    const editInfo = msg.forum_topic_edited ?? parsedMessage.forumTopicEdited;
+    const topicInfo = createInfo ?? editInfo;
+    if (!topicInfo) {
+      console.log("[topicEdit] 无 forum topic 事件，跳过");
       return;
     }
 
     const chatId: number = parsedMessage.chatId ?? msg.chat?.id;
     const threadId: number | undefined = parsedMessage.threadId ?? msg.message_thread_id;
-    const newTitle: string | undefined = (editInfo && typeof editInfo.name === "string") ? editInfo.name : undefined;
+    const newTitle: string | undefined = (topicInfo && typeof topicInfo.name === "string") ? topicInfo.name : undefined;
+    const eventType = createInfo ? 'created' : 'edited';
 
     if (!chatId || !threadId) {
       console.log("[topicEdit] 无 chatId 或 threadId，跳过");
@@ -58,10 +136,7 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
     };
 
     const allowedThreads = whitelist[chatId];
-    if (!allowedThreads || !allowedThreads.includes(threadId)) {
-      console.log(`[topicEdit] chat_id=${chatId} threadId=${threadId} 不在白名单，跳过`);
-      return;
-    }
+    const shouldUpdateTopicStatus = Boolean(allowedThreads && allowedThreads.includes(threadId));
 
     console.log(`[topicEdit] 话题标题更新：chat=${chatId} thread=${threadId} newTitle="${newTitle}"`);
 
@@ -93,8 +168,18 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
     // --- KV key + 读取 ---
     const KV_KEY = 'topic_status:single';
     const kv = env.TOPIC_KV;
-    if (!kv) {
-      console.error("[topicEdit] 未绑定 TOPIC_KV，跳过");
+    if (!kv || !shouldUpdateTopicStatus) {
+      if (!kv) console.error("[topicEdit] 未绑定 TOPIC_KV，跳过状态提示");
+      if (!shouldUpdateTopicStatus) console.log(`[topicEdit] chat_id=${chatId} threadId=${threadId} 不在状态提示白名单，仅记录 D1`);
+      await recordTopicEvent(env, {
+        chatId,
+        threadId,
+        eventType,
+        oldName: null,
+        newName: newTitle,
+        messageId: msg.message_id ?? null,
+        actorUserId: parsedMessage.from?.id ?? msg.from?.id ?? null,
+      });
       return;
     }
 
@@ -104,7 +189,7 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
     } | null = null;
 
     try {
-      record = await kv.get(KV_KEY, "json") as any;
+      record = parseTopicKvRecord(await kv.get(KV_KEY, "json"));
     } catch (err) {
       console.warn("[topicEdit] 读取 KV 时出错，继续以空记录初始化", err);
       record = null;
@@ -128,6 +213,16 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
 
     const prevTitle = record.titles[threadId.toString()] ?? '等待初始化标题';
     record.titles[threadId.toString()] = newTitle;
+
+    await recordTopicEvent(env, {
+      chatId,
+      threadId,
+      eventType,
+      oldName: eventType === 'edited' ? prevTitle : null,
+      newName: newTitle,
+      messageId: msg.message_id ?? null,
+      actorUserId: parsedMessage.from?.id ?? msg.from?.id ?? null,
+    });
 
     try {
       await kv.put(KV_KEY, JSON.stringify(record));

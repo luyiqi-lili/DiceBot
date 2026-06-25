@@ -11,6 +11,7 @@ const DEFAULT_LIMIT = 10;
 type TopicTopRow = {
 	thread_id: number;
 	topic_name: string | null;
+	metadata_topic_name?: string | null;
 	message_count: number;
 };
 
@@ -20,7 +21,8 @@ function fallbackTopicName(threadId: number): string {
 
 function displayTopicName(chatId: number, row: TopicTopRow): string {
 	const topicName = String(row.topic_name ?? '').trim();
-	return topicName || getKnownTopicRoomName(chatId, row.thread_id) || fallbackTopicName(row.thread_id);
+	const metadataTopicName = String(row.metadata_topic_name ?? '').trim();
+	return topicName || metadataTopicName || getKnownTopicRoomName(chatId, row.thread_id) || fallbackTopicName(row.thread_id);
 }
 
 function normalizeRows(result: any): TopicTopRow[] {
@@ -42,6 +44,20 @@ function buildTopReply(chatId: number, rows: TopicTopRow[]): string {
 		'',
 		...lines,
 	].join('\n');
+}
+
+async function ensureTopicMetadataTable(env: Env): Promise<void> {
+	await env.DB!.prepare(`
+		CREATE TABLE IF NOT EXISTS topic_metadata (
+			chat_id INTEGER NOT NULL,
+			thread_id INTEGER NOT NULL,
+			current_name TEXT NOT NULL DEFAULT '',
+			created_at TEXT,
+			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+			last_event_message_id INTEGER,
+			PRIMARY KEY (chat_id, thread_id)
+		)
+	`).run();
 }
 
 export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
@@ -75,6 +91,8 @@ export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
 	const since = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
 	try {
+		await ensureTopicMetadataTable(env);
+
 		const result = await env.DB.prepare(`
 			SELECT
 				mh.thread_id,
@@ -88,12 +106,16 @@ export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
 					ORDER BY mh2.created_at DESC
 					LIMIT 1
 				), '') AS topic_name,
+				tm.current_name AS metadata_topic_name,
 				COUNT(*) AS message_count
 			FROM message_history mh
+			LEFT JOIN topic_metadata tm
+				ON tm.chat_id = mh.chat_id
+				AND tm.thread_id = mh.thread_id
 			WHERE mh.chat_id = ?
 				AND mh.created_at >= ?
 				AND mh.thread_id IS NOT NULL
-			GROUP BY mh.thread_id
+			GROUP BY mh.thread_id, tm.current_name
 			ORDER BY message_count DESC, mh.thread_id ASC
 			LIMIT ?
 		`)

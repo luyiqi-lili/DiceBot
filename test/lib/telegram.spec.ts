@@ -80,6 +80,25 @@ describe('parsedUpdateFromContext message reactions', () => {
 });
 
 describe('parsedUpdateFromContext forum topic replies', () => {
+	it('parses forum topic creation service messages', () => {
+		const message = {
+			message_id: 210,
+			message_thread_id: 210,
+			is_topic_message: true,
+			date: 1782270001,
+			chat: { id: -100999, type: 'supergroup' },
+			from: { id: 222, is_bot: false, first_name: 'Admin' },
+			forum_topic_created: { name: '酒馆', icon_color: 0x6fb9f0 },
+		};
+
+		const parsed = parsedUpdateFromContext({ update: { update_id: 6, message }, message } as any, 'DiceBot');
+
+		expect(parsed.type).toBe('topic_created');
+		expect(parsed.chatId).toBe(-100999);
+		expect(parsed.threadId).toBe(210);
+		expect(parsed.forumTopicCreated).toEqual({ name: '酒馆', icon_color: 0x6fb9f0 });
+	});
+
 	it('does not treat the implicit forum topic root reply as a user reply', () => {
 		const topicRoot = {
 			message_id: 89,

@@ -233,8 +233,9 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 			return;
 		}
 
+		case 'topic_created':
 		case 'topic_edited': {
-			console.log('index: 检测到 topic_edited');
+			console.log('index: 检测到 topic 事件', parsedMessage.type);
 			try {
 				const { handleTopicEdited } = await import('./commands/topicEditHandler');
 				await handleTopicEdited(parsedMessage, env);

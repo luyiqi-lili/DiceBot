@@ -21,6 +21,7 @@ export type ParsedUpdate = {
 	args?: string[];
 	textPreview?: string | undefined;
 	forumTopicEdited?: any;
+	forumTopicCreated?: any;
 	inlineQuery?: any;
 	inlineQueryId?: string;
 	offset?: string;
@@ -212,6 +213,10 @@ export function parsedUpdateFromContext(ctx: Context, botUsername?: string): Par
 		if (message.forum_topic_edited) {
 			parsed.type = 'topic_edited';
 			parsed.forumTopicEdited = message.forum_topic_edited;
+		}
+		if (message.forum_topic_created) {
+			parsed.type = 'topic_created';
+			parsed.forumTopicCreated = message.forum_topic_created;
 		}
 		if (typeof parsed.text === 'string' && parsed.text.trim()) {
 			const command = parseCommandFromText(parsed.text, botUsername);
