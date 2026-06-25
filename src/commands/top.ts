@@ -1,6 +1,7 @@
 import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { TOP_ADMIN_UIDS } from '../lib/liveConfig';
 import { escapeHtml } from '../lib/util';
+import { getKnownTopicRoomName } from '../data/topics';
 
 import type { Env } from '../index';
 
@@ -17,9 +18,9 @@ function fallbackTopicName(threadId: number): string {
 	return `主题 ${threadId}`;
 }
 
-function displayTopicName(row: TopicTopRow): string {
+function displayTopicName(chatId: number, row: TopicTopRow): string {
 	const topicName = String(row.topic_name ?? '').trim();
-	return topicName || fallbackTopicName(row.thread_id);
+	return topicName || getKnownTopicRoomName(chatId, row.thread_id) || fallbackTopicName(row.thread_id);
 }
 
 function normalizeRows(result: any): TopicTopRow[] {
@@ -27,11 +28,11 @@ function normalizeRows(result: any): TopicTopRow[] {
 	return Array.isArray(rows) ? rows : [];
 }
 
-function buildTopReply(rows: TopicTopRow[]): string {
+function buildTopReply(chatId: number, rows: TopicTopRow[]): string {
 	const first = rows[0];
-	const firstName = displayTopicName(first);
+	const firstName = displayTopicName(chatId, first);
 	const lines = rows.map((row, index) => {
-		const name = escapeHtml(displayTopicName(row));
+		const name = escapeHtml(displayTopicName(chatId, row));
 		return `${index + 1}. ${name}：${Number(row.message_count) || 0} 条`;
 	});
 
@@ -111,7 +112,7 @@ export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
 
 		await TgMessage.sendText(env, {
 			chat_id: chatId,
-			text: buildTopReply(rows),
+			text: buildTopReply(chatId, rows),
 			parse_mode: 'HTML',
 			message_thread_id: threadId,
 		});

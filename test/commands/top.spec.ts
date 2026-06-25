@@ -68,6 +68,27 @@ describe('/top', () => {
 		expect(reply?.text).toContain('3. 耀阳：3 条');
 	});
 
+	it('D1 没有 topic_name 时使用已知房间名称', async () => {
+		const db = makeDb([
+			{ thread_id: 210, topic_name: null, message_count: 19238 },
+			{ thread_id: 162, topic_name: '', message_count: 2133 },
+			{ thread_id: 161, topic_name: null, message_count: 1815 },
+		]);
+
+		await handleTop(makeParsed({
+			chatId: -1002970430696,
+			threadId: 210,
+			from: { id: 8080375150, first_name: 'Admin' },
+			message: { message_id: 1, chat: { id: -1002970430696 }, message_thread_id: 210 },
+		}), { DB: db } as any);
+
+		const reply = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1];
+		expect(reply?.text).toContain('消息最多的主题：<b>酒馆</b>');
+		expect(reply?.text).toContain('1. 酒馆：19238 条');
+		expect(reply?.text).toContain('2. 耀阳：2133 条');
+		expect(reply?.text).toContain('3. 电竞：1815 条');
+	});
+
 	it('没有最近消息时返回空数据提示', async () => {
 		const db = makeDb([]);
 

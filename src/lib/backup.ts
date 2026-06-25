@@ -10,6 +10,7 @@
 
 import { backupConfig, deleteUids } from './liveConfig';
 import TgMessage, { ParsedUpdate, EnvLike } from './telegram';
+import { getKnownTopicRoomName } from '../data/topics';
  
 // 备份配置类型定义（如果 liveConfig 中已有可不重复定义）
 export type BackupTarget = { chat_id: number; threadId?: number };
@@ -209,6 +210,9 @@ async function recordMessageContent(
       (msg as any).topic_name ??
       (msg as any).forum_topic ??
       (msg as any).forum_topic_name ??
+      (msg as any).reply_to_message?.forum_topic_created?.name ??
+      (msg as any).reply_to_message?.forum_topic_edited?.name ??
+      getKnownTopicRoomName(chatId, threadId) ??
       null;
 
     // 文本优先：parsed.text -> caption -> textPreview -> null
