@@ -62,6 +62,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/act end</code> — 结束记录并生成摘要
  <code>/report</code> — AI 生成昨日群聊汇报
  <code>/rule</code> — 查看/设置群组规则
+ <code>/top</code> — （管理）最近 7 天主题消息排行
 
 <b>🎫 彩票（管理）</b>
  <code>/lottery now</code> — 开奖

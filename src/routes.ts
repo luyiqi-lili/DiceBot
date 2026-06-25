@@ -42,6 +42,9 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 活动记录 ── */
 	act:      { module: './commands/act', handler: 'handleAct' },
 
+	/* ── 主题消息排行 ── */
+	top:      { module: './commands/top', handler: 'handleTop' },
+
 	/* ── 群聊汇报 ── */
 	report:   { module: './commands/report', handler: 'handleReport' },
 

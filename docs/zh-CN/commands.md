@@ -19,6 +19,7 @@ English source: [../commands.md](../commands.md)
 | `/trans` | `handleTrans` | DeepSeek 翻译回复文本 |
 | `/ask` | `handleAsk` | DeepSeek 评论回复内容 |
 | `/act` | `handleAct` | D1 活动/会话记录 |
+| `/top` | `handleTop` | 管理员查看最近 7 天主题消息排行 |
 | `/report` | `handleReport` | AI 群汇报 |
 | `/fate` | `handleFate` | 塔罗式抽取 |
 
