@@ -11,6 +11,8 @@ type MessageAuthorRow = {
 	last_name: string | null;
 };
 
+const FIXED_MEDIA_REPLY_AFFECTION = 5;
+
 function userIdOf(user: any): number | null {
 	const id = Number(user?.id ?? user?.user_id);
 	return Number.isFinite(id) ? id : null;
@@ -39,16 +41,54 @@ function reactionMarkerKey(chatId: number, messageId: number, reactorId: number)
 	return `affection:reaction-counted:${chatId}:${messageId}:${reactorId}`;
 }
 
+function graphemeLength(text: string): number {
+	const segmenterCtor = (Intl as any).Segmenter;
+	if (typeof segmenterCtor === 'function') {
+		const segmenter = new segmenterCtor('zh', { granularity: 'grapheme' });
+		return Array.from(segmenter.segment(text)).length;
+	}
+	return Array.from(text).length;
+}
+
+function isEmojiOnlyText(text: string): boolean {
+	const compact = text.trim().replace(/\s+/g, '');
+	if (!compact) return false;
+	const nonEmoji = compact.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u200D\p{Emoji_Modifier}]/gu, '');
+	return nonEmoji.length === 0;
+}
+
+function isImageMessage(message: any): boolean {
+	if (Array.isArray(message?.photo) && message.photo.length > 0) return true;
+	const mimeType = String(message?.document?.mime_type ?? '');
+	return mimeType.startsWith('image/');
+}
+
+function replyTextOf(parsed: ParsedUpdate): string {
+	const message = parsed.message ?? {};
+	return String(parsed.text ?? message.text ?? message.caption ?? '').trim();
+}
+
+function replyAffectionDelta(parsed: ParsedUpdate): number {
+	const message = parsed.message ?? {};
+	const text = replyTextOf(parsed);
+	if (isImageMessage(message) || message.sticker || isEmojiOnlyText(text)) {
+		return FIXED_MEDIA_REPLY_AFFECTION;
+	}
+	return graphemeLength(text);
+}
+
 async function incrementInteractionAffection(
 	env: AffectionInteractionEnv,
 	source: any,
 	target: any,
+	delta: number,
 ): Promise<boolean> {
 	if (!isCountablePair(source, target)) return false;
+	if (!Number.isFinite(delta) || Math.floor(delta) !== delta || delta <= 0) return false;
 
 	const sourceId = userIdOf(source)!;
 	const targetId = userIdOf(target)!;
-	const result = await incrementAffection(env.DB, env.AFFECTION_KV, sourceId, targetId, displayNameOf(target), 1);
+	const result = await incrementAffection(env.DB, env.AFFECTION_KV, sourceId, targetId, displayNameOf(target), delta);
 	if (!result.ok) {
 		console.error('[affectionInteractions] increment affection failed', { sourceId, targetId, error: result.error });
 		return false;
@@ -91,7 +131,7 @@ async function findMessageAuthor(
 export async function recordReplyAffection(parsed: ParsedUpdate, env: AffectionInteractionEnv): Promise<void> {
 	try {
 		if (!parsed.isReply || !parsed.replyToMessage?.from) return;
-		await incrementInteractionAffection(env, parsed.from, parsed.replyToMessage.from);
+		await incrementInteractionAffection(env, parsed.from, parsed.replyToMessage.from, replyAffectionDelta(parsed));
 	} catch (error) {
 		console.error('[affectionInteractions] record reply affection failed', { error });
 	}
@@ -117,7 +157,7 @@ export async function recordReactionAffection(parsed: ParsedUpdate, env: Affecti
 		const target = await findMessageAuthor(env.DB, chatId, messageId);
 		if (!target) return;
 
-		const incremented = await incrementInteractionAffection(env, reactor, target);
+		const incremented = await incrementInteractionAffection(env, reactor, target, 1);
 		if (!incremented) return;
 
 		await env.AFFECTION_KV.put(markerKey, '1');

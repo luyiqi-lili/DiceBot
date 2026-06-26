@@ -41,17 +41,57 @@ describe('affection interactions', () => {
 		vi.mocked(incrementAffection).mockResolvedValue({ ok: true, value: 1 });
 	});
 
-	it('increments A to B by 1 when A replies to B', async () => {
+	it('increments A to B by the reply text length when A replies to B', async () => {
 		const env = makeEnv();
 		await recordReplyAffection({
 			type: 'message',
 			chatId: -100999,
 			from: { id: 1, first_name: 'A' },
+			text: '你好呀',
+			message: { text: '你好呀' },
 			isReply: true,
 			replyToMessage: { from: { id: 2, first_name: 'B' } },
 		} as any, env);
 
-		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 1);
+		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 3);
+	});
+
+	it('increments A to B by 5 when the reply is a photo', async () => {
+		const env = makeEnv();
+		await recordReplyAffection({
+			type: 'message',
+			chatId: -100999,
+			from: { id: 1, first_name: 'A' },
+			message: { photo: [{ file_id: 'small' }] },
+			isReply: true,
+			replyToMessage: { from: { id: 2, first_name: 'B' } },
+		} as any, env);
+
+		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
+	});
+
+	it('increments A to B by 5 when the reply is a sticker or pure emoji text', async () => {
+		const env = makeEnv();
+		await recordReplyAffection({
+			type: 'message',
+			chatId: -100999,
+			from: { id: 1, first_name: 'A' },
+			message: { sticker: { file_id: 'sticker' } },
+			isReply: true,
+			replyToMessage: { from: { id: 2, first_name: 'B' } },
+		} as any, env);
+		await recordReplyAffection({
+			type: 'message',
+			chatId: -100999,
+			from: { id: 1, first_name: 'A' },
+			text: '🌱❤️',
+			message: { text: '🌱❤️' },
+			isReply: true,
+			replyToMessage: { from: { id: 2, first_name: 'B' } },
+		} as any, env);
+
+		expect(incrementAffection).toHaveBeenNthCalledWith(1, env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
+		expect(incrementAffection).toHaveBeenNthCalledWith(2, env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
 	});
 
 	it('ignores self replies and bot targets', async () => {

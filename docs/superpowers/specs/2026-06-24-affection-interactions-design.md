@@ -6,7 +6,8 @@ Increase directed affection by 1 when user A replies to user B or reacts to one 
 
 ## Behavior
 
-- Any user reply to another non-bot user increases A -> B affection by 1.
+- Any user reply to another non-bot user increases A -> B affection by the reply text length.
+- Photo, image document, sticker, and pure emoji replies increase A -> B affection by 5.
 - Any Telegram reaction emoji counts as a reaction interaction.
 - A user's reaction to the same message can increase affection at most once.
 - If a user cancels a reaction and reacts to the same message again, it does not increase affection again.

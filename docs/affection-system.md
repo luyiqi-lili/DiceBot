@@ -22,7 +22,7 @@ The affection system tracks directional affection between Telegram users.
 
 ## Passive Interactions
 
-Non-command and command replies both count as passive interaction. When user A replies to user B's message, A's affection toward B increases by 1. Self replies and bot targets are ignored.
+Non-command and command replies both count as passive interaction. When user A replies to user B's message, A's affection toward B increases by the length of A's reply text. If A's reply is a photo, image document, sticker, or pure emoji text, it increases affection by 5 instead. Self replies and bot targets are ignored.
 
 Telegram reactions also count as passive interaction. Any reaction emoji counts, but each reacting user can increase affection only once per target message. If A reacts to B's message, cancels the reaction, and reacts to the same message again, the second reaction is ignored.
 
