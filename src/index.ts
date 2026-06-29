@@ -157,6 +157,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 			const { handleEmote } = await import('./commands/emote'); return handleEmote;
 		}
 		case 'help':    { const { handleHelp } = await import('./commands/help'); return handleHelp; }
+		case 'check':   { const { handleCheck } = await import('./commands/check'); return handleCheck; }
 		case 'f': case 'fish': { const { handleFish } = await import('./commands/fish'); return handleFish; }
 		case 'wish':    { const { handleWish } = await import('./commands/wish'); return handleWish; }
 		case 'coin':    { const { handleCoin } = await import('./commands/coin'); return handleCoin; }

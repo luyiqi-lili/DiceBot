@@ -20,6 +20,13 @@ describe('COMMAND_ROUTES', () => {
 		});
 	});
 
+	it('/check 注册到规则查询命令', () => {
+		expect(COMMAND_ROUTES.check).toMatchObject({
+			module: './commands/check',
+			handler: 'handleCheck',
+		});
+	});
+
 	it('/wish 不删除用户原始许愿消息', () => {
 		expect(COMMAND_ROUTES.wish).toMatchObject({
 			module: './commands/wish',

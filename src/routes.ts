@@ -80,6 +80,9 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 帮助 ── */
 	help:     { module: './commands/help', handler: 'handleHelp' },
 
+	/* ── 功能规则查询 ── */
+	check:    { module: './commands/check', handler: 'handleCheck' },
+
 	/* ── 钓鱼 ── */
 	f:        { module: './commands/fish', handler: 'handleFish' },
 	fish:     { module: './commands/fish', handler: 'handleFish' },

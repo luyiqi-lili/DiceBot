@@ -16,6 +16,7 @@ describe('/help', () => {
 		expect(c.text).toContain('💰');
 		expect(c.text).toContain('/roll');
 		expect(c.text).toContain('/coin');
+		expect(c.text).toContain('/check');
 	});
 
 	it('帮助文本和快捷按钮使用 /f 钓鱼指令', async () => {

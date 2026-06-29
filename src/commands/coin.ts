@@ -149,10 +149,10 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21"]);
-const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
-const ERRONEOUS_PRAY_REWARD_FIX_DATE = "2026-06-29";
-const ERRONEOUS_PRAY_REWARD_AMOUNT = 50;
+export const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21"]);
+export const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
+export const ERRONEOUS_PRAY_REWARD_FIX_DATE = "2026-06-29";
+export const ERRONEOUS_PRAY_REWARD_AMOUNT = 50;
 const DAILY_PRAY_FORTUNES = [
   "今日运势：小吉\n适合把想做的小事往前推一步。",
   "今日运势：平稳\n慢慢来就很好，别把日程塞得太满。",

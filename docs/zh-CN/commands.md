@@ -18,6 +18,7 @@ English source: [../commands.md](../commands.md)
 | `/rule` | `handleRule` | D1 群规则 |
 | `/trans` | `handleTrans` | DeepSeek 翻译回复文本 |
 | `/ask` | `handleAsk` | DeepSeek 评论回复内容 |
+| `/check <问题>` | `handleCheck` | 查询当前实现里的功能规则判断逻辑 |
 | `/act` | `handleAct` | D1 活动/会话记录 |
 | `/top` | `handleTop` | 管理员查看最近 7 天主题消息排行 |
 | `/report` | `handleReport` | AI 群汇报 |

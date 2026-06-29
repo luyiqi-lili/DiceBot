@@ -18,6 +18,7 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/rule` | `handleRule` | Group rule storage in D1 |
 | `/trans` | `handleTrans` | Translate replied text with DeepSeek |
 | `/ask` | `handleAsk` | Comment on replied content with DeepSeek |
+| `/check <question>` | `handleCheck` | Explains currently implemented bot rule logic when the question is specific enough |
 | `/act` | `handleAct` | Activity/session recording in D1 |
 | `/top` | `handleTop` | Admin topic ranking by message count over the last 7 days |
 | `/report` | `handleReport` | AI group report generation |

@@ -54,6 +54,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/news YYYYMMDD</code> — 查看指定日期消息
  <code>/trans 日语</code> — 回复消息翻译（默认简体中文）
  <code>/ask</code> — 回复消息，评论内容真假和合理性
+ <code>/check 问题</code> — 查询莉莉当前功能规则
  <code>/echo 内容</code> — 让骰娘评判你的话
  <code>/like</code> — 查看召唤骰娘次数
  <code>/like all</code> — 查看使用排行榜
@@ -90,7 +91,8 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       [
         { text: "/news", switch_inline_query_current_chat: `/news` },
         { text: "/trans", switch_inline_query_current_chat: `/trans English` },
-        { text: "/ask", switch_inline_query_current_chat: `/ask` }
+        { text: "/ask", switch_inline_query_current_chat: `/ask` },
+        { text: "/check", switch_inline_query_current_chat: `/check 每日签到周年庆 50c 的触发逻辑是什么` }
       ],
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },
