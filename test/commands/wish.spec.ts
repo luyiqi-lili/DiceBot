@@ -35,7 +35,7 @@ describe('/wish', () => {
 		vi.mocked(wishCore.approveWishSummaryItems).mockResolvedValue([{ id: 7, item_number: 1, title: '新增签到' }] as any);
 	});
 
-	it('stores a meaningful wish and replies with the wish id', async () => {
+	it('stores a meaningful wish and replies with the wish id, status, and next steps', async () => {
 		await handleWish(makeParsed(), { DB: {} } as any);
 
 		expect(wishCore.createWish).toHaveBeenCalledWith(expect.anything(), {
@@ -45,7 +45,12 @@ describe('/wish', () => {
 			firstName: 'Alice',
 			body: '增加 签到',
 		});
-		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('#42');
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).toContain('#42');
+		expect(text).toContain('状态：已记录');
+		expect(text).toContain('等待莉莉整理');
+		expect(text).toContain('管理员确认');
+		expect(text).toContain('确认后');
 	});
 
 	it('ignores obviously meaningless wishes', async () => {

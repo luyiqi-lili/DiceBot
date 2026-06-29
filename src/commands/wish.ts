@@ -55,7 +55,7 @@ export async function handleWish(parsedMessage: ParsedUpdate, env: Env) {
 
 	await TgMessage.sendText(env, {
 		chat_id: chatId,
-		text: `收到愿望 <b>#${wish.id}</b>：${escapeHtml(body)}\n我会把它放进下一次愿望汇总里。`,
+		text: `莉莉收到愿望 <b>#${wish.id}</b> 啦：${escapeHtml(body)}\n状态：已记录。\n接下来会这样走：等待莉莉整理、管理员确认、确认后开始处理。`,
 		parse_mode: 'HTML',
 		message_thread_id: threadId,
 	});
