@@ -149,8 +149,10 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21", "2026-06-29"]);
+const VIOLET_ANNIVERSARY_PRAY_DATES = new Set(["2026-06-19", "2026-06-21"]);
 const VIOLET_ANNIVERSARY_PRAY_REWARD = 50;
+const ERRONEOUS_PRAY_REWARD_FIX_DATE = "2026-06-29";
+const ERRONEOUS_PRAY_REWARD_AMOUNT = 50;
 const DAILY_PRAY_FORTUNES = [
   "今日运势：小吉\n适合把想做的小事往前推一步。",
   "今日运势：平稳\n慢慢来就很好，别把日程塞得太满。",
@@ -236,10 +238,16 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     // 修复：使用专门的祈祷记录存储，而不是余额
     const prayKey = `coin_pray:${userId}`;
     const today = new Date().toISOString().split("T")[0];
+    const erroneousPrayFixKey = `coin_pray_fix:${ERRONEOUS_PRAY_REWARD_FIX_DATE}:${userId}`;
 
     const lastPrayDate = await doGetRaw(doNs, prayKey);
+    const erroneousPrayFixDone = await doGetRaw(doNs, erroneousPrayFixKey);
+    const shouldFixErroneousPrayReward =
+      today === ERRONEOUS_PRAY_REWARD_FIX_DATE &&
+      lastPrayDate === today &&
+      erroneousPrayFixDone !== "done";
 
-    if (lastPrayDate === today) {
+    if (lastPrayDate === today && !shouldFixErroneousPrayReward) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
@@ -247,6 +255,23 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         message_thread_id: threadId
       });
       return;
+    }
+
+    let correctionText = "";
+    if (shouldFixErroneousPrayReward) {
+      const correction = await addToTreasury(env, doNs, userId, ERRONEOUS_PRAY_REWARD_AMOUNT, "祈祷奖励修正");
+      if (!correction.ok) {
+        await TgMessage.sendText(env, {
+          chat_id: chatId,
+          text: `🙏 ${userName}，莉莉发现今天早些时候把奖励算多了，但现在还没能把这笔记录整理好。先别重复签到，等管理员看一下就好。`,
+          parse_mode: "HTML",
+          message_thread_id: threadId
+        });
+        return;
+      }
+      await doPutRaw(doNs, erroneousPrayFixKey, "done");
+      await doPutRaw(doNs, prayKey, `${today}:corrected`);
+      correctionText = `莉莉发现今天早些时候把奖励算多啦，已经先把多发的 ${ERRONEOUS_PRAY_REWARD_AMOUNT} 💰收回；现在可以重新签到一次。`;
     }
 
     const duringVioletAnniversary = VIOLET_ANNIVERSARY_PRAY_DATES.has(today);
@@ -269,6 +294,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 标记今天已祈祷（使用专门的存储，不是余额）
     await doPutRaw(doNs, prayKey, today);
+    if (today === ERRONEOUS_PRAY_REWARD_FIX_DATE) {
+      await doPutRaw(doNs, erroneousPrayFixKey, "done");
+    }
 
     const newBal = await getBalance(doNs, userId);
     const fortuneText = randomDailyPrayFortune();
@@ -277,7 +305,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       : `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`;
     await TgMessage.sendText(env, {
       chat_id: chatId,
-      text: `${rewardText}\n\n🔮 ${fortuneText}`,
+      text: `${correctionText ? `${correctionText}\n` : ""}${rewardText}\n\n🔮 ${fortuneText}`,
       parse_mode: "HTML",
       message_thread_id: threadId
     });
