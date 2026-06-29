@@ -88,7 +88,7 @@ export async function handleEcho(parsedMessage: ParsedUpdate, env: Env) {
     const generatedResponse = await callAIChat(env, {
       temperature: 0.9,
       maxTokens: 180,
-      timeoutMs: 60000,
+      timeoutMs: 30000,
       messages: [
         {
           role: "system",

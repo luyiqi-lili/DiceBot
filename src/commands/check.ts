@@ -240,7 +240,7 @@ async function answerWithAI(question: string, env: EnvLike): Promise<string | nu
 		const answer = await callAIChat(env as Env, {
 			temperature: 0.2,
 			maxTokens: 900,
-			timeoutMs: 60000,
+			timeoutMs: 30000,
 			messages: [
 				{ role: 'system', content: buildCheckSystemPrompt() },
 				{ role: 'user', content: buildCheckUserPrompt(question) },

@@ -68,7 +68,7 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env) {
 			],
 			maxTokens: 5000,
 			temperature: 0.2,
-			timeoutMs: 60000,
+				timeoutMs: 30000,
 		});
 
 		console.log('[Trans] ✅ 收到 AI 翻译响应');

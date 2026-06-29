@@ -370,7 +370,7 @@ ${longTermMemory ? longTermMemory : '（暂无长期记忆，这是第一次记�
 				],
 				temperature: 0.7,
 				maxTokens: 2000,
-				timeoutMs: 90000,
+				timeoutMs: 30000,
 			});
 			console.log('[Report] ✅ AI 服务响应接收成功');
 		} catch (err) {

@@ -93,7 +93,7 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
                 ],
                 temperature: 0.8,
                 maxTokens: 1800,
-                timeoutMs: 90000,
+                timeoutMs: 30000,
             });
         } catch (err) {
             console.error("🔮 [handleFate] 调用 AI 服务失败", err);

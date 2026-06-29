@@ -447,7 +447,9 @@ export default {
 		try {
 			await request.clone().json();
 			const bot = createTelegramBot(env, ctx);
-			return await webhookCallback(bot, 'cloudflare-mod')(request);
+			return await webhookCallback(bot, 'cloudflare-mod', {
+				timeoutMilliseconds: 30000,
+			})(request);
 		} catch (e) {
 			if (e instanceof SyntaxError) {
 				console.error('index: 无法解析 JSON', e);

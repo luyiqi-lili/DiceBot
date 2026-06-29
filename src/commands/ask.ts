@@ -36,7 +36,7 @@ export async function handleAsk(parsed: ParsedUpdate, env: Env): Promise<void> {
 		const answer = await callAIChat(env, {
 			temperature: 0.3,
 			maxTokens: 1200,
-			timeoutMs: 60000,
+			timeoutMs: 30000,
 			messages: [
 				{
 					role: 'system',
