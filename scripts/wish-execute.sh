@@ -16,6 +16,7 @@ VERIFY_CMD="${WISH_VERIFY_CMD:-npm test -- test/lib/wishCore.spec.ts test/comman
 EXEC_ATTEMPTS="${WISH_EXEC_ATTEMPTS:-3}"
 EXEC_RETRY_DELAY="${WISH_EXEC_RETRY_DELAY:-30}"
 CLEANUP_ON_EXIT=0
+TASK_FINALIZED=0
 
 has_worktree_changes() {
 	! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]
@@ -35,9 +36,16 @@ cleanup_failed_changes() {
 	fi
 	echo "Cleaning generated changes from failed wish task ${TASK_ID:-unknown}." >&2
 	reset_generated_changes
+	if [ "$TASK_FINALIZED" != "1" ] && [ -n "${TASK_ID:-}" ]; then
+		echo "Requeueing interrupted wish task ${TASK_ID}." >&2
+		if ! finish_task "approved" "莉莉这轮处理被中断啦，已经把愿望放回队列，下一轮会重新试。"; then
+			echo "Failed to requeue interrupted wish task ${TASK_ID}." >&2
+		fi
+	fi
 }
 
 trap cleanup_failed_changes EXIT
+trap 'exit 130' INT TERM HUP
 
 notify_telegram() {
 	local text="$1"
@@ -156,31 +164,11 @@ build_completion_result() {
 		] | join("\n")'
 }
 
-if has_worktree_changes; then
-	echo "Working tree is dirty; refusing to run before claiming a wish task." >&2
-	exit 1
-fi
-
-CLAIM_JSON=$(curl_retry -X POST \
-	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
-	"${WORKER_BASE_URL%/}/api/wish/approved/claim")
-
-TASK_ID=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.id // empty')
-if [ -z "$TASK_ID" ]; then
-	echo "No approved wish task."
-	exit 0
-fi
-CLEANUP_ON_EXIT=1
-
-TITLE=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.title')
-BODY=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.body')
-WISH_IDS=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.wish_ids_json')
-WISHERS_JSON=$(printf '%s' "$CLAIM_JSON" | jq -c '.task.wishers_json | fromjson? // []')
-
 finish_task() {
 	local status="$1"
 	local text="$2"
 	local payload
+	TASK_FINALIZED=1
 	payload=$(jq -n --arg status "$status" --arg resultText "$text" '{status: $status, resultText: $resultText}')
 	curl_retry -X POST "${WORKER_BASE_URL%/}/api/wish/tasks/${TASK_ID}/status" \
 		-H "X-API-Key: ${EXTERNAL_API_KEY}" \
@@ -212,6 +200,27 @@ finish_task() {
 requeue_task() {
 	finish_task "approved" "$1"
 }
+
+if has_worktree_changes; then
+	echo "Working tree is dirty; refusing to run before claiming a wish task." >&2
+	exit 1
+fi
+
+CLAIM_JSON=$(curl_retry -X POST \
+	-H "X-API-Key: ${EXTERNAL_API_KEY}" \
+	"${WORKER_BASE_URL%/}/api/wish/approved/claim")
+
+TASK_ID=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.id // empty')
+if [ -z "$TASK_ID" ]; then
+	echo "No approved wish task."
+	exit 0
+fi
+CLEANUP_ON_EXIT=1
+
+TITLE=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.title')
+BODY=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.body')
+WISH_IDS=$(printf '%s' "$CLAIM_JSON" | jq -r '.task.wish_ids_json')
+WISHERS_JSON=$(printf '%s' "$CLAIM_JSON" | jq -c '.task.wishers_json | fromjson? // []')
 
 git pull --ff-only origin main
 
