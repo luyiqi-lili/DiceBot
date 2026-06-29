@@ -145,6 +145,18 @@ if ! printf '%s' "$TELEGRAM_TEXT" | grep -q '<a href="tg://user?id=12345">Alice 
 	exit 1
 fi
 
+STATUS_RESULT=$(jq -r '.resultText' "$STATUS_LOG")
+for required in "实现说明" "关键步骤" "简短描述" "兼容命令" "增加中文命令"; do
+	if ! printf '%s' "$STATUS_RESULT" | grep -q "$required"; then
+		echo "Expected status result to include ${required}, got: ${STATUS_RESULT}" >&2
+		exit 1
+	fi
+	if ! printf '%s' "$TELEGRAM_TEXT" | grep -q "$required"; then
+		echo "Expected completion notification to include ${required}, got: ${TELEGRAM_TEXT}" >&2
+		exit 1
+	fi
+done
+
 if [ "$(jq -r '.parse_mode' "$TELEGRAM_LOG")" != "HTML" ]; then
 	echo "Expected completion notification to use HTML parse mode." >&2
 	exit 1
