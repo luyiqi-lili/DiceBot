@@ -160,6 +160,15 @@ CREATE TABLE IF NOT EXISTS long_term_memory (
   UNIQUE(chat_id, thread_id)
 );
 
+CREATE TABLE IF NOT EXISTS permission_grants (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  permission TEXT NOT NULL,
+  granted_by INTEGER,
+  granted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (chat_id, user_id, permission)
+);
+
 CREATE TABLE IF NOT EXISTS message_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER,

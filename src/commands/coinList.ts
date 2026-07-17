@@ -6,7 +6,6 @@
 
 import TgMessage, { EnvLike } from '../lib/telegram';
 import { deleteMarkup, escapeHtml } from "../lib/util";
-import { ADMIN_UIDS_CHECK } from "../lib/liveConfig";
 import {
   getBalance,
   getTreasury,
@@ -14,6 +13,7 @@ import {
   sumAllUserBalances,
 } from "../lib/coinService";
 import { scopeKey } from "../lib/groupScope";
+import { hasAdminPermission } from "../lib/permissions";
 import type { Env } from "../index";
 type CoinEnv = Env;
 
@@ -27,7 +27,7 @@ export async function handleCoinList(
   env: CoinEnv,
 ): Promise<void> {
   const callerNum = Number(userId);
-  if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+  if (!(await hasAdminPermission(env, chatId, callerNum, 'coin_check'))) {
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `❌ ${userName}，你没有权限使用 /coin list。`,

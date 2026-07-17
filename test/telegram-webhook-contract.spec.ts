@@ -150,15 +150,18 @@ describe('Telegram webhook user-facing contract', () => {
 		expect(answer?.body.url).toContain('auth=');
 	});
 
-	it('ignores Telegram messages from chats outside the allowlist', async () => {
+	it('responds to Telegram messages from any group (allowlist removed)', async () => {
+		const OTHER_CHAT_ID = -1001111111111;
 		const { response } = await postTelegramUpdate(
 			messageUpdate('/help', {
-				chat: { id: -1001111111111, type: 'supergroup', title: 'Other Group' },
+				chat: { id: OTHER_CHAT_ID, type: 'supergroup', title: 'Other Group' },
 			}),
 		);
 
 		expect(response.status).toBe(200);
-		expect(telegramCalls(fetchMock)).toHaveLength(0);
+		const sendMessage = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(sendMessage?.body.chat_id).toBe(OTHER_CHAT_ID);
+		expect(sendMessage?.body.text).toContain('可用命令');
 	});
 
 	it('handles Business private messages with a business_connection_id', async () => {

@@ -52,6 +52,7 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 - 骰子与游戏：`/roll`、`/r`、`/rd`、`/rh`、`/groll`、`/21`、`/duel`。
 - 经济：`/coin`、`/lottery`、`/congrats`、`/恭喜发财`。
 - 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/trans`、`/ask`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`、`/report`。
+- 权限控制：机器人在其被加入的任意群组都会响应（无群组白名单；数据按 `chat_id` 隔离）。群主自动拥有全部管理命令权限，并可用 `/perm` 为具体用户授予/移除权限（存于 D1 `permission_grants` 表）。详见 [docs/zh-CN/commands.md](docs/zh-CN/commands.md)。
 - 钓鱼：`/f`、`/f check`、`/f add`、`/f list`、`/f remove`。
 - 好感度：`/rose`、`/rose send`、`/rose check`。
 - Wish 自动化：`/wish`；管理员回复汇总消息批准任务。

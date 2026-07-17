@@ -56,6 +56,7 @@ Main command groups:
 - Dice and party games: `/roll`, `/r`, `/rd`, `/rh`, `/groll`, `/21`, `/duel`.
 - Economy: `/coin`, `/lottery`, `/congrats`, `/恭喜发财`.
 - Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/trans`, `/ask`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/report`.
+- Access control: the bot responds in any group it is added to (no chat allowlist; data isolated per `chat_id`). Group owners implicitly hold every admin permission and can grant/revoke per-user permissions with `/perm` (stored in D1 `permission_grants`). See [docs/commands.md](docs/commands.md#access-control-and-permissions).
 - Fish: `/f`, `/f check`, `/f add`, `/f list`, `/f remove`.
 - Affection: `/rose`, `/rose send`, `/rose check`.
 - Wish automation: `/wish`; admin replies to digest messages approve tasks.

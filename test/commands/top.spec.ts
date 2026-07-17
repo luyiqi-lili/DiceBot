@@ -21,9 +21,10 @@ function makeParsed(o: any = {}): any {
 function makeDb(results: any[]) {
 	const run = vi.fn().mockResolvedValue({ success: true });
 	const all = vi.fn().mockResolvedValue({ results });
-	const bind = vi.fn(() => ({ all }));
-	const prepare = vi.fn(() => ({ bind, run }));
-	return { prepare, bind, all, run };
+	const first = vi.fn().mockResolvedValue(null); // 动态权限查询默认无授权
+	const bind = vi.fn(() => ({ all, first }));
+	const prepare = vi.fn(() => ({ bind, run, first }));
+	return { prepare, bind, all, run, first };
 }
 
 describe('/top', () => {
@@ -42,7 +43,9 @@ describe('/top', () => {
 
 		await handleTop(makeParsed(), { DB: db } as any);
 
-		expect(db.prepare).not.toHaveBeenCalled();
+		// 权限判定可能查询 permission_grants，但绝不应触及主题排行/建表查询
+		const preparedSqls = db.prepare.mock.calls.map(c => String(c[0]));
+		expect(preparedSqls.every(s => s.includes('permission_grants'))).toBe(true);
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]).toMatchObject({
 			chat_id: -100999,
 			message_thread_id: 66,

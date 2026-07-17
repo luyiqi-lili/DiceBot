@@ -7,7 +7,6 @@
 
 import { Bot, webhookCallback, type Context } from 'grammy';
 import TgMessage, { getTelegramApiClientOptions, parsedUpdateFromContext, type ParsedUpdate } from './lib/telegram';
-import { ALLOWED_CHAT_IDS } from './lib/liveConfig';
 import { incrementUsageCount } from './commands/like';
 import { runCoinCheck } from './cron/cron';
 import { handleBackup } from './lib/backup';
@@ -147,6 +146,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'ask':     { const { handleAsk } = await import('./commands/ask'); return handleAsk; }
 		case 'book':    { const { handleBook } = await import('./commands/book'); return handleBook; }
 		case 'whoami':  { const { handleWhoami } = await import('./commands/whoami'); return handleWhoami; }
+		case 'perm':    { const { handlePerm } = await import('./commands/perm'); return handlePerm; }
 		case 'fate':    { const { handleFate } = await import('./commands/fate'); return handleFate; }
 		case 'item':    { const { handleItem } = await import('./commands/item'); return handleItem; }
 		case 'rose':    { const { handleRose } = await import('./commands/rose'); return handleRose; }
@@ -215,10 +215,8 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 		return;
 	}
 
-	if (!ALLOWED_CHAT_IDS.has(parsedMessage.chatId)) {
-		console.log(`🚫 chatId ${parsedMessage.chatId} 不在允许响应的群组内，跳过处理`);
-		return;
-	}
+	// 群组白名单已放开：机器人在其被加入的任意群组均可使用。
+	// 数据按 chat_id 隔离存储，无需再对 chatId 做准入过滤。
 
 	console.log('index:parsedMessage.type', parsedMessage.type);
 

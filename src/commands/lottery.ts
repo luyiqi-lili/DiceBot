@@ -9,8 +9,8 @@
 import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { Env } from '../index';
 import { deleteMarkup, escapeHtml } from "../lib/util";
-import { LOTTERY_ADMIN_UIDS } from "../lib/liveConfig";
 import { getBalance, transfer } from "../lib/coinService";
+import { hasAdminPermission } from "../lib/permissions";
 
 type LotteryEnv = Env;
 const TICKET_PRICE = 10;
@@ -418,7 +418,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery list - 管理员查看购买记录
     if (sub === "list") {
         const callerNum = Number(userId);
-        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
+        if (!(await hasAdminPermission(env, chatId, callerNum, 'lottery'))) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限查看购买记录。`,
@@ -518,7 +518,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery now - 管理员开奖
     if (sub === "now") {
         const callerNum = Number(userId);
-        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
+        if (!(await hasAdminPermission(env, chatId, callerNum, 'lottery'))) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限开奖。`,
@@ -672,7 +672,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     // /lottery clean - 管理员清空记录
     if (sub === "clean") {
         const callerNum = Number(userId);
-        if (!LOTTERY_ADMIN_UIDS.includes(callerNum)) {
+        if (!(await hasAdminPermission(env, chatId, callerNum, 'lottery'))) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,
                 text: `❌ ${userName}，你没有权限清空记录。`,

@@ -1,7 +1,7 @@
 import TgMessage, { ParsedUpdate } from '../lib/telegram';
-import { TOP_ADMIN_UIDS } from '../lib/liveConfig';
 import { escapeHtml } from '../lib/util';
 import { getKnownTopicRoomName } from '../data/topics';
+import { hasAdminPermission } from '../lib/permissions';
 
 import type { Env } from '../index';
 
@@ -75,7 +75,7 @@ export async function handleTop(parsedMessage: ParsedUpdate, env: Env) {
 		return;
 	}
 
-	if (!TOP_ADMIN_UIDS.includes(callerId)) {
+	if (!(await hasAdminPermission(env, chatId, callerId, 'top'))) {
 		await TgMessage.sendText(env, {
 			chat_id: chatId,
 			text: '❌ 你没有权限使用 /top。',

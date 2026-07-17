@@ -9,13 +9,7 @@ import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import type { Env } from "../index";
 import { deleteMarkup, escapeHtml } from "../lib/util";
 import { handleCoinList } from "./coinList";
-import {
-  payConfigs,
-  ADMIN_UIDS_CHECK,
-  ADMIN_UIDS_TAKE,
-  ADMIN_UIDS_CREATE,
-  ADMIN_UIDS_REMOVE,
-} from "../lib/liveConfig";
+import { payConfigs } from "../lib/liveConfig";
 import {
   getBalance,
   getTreasury,
@@ -26,6 +20,7 @@ import {
   transfer
 } from "../lib/coinService";
 import { scopeKey } from "../lib/groupScope";
+import { hasAdminPermission } from "../lib/permissions";
 
 type CoinEnv = Env; // 统一类型，从 ../index 导入
 
@@ -497,7 +492,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   // /coin check - 保持不变
   if (sub === "check") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS_CHECK.includes(callerNum)) {
+    if (!(await hasAdminPermission(env, chatId, callerNum, 'coin_check'))) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，你没有权限使用 /coin check。`,
@@ -554,7 +549,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   // /coin remove - 保持不变
   if (sub === "remove") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS_REMOVE.includes(callerNum)) {
+    if (!(await hasAdminPermission(env, chatId, callerNum, 'coin_remove'))) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，你没有权限使用 /coin remove。`,
@@ -616,7 +611,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   // /coin take - 保持不变
   if (sub === "take") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS_TAKE.includes(callerNum)) {
+    if (!(await hasAdminPermission(env, chatId, callerNum, 'coin_take'))) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，你没有权限使用 /coin take。`,
@@ -674,7 +669,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   // /coin create - 保持不变
   if (sub === "create") {
     const callerNum = Number(userId);
-    if (!ADMIN_UIDS_CREATE.includes(callerNum)) {
+    if (!(await hasAdminPermission(env, chatId, callerNum, 'coin_create'))) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${userName}，你没有权限使用 /coin create。`,

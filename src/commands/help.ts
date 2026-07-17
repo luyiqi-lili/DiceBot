@@ -69,6 +69,13 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/lottery now</code> — 开奖
  <code>/lottery clean</code> — 清空记录
  <code>/lottery list</code> — 查看购买记录
+
+<b>🛡️ 权限（群主）</b>
+ 群主自动拥有全部管理命令权限，并可授权他人：
+ <code>/perm grant coin_take</code> — 回复某人，授予其某项管理权限
+ <code>/perm revoke coin_take</code> — 回复某人，移除该权限
+ <code>/perm list</code> — 回复某人，查看其已获授权
+ <code>/perm keys</code> — 查看全部可授予的权限名
 </blockquote>`;
 
   const reply_markup = {

@@ -23,6 +23,35 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/top` | `handleTop` | Admin topic ranking by message count over the last 7 days |
 | `/report` | `handleReport` | AI group report generation |
 | `/fate` | `handleFate` | Tarot-style draw |
+| `/perm` | `handlePerm` | Group owner grants/revokes admin permissions per user (see below) |
+
+## Access Control And Permissions
+
+The bot responds in **any group it is added to** — there is no chat allowlist. Stored data is isolated per Telegram `chat_id`.
+
+Admin commands (`/coin check|take|create|remove`, `/coin list`, `/lottery` admin subcommands, `/top`) authorize a caller if **any** of the following holds:
+
+1. The caller's Telegram user id is in a static allowlist (`src/data/admin.ts`).
+2. The caller is the **group owner** (Telegram `creator`) — owners implicitly hold every admin permission.
+3. The caller has been **dynamically granted** that permission in this group via `/perm` (stored in D1 table `permission_grants`, isolated per `chat_id`).
+
+Authorization is centralized in `hasAdminPermission()` (`src/lib/permissions.ts`).
+
+### `/perm` — dynamic per-user permissions (group owner only)
+
+Reply to the target user's message, then run one of:
+
+| Command | Effect |
+|---------|--------|
+| `/perm grant <key\|all>` | Grant a permission to the replied-to user |
+| `/perm revoke <key\|all>` | Revoke a permission |
+| `/perm list` | List the user's dynamically granted permissions |
+| `/perm keys` | Show all available permission keys (open to everyone) |
+| `/perm help` | Usage help (open to everyone) |
+
+Instead of replying, a numeric user id may be appended (e.g. `/perm grant coin_take 12345`).
+
+Permission keys: `coin_check`, `coin_take`, `coin_create`, `coin_remove`, `lottery`, `top`, plus `all`. `grant`/`revoke`/`list` require the caller to be the group owner and require the D1 `DB` binding.
 
 ## Dice And Games
 

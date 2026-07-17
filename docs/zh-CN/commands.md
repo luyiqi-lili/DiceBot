@@ -23,6 +23,35 @@ English source: [../commands.md](../commands.md)
 | `/top` | `handleTop` | 管理员查看最近 7 天主题消息排行 |
 | `/report` | `handleReport` | AI 群汇报 |
 | `/fate` | `handleFate` | 塔罗式抽取 |
+| `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
+
+## 权限控制
+
+机器人在**任意被加入的群组**都会响应——没有群组白名单。存储数据按 Telegram `chat_id` 隔离。
+
+管理命令（`/coin check|take|create|remove`、`/coin list`、`/lottery` 管理子命令、`/top`）在满足以下**任一**条件时通过鉴权：
+
+1. 调用者的 Telegram 用户 ID 在静态白名单中（`src/data/admin.ts`）。
+2. 调用者是**群主**（Telegram `creator`）——群主隐式拥有全部管理权限。
+3. 调用者在本群被群主通过 `/perm` **动态授予**了该权限（存于 D1 表 `permission_grants`，按 `chat_id` 隔离）。
+
+鉴权逻辑集中在 `hasAdminPermission()`（`src/lib/permissions.ts`）。
+
+### `/perm` — 按用户的动态权限（仅群主）
+
+回复目标用户的一条消息后，执行：
+
+| 命令 | 作用 |
+|------|------|
+| `/perm grant <权限名\|all>` | 授予被回复用户某项权限 |
+| `/perm revoke <权限名\|all>` | 移除某项权限 |
+| `/perm list` | 查看该用户已被动态授予的权限 |
+| `/perm keys` | 列出全部可用权限名（所有人可用）|
+| `/perm help` | 用法帮助（所有人可用）|
+
+也可不回复、在命令末尾附数字用户 ID（例如 `/perm grant coin_take 12345`）。
+
+权限名：`coin_check`、`coin_take`、`coin_create`、`coin_remove`、`lottery`、`top`，以及 `all`。`grant`/`revoke`/`list` 要求调用者为群主，且需要 D1 `DB` 绑定。
 
 ## 骰子与游戏
 
