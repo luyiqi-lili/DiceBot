@@ -182,8 +182,8 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
 	// 读取余额与记录
 	const ownerIdStr = String(ownerId);
-	const currentBal = await coinGetBalance(env.COIN_DO, ownerIdStr);
-	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
+	const currentBal = await coinGetBalance(env.COIN_DO, chatId, ownerIdStr);
+	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr);
 	const fishList = await getFishCatalog(requireFishKv(env));
 
 	const zeroCount = (fishingRecord.results || []).filter((r) => r.fishValue === 0).length;
@@ -216,7 +216,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
 		fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId });
 		fishingRecord.count += 1;
-		await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
+		await setFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr, fishingRecord);
 
 		const fishingRecordText = showFishingRecord(fishingRecord);
 		const text =
@@ -242,7 +242,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 
 		fishingRecord.results.push({ baitCost, hooked: false, fishValue: 0, messageId });
 		fishingRecord.count += 1;
-		await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
+		await setFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr, fishingRecord);
 
 		const fishingRecordText = showFishingRecord(fishingRecord);
 		const text =
@@ -275,7 +275,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 		// 给用户发奖（允许国库赤字）
 		const payout = Number(chosen.value) || 0;
 		const newOwnerBal = currentBal + payout;
-		await takeFromTreasury(env, env.COIN_DO, ownerIdStr, payout, '渔获（保底）');
+		await takeFromTreasury(env, env.COIN_DO, chatId, ownerIdStr, payout, '渔获（保底）');
 
 		// 更新鱼塘当天 payout
 		const today = nowDateYMD();
@@ -285,7 +285,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 		(fishingRecord as any).guaranteeUsed = true;
 		fishingRecord.results.push({ baitCost, hooked: true, fishValue: chosen.name, messageId });
 		fishingRecord.count += 1;
-		await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
+		await setFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr, fishingRecord);
 
 		const resultText =
 			`${clickerName} 拉杆！\n` +
@@ -313,7 +313,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	if (fishCoreResult.hooked) {
 		const payout = fishCoreResult.fishValue;
 		const newOwnerBal = currentBal + payout;
-		await takeFromTreasury(env, env.COIN_DO, ownerIdStr, payout, '渔获');
+		await takeFromTreasury(env, env.COIN_DO, chatId, ownerIdStr, payout, '渔获');
 
 		// 更新鱼塘当日 payout
 		const today = nowDateYMD();
@@ -336,7 +336,7 @@ export async function handleFishCallback(callbackQuery: any, callbackData: any, 
 	// 写入记录并回复
 	fishingRecord.results.push({ baitCost, hooked: fishCoreResult.hooked, fishValue: fishCoreResult.hooked ? fishCoreResult.fishName : 0, messageId });
 	fishingRecord.count += 1;
-	await setFishingRecord(env.FISHING_RECORD_KV, ownerIdStr, fishingRecord);
+	await setFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr, fishingRecord);
 
 	resultText += showFishingRecord(fishingRecord);
 
@@ -471,7 +471,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 			return;
 		}
 
-		const currentBal = await coinGetBalance(env.COIN_DO, ownerIdStr);
+		const currentBal = await coinGetBalance(env.COIN_DO, chatId, ownerIdStr);
 		if (currentBal < FISH_ADD_COST) {
 			await TgMessage.sendText(env, {
 				chat_id: chatId,
@@ -484,7 +484,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 
 		let fish;
 		try {
-			const charge = await addToTreasury(env, env.COIN_DO, ownerIdStr, FISH_ADD_COST, '添加鱼');
+			const charge = await addToTreasury(env, env.COIN_DO, chatId, ownerIdStr, FISH_ADD_COST, '添加鱼');
 			if (!charge.ok) {
 				await TgMessage.sendText(env, {
 					chat_id: chatId,
@@ -575,7 +575,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	}
 
 	// 读取记录、检查次数
-	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, ownerIdStr);
+	const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, chatId, ownerIdStr);
 	await getFishCatalog(requireFishKv(env));
 	if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
 		await TgMessage.sendText(env, {
@@ -588,7 +588,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	}
 
 	// 读取余额与扣除 baitCost（发起者先付鱼饵）
-	const currentBal = await coinGetBalance(kvBackend, ownerIdStr);
+	const currentBal = await coinGetBalance(kvBackend, chatId, ownerIdStr);
 	if (currentBal < baitCost) {
 		await TgMessage.sendText(env, {
 			chat_id: chatId,
@@ -602,7 +602,7 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	// 扣除用户余额（直接用 coinSetBalance）
 
 	// 把鱼饵费用计入艾丽莎宝库（若要计费可使用 addToTreasury）
-	await addToTreasury(env, env.COIN_DO, ownerIdStr, baitCost, '鱼饵');
+	await addToTreasury(env, env.COIN_DO, chatId, ownerIdStr, baitCost, '鱼饵');
 
 	// 同时把鱼饵消耗计入鱼塘当天汇总
 	const today = nowDateYMD();

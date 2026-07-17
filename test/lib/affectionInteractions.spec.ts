@@ -53,7 +53,7 @@ describe('affection interactions', () => {
 			replyToMessage: { from: { id: 2, first_name: 'B' } },
 		} as any, env);
 
-		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 3);
+		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, -100999, 1, 2, 'B', 3);
 	});
 
 	it('increments A to B by 5 when the reply is a photo', async () => {
@@ -67,7 +67,7 @@ describe('affection interactions', () => {
 			replyToMessage: { from: { id: 2, first_name: 'B' } },
 		} as any, env);
 
-		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
+		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, -100999, 1, 2, 'B', 5);
 	});
 
 	it('increments A to B by 5 when the reply is a sticker or pure emoji text', async () => {
@@ -90,8 +90,8 @@ describe('affection interactions', () => {
 			replyToMessage: { from: { id: 2, first_name: 'B' } },
 		} as any, env);
 
-		expect(incrementAffection).toHaveBeenNthCalledWith(1, env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
-		expect(incrementAffection).toHaveBeenNthCalledWith(2, env.DB, env.AFFECTION_KV, 1, 2, 'B', 5);
+		expect(incrementAffection).toHaveBeenNthCalledWith(1, env.DB, env.AFFECTION_KV, -100999, 1, 2, 'B', 5);
+		expect(incrementAffection).toHaveBeenNthCalledWith(2, env.DB, env.AFFECTION_KV, -100999, 1, 2, 'B', 5);
 	});
 
 	it('ignores self replies and bot targets', async () => {
@@ -132,7 +132,7 @@ describe('affection interactions', () => {
 		} as any, env);
 
 		expect(env.__db.prepare).toHaveBeenCalled();
-		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, 1, 2, 'B', 1);
+		expect(incrementAffection).toHaveBeenCalledWith(env.DB, env.AFFECTION_KV, -100999, 1, 2, 'B', 1);
 		expect(env.__kv.put).toHaveBeenCalledWith('affection:reaction-counted:-100999:42:1', '1');
 	});
 

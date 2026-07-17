@@ -20,12 +20,13 @@ CREATE TABLE IF NOT EXISTS act_sessions (
 );
 
 CREATE TABLE IF NOT EXISTS affections (
+  chat_id TEXT NOT NULL DEFAULT '',
   source_id INTEGER NOT NULL,
   target_id INTEGER NOT NULL,
   first_name TEXT NOT NULL DEFAULT '',
   value INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  PRIMARY KEY (source_id, target_id)
+  PRIMARY KEY (chat_id, source_id, target_id)
 );
 
 CREATE TABLE IF NOT EXISTS dnd_characters (
@@ -199,26 +200,31 @@ CREATE TABLE IF NOT EXISTS topic_events (
 );
 
 CREATE TABLE IF NOT EXISTS rose_sends (
-  user_id INTEGER PRIMARY KEY,
+  chat_id TEXT NOT NULL DEFAULT '',
+  user_id INTEGER NOT NULL,
   send_date TEXT NOT NULL,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (chat_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS user_last_active (
-  user_id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL,
   username TEXT,
   first_name TEXT,
   last_name TEXT,
-  chat_id INTEGER,
+  chat_id INTEGER NOT NULL DEFAULT 0,
   last_active_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (chat_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS user_usage_count (
-  user_id INTEGER PRIMARY KEY,
+  chat_id INTEGER NOT NULL DEFAULT 0,
+  user_id INTEGER NOT NULL,
   first_name TEXT NOT NULL DEFAULT '',
   usage_count INTEGER NOT NULL DEFAULT 0,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (chat_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS wish_summaries (

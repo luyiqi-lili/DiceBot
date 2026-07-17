@@ -1,12 +1,13 @@
 /**
  * @file lib/affectionDB.ts
- * @description 好感度系统的数据库存储层。
+ * @description 好感度系统的数据库存储层（按群组 chat_id 隔离）。
  *   使用 D1 数据库存储好感度数据，同时保留 KV 回退机制以支持平滑迁移。
  *
- *   迁移策略：
- *   - 读操作：优先从数据库查询，没有数据则从 KV 读取并自动写入数据库
- *   - 写操作：只写入数据库，不回写 KV
- *   - 排行榜：合并 DB 和 KV 结果，KV 中未迁移的 source 也会被计入
+ *   隔离策略：
+ *   - 所有 D1 查询都带上 chat_id；affections/rose_sends 主键含 chat_id。
+ *   - KV 回退 key 也按 chatId 作用域：affection:${chatId}:${sourceId} /
+ *     rose_send:${chatId}:${userId}。
+ *   - 历史（未隔离）数据由一次性迁移回填到 LEGACY_CHAT_ID，不在此处处理。
  */
 
 // 数据库表已在 D1 控制台手动创建，不再执行建表语句
@@ -14,12 +15,16 @@ async function ensureDB(_db: D1Database): Promise<void> {}
 
 /* ---------- KV 辅助（用于回退） ---------- */
 
+function affectionKvKey(chatId: string | number, sourceId: number): string {
+  return `affection:${chatId}:${sourceId}`;
+}
+
 async function readAffectionMapFromKV(
   kv: KVNamespace,
+  chatId: string | number,
   sourceId: number
 ): Promise<Record<string, { firstName: string; value: number }>> {
-  const key = `affection:${sourceId}`;
-  const raw = await kv.get(key);
+  const raw = await kv.get(affectionKvKey(chatId, sourceId));
   if (!raw) return {};
   try {
     return JSON.parse(raw) as Record<string, { firstName: string; value: number }>;
@@ -30,30 +35,34 @@ async function readAffectionMapFromKV(
 
 async function writeAffectionMapToKV(
   kv: KVNamespace,
+  chatId: string | number,
   sourceId: number,
   map: Record<string, { firstName: string; value: number }>
 ): Promise<void> {
-  await kv.put(`affection:${sourceId}`, JSON.stringify(map));
+  await kv.put(affectionKvKey(chatId, sourceId), JSON.stringify(map));
 }
 
 async function writeMapToDB(
   db: D1Database,
+  chatId: string | number,
   sourceId: number,
   map: Record<string, { firstName: string; value: number }>
 ): Promise<void> {
-  // 先删除该 source 的旧数据
-  await db.prepare('DELETE FROM affections WHERE source_id = ?').bind(sourceId).run();
+  // 先删除该 (chat, source) 的旧数据
+  await db.prepare('DELETE FROM affections WHERE chat_id = ? AND source_id = ?')
+    .bind(String(chatId), sourceId)
+    .run();
 
   const entries = Object.entries(map);
   if (entries.length === 0) return;
 
   // 批量插入
   const stmt = db.prepare(
-    `INSERT INTO affections (source_id, target_id, first_name, value, updated_at)
-     VALUES (?, ?, ?, ?, datetime('now'))`
+    `INSERT INTO affections (chat_id, source_id, target_id, first_name, value, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`
   );
   const batch = entries.map(([targetId, rec]) =>
-    stmt.bind(sourceId, Number(targetId), rec.firstName, rec.value)
+    stmt.bind(String(chatId), sourceId, Number(targetId), rec.firstName, rec.value)
   );
   await db.batch(batch);
 }
@@ -69,20 +78,21 @@ export async function initAffectionTables(db: D1Database): Promise<void> {
 }
 
 /**
- * 读取某 source 的好感度 map。
+ * 读取某 (chat, source) 的好感度 map。
  * 优先查询数据库，无数据则从 KV 读取并自动迁移到数据库。
  */
 export async function readAffectionMap(
   db: D1Database | undefined,
   kv: KVNamespace,
+  chatId: string | number,
   sourceId: number
 ): Promise<Record<string, { firstName: string; value: number }>> {
   if (db) {
     try {
       await ensureDB(db);
       const { results } = await db
-        .prepare('SELECT target_id, first_name, value FROM affections WHERE source_id = ?')
-        .bind(sourceId)
+        .prepare('SELECT target_id, first_name, value FROM affections WHERE chat_id = ? AND source_id = ?')
+        .bind(String(chatId), sourceId)
         .all<{ target_id: number; first_name: string; value: number }>();
 
       if (results && results.length > 0) {
@@ -101,11 +111,11 @@ export async function readAffectionMap(
   }
 
   // 回退到 KV
-  const map = await readAffectionMapFromKV(kv, sourceId);
+  const map = await readAffectionMapFromKV(kv, chatId, sourceId);
 
   // 如果有 DB，将 KV 数据迁移到数据库
   if (db && Object.keys(map).length > 0) {
-    await writeMapToDB(db, sourceId, map).catch((e) =>
+    await writeMapToDB(db, chatId, sourceId, map).catch((e) =>
       console.error('[affectionDB] 迁移 KV→DB 失败', e)
     );
   }
@@ -120,12 +130,13 @@ export async function readAffectionMap(
 export async function writeAffectionMap(
   db: D1Database,
   kv: KVNamespace,
+  chatId: string | number,
   sourceId: number,
   map: Record<string, { firstName: string; value: number }>
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     await ensureDB(db);
-    await writeMapToDB(db, sourceId, map);
+    await writeMapToDB(db, chatId, sourceId, map);
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -135,11 +146,12 @@ export async function writeAffectionMap(
 }
 
 /**
- * 原子增加某 source 对 target 的好感度。
+ * 原子增加某 (chat, source) 对 target 的好感度。
  */
 export async function incrementAffection(
   db: D1Database | undefined,
   kv: KVNamespace,
+  chatId: string | number,
   sourceId: number,
   targetId: number,
   firstName: string,
@@ -154,15 +166,15 @@ export async function incrementAffection(
       await ensureDB(db);
       const row = await db
         .prepare(
-          `INSERT INTO affections (source_id, target_id, first_name, value, updated_at)
-           VALUES (?, ?, ?, ?, datetime('now'))
-           ON CONFLICT(source_id, target_id) DO UPDATE SET
+          `INSERT INTO affections (chat_id, source_id, target_id, first_name, value, updated_at)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(chat_id, source_id, target_id) DO UPDATE SET
              first_name = excluded.first_name,
              value = affections.value + excluded.value,
              updated_at = datetime('now')
            RETURNING value`
         )
-        .bind(sourceId, targetId, firstName, delta)
+        .bind(String(chatId), sourceId, targetId, firstName, delta)
         .first<{ value: number }>();
 
       if (row) {
@@ -177,11 +189,11 @@ export async function incrementAffection(
   }
 
   try {
-    const map = await readAffectionMapFromKV(kv, sourceId);
+    const map = await readAffectionMapFromKV(kv, chatId, sourceId);
     const key = String(targetId);
     const next = Number(map[key]?.value || 0) + delta;
     map[key] = { firstName, value: next };
-    await writeAffectionMapToKV(kv, sourceId, map);
+    await writeAffectionMapToKV(kv, chatId, sourceId, map);
     return { ok: true, value: next };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -191,13 +203,14 @@ export async function incrementAffection(
 }
 
 /**
- * 获取对某 target 的好感度排行榜。
+ * 获取本群内对某 target 的好感度排行榜。
  * 合并 DB 和 KV 结果：DB 中已有的 source 不再从 KV 重复读取，
  * KV 中尚未迁移的 source 会被补充进来并写入 DB。
  */
 export async function getAffectionRanking(
   db: D1Database | undefined,
   kv: KVNamespace,
+  chatId: string | number,
   targetId: number
 ): Promise<Array<{ sourceId: number; firstName: string; value: number }>> {
   const rows: Array<{ sourceId: number; firstName: string; value: number }> = [];
@@ -209,9 +222,9 @@ export async function getAffectionRanking(
       await ensureDB(db);
       const { results } = await db
         .prepare(
-          'SELECT source_id, first_name, value FROM affections WHERE target_id = ? AND source_id != ?'
+          'SELECT source_id, first_name, value FROM affections WHERE chat_id = ? AND target_id = ? AND source_id != ?'
         )
-        .bind(targetId, targetId)
+        .bind(String(chatId), targetId, targetId)
         .all<{ source_id: number; first_name: string; value: number }>();
 
       if (results) {
@@ -229,19 +242,18 @@ export async function getAffectionRanking(
     }
   }
 
-  // 2. 遍历 KV 补充未迁移的 source
+  // 2. 遍历本群 KV 补充未迁移的 source（前缀含 chatId）
   const migratedSources = new Set<number>();
   const targetKey = String(targetId);
+  const kvPrefix = `affection:${chatId}:`;
   let cursor: string | undefined;
 
   do {
-    const list = await kv.list({ prefix: 'affection:', cursor });
+    const list = await kv.list({ prefix: kvPrefix, cursor });
     const keys = (list.keys ?? []) as Array<{ name: string }>;
 
     for (const k of keys) {
-      const parts = k.name.split(':');
-      if (parts.length < 2) continue;
-      const sourceId = Number(parts[1]);
+      const sourceId = Number(k.name.slice(kvPrefix.length));
       if (Number.isNaN(sourceId) || sourceId === targetId) continue;
       if (dbSourceIds.has(sourceId)) continue; // 已在 DB 中，跳过
 
@@ -266,9 +278,9 @@ export async function getAffectionRanking(
   if (db && migratedSources.size > 0) {
     for (const sid of migratedSources) {
       try {
-        const map = await readAffectionMapFromKV(kv, sid);
+        const map = await readAffectionMapFromKV(kv, chatId, sid);
         if (Object.keys(map).length > 0) {
-          await writeMapToDB(db, sid, map);
+          await writeMapToDB(db, chatId, sid, map);
         }
       } catch (e) {
         console.error('[affectionDB] 迁移排行数据到 DB 失败', e);
@@ -282,20 +294,21 @@ export async function getAffectionRanking(
 }
 
 /**
- * 获取用户最近一次免费送花日期。
+ * 获取用户在本群最近一次免费送花日期。
  * 优先从数据库查询，无数据则从 KV 读取并迁移。
  */
 export async function getRoseSendDate(
   db: D1Database | undefined,
   kv: KVNamespace,
+  chatId: string | number,
   userId: number
 ): Promise<string | null> {
   if (db) {
     try {
       await ensureDB(db);
       const row = await db
-        .prepare('SELECT send_date FROM rose_sends WHERE user_id = ?')
-        .bind(userId)
+        .prepare('SELECT send_date FROM rose_sends WHERE chat_id = ? AND user_id = ?')
+        .bind(String(chatId), userId)
         .first<{ send_date: string }>();
 
       if (row) {
@@ -307,17 +320,17 @@ export async function getRoseSendDate(
   }
 
   // 回退到 KV
-  const sendKey = `rose_send:${userId}`;
+  const sendKey = `rose_send:${chatId}:${userId}`;
   const date = await kv.get(sendKey);
 
   // 迁移到 DB
   if (db && date) {
     try {
       await db.prepare(
-        `INSERT OR REPLACE INTO rose_sends (user_id, send_date, updated_at)
-         VALUES (?, ?, datetime('now'))`
+        `INSERT OR REPLACE INTO rose_sends (chat_id, user_id, send_date, updated_at)
+         VALUES (?, ?, ?, datetime('now'))`
       )
-        .bind(userId, date)
+        .bind(String(chatId), userId, date)
         .run();
     } catch (e) {
       console.error('[affectionDB] 迁移 rose_send 到 DB 失败', e);
@@ -328,12 +341,13 @@ export async function getRoseSendDate(
 }
 
 /**
- * 原子占用用户当天的免费送花次数。
+ * 原子占用用户在本群当天的免费送花次数。
  * 返回 true 表示本次成功占用免费次数；false 表示今天已经占用过。
  */
 export async function claimDailyFreeRoseSend(
   db: D1Database | undefined,
   kv: KVNamespace,
+  chatId: string | number,
   userId: number,
   date: string
 ): Promise<boolean> {
@@ -342,15 +356,15 @@ export async function claimDailyFreeRoseSend(
       await ensureDB(db);
       const row = await db
         .prepare(
-          `INSERT INTO rose_sends (user_id, send_date, updated_at)
-           VALUES (?, ?, datetime('now'))
-           ON CONFLICT(user_id) DO UPDATE SET
+          `INSERT INTO rose_sends (chat_id, user_id, send_date, updated_at)
+           VALUES (?, ?, ?, datetime('now'))
+           ON CONFLICT(chat_id, user_id) DO UPDATE SET
              send_date = excluded.send_date,
              updated_at = datetime('now')
            WHERE rose_sends.send_date != excluded.send_date
            RETURNING user_id`
         )
-        .bind(userId, date)
+        .bind(String(chatId), userId, date)
         .first<{ user_id: number }>();
 
       return Boolean(row);
@@ -360,7 +374,7 @@ export async function claimDailyFreeRoseSend(
     }
   }
 
-  const sendKey = `rose_send:${userId}`;
+  const sendKey = `rose_send:${chatId}:${userId}`;
   const lastSendDate = await kv.get(sendKey);
   if (lastSendDate === date) return false;
   await kv.put(sendKey, date);
@@ -368,22 +382,23 @@ export async function claimDailyFreeRoseSend(
 }
 
 /**
- * 记录用户免费送花日期。
+ * 记录用户在本群的免费送花日期。
  * 仅写入数据库，不再回写 KV。
  */
 export async function setRoseSendDate(
   db: D1Database,
   _kv: KVNamespace,
+  chatId: string | number,
   userId: number,
   date: string
 ): Promise<void> {
   try {
     await db
       .prepare(
-        `INSERT OR REPLACE INTO rose_sends (user_id, send_date, updated_at)
-         VALUES (?, ?, datetime('now'))`
+        `INSERT OR REPLACE INTO rose_sends (chat_id, user_id, send_date, updated_at)
+         VALUES (?, ?, ?, datetime('now'))`
       )
-      .bind(userId, date)
+      .bind(String(chatId), userId, date)
       .run();
   } catch (e) {
     console.error('[affectionDB] setRoseSendDate DB 写入失败', e);

@@ -9,6 +9,7 @@
 import TgMessage from '../lib/telegram';
 import type { Env } from "../index";
 import { getTreasury,sumAllUserBalances } from "../lib/coinService";
+import { LEGACY_CHAT_ID } from "../lib/groupScope";
  
 type CronEnv = Env;
 
@@ -28,13 +29,14 @@ export async function runCoinCheck(env: CronEnv, opts?: { chat_id?: number; mess
   log("开始执行 coin check", { chatId, threadId });
 
   try {
-    const treasuryBal = await getTreasury( env.COIN_DO);
-    const totalUserBal = await sumAllUserBalances(env.COIN_DO);
+    const treasuryBal = await getTreasury(env.COIN_DO, LEGACY_CHAT_ID);
+    const totalUserBal = await sumAllUserBalances(env.COIN_DO, LEGACY_CHAT_ID);
 
     const text =
       `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
       `👥 所有用户账户余额合计：${totalUserBal} 💰。\n` +
-      `🔢 总计（宝库 + 用户）：${treasuryBal + totalUserBal} 💰。`;
+      `🔢 总计（宝库 + 用户）：${treasuryBal + totalUserBal} 💰。\n` +
+      `📌 统计范围：主群（${LEGACY_CHAT_ID}）。`;
 
     log("查询结果", { treasuryBal, totalUserBal });
 

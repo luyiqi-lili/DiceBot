@@ -47,6 +47,10 @@ describe('LotteryDO recovery diagnostics', () => {
 			lastWinner: { winningNumber: '111' },
 		});
 
+		// 构造期会把旧全局数据一次性迁移到 LEGACY 群桶（会写一次）；
+		// 清掉这些迁移写入，验证 debug-state 请求本身是只读的。
+		state.storage.put.mockClear();
+
 		const response = await lottery.fetch(new Request('https://do/debug-state'));
 		const body = await response.json() as any;
 

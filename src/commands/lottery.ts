@@ -116,7 +116,7 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
     const lotteryStub = getLotteryStub(env.LOTTERY_DO);
 
     // 获取用户已购买张数
-    const userCountRes = await lotteryStub.fetch(`https://do/get-user-ticket-count?userId=${encodeURIComponent(userId)}`);
+    const userCountRes = await lotteryStub.fetch(`https://do/get-user-ticket-count?userId=${encodeURIComponent(userId)}&chatId=${chatId}`);
     const userCountData = await userCountRes.json() as UserTicketCountResponse;
     const userTicketCount = userCountData.count || 0;
 
@@ -133,7 +133,7 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
     }
 
     // 检查余额
-    const userBalance = await getBalance(env.COIN_DO, userId);
+    const userBalance = await getBalance(env.COIN_DO, chatId, userId);
 
     if (userBalance < TICKET_PRICE) {
         await TgMessage.sendText(env, {
@@ -157,7 +157,7 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
     }
 
     // 扣除coin（从用户账户转到国库）
-    const transferResult = await transfer(env, env.COIN_DO, userId, "__treasury__", TICKET_PRICE, false);
+    const transferResult = await transfer(env, env.COIN_DO, chatId, userId, "__treasury__", TICKET_PRICE, false);
 
     if (!transferResult.ok) {
         await TgMessage.sendText(env, {
@@ -174,14 +174,14 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
     const addTicketRes = await lotteryStub.fetch("https://do/add-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, ticketNumber })
+        body: JSON.stringify({ chatId, userId, ticketNumber })
     });
 
     const addTicketData = await addTicketRes.json() as AddTicketResponse;
 
     if (!addTicketData.success) {
         // 购买失败，尝试退款
-        await transfer(env, env.COIN_DO, "__treasury__", userId, TICKET_PRICE, true);
+        await transfer(env, env.COIN_DO, chatId, "__treasury__", userId, TICKET_PRICE, true);
 
         await TgMessage.sendText(env, {
             chat_id: chatId,
@@ -194,16 +194,16 @@ async function handleLotteryBuy(parsedMessage: ParsedUpdate, env: LotteryEnv): P
     }
 
     // 获取更新后的信息
-    const poolRes = await lotteryStub.fetch("https://do/get-pool");
+    const poolRes = await lotteryStub.fetch(`https://do/get-pool?chatId=${chatId}`);
     const poolData = await poolRes.json() as PoolResponse;
     const poolAmount = poolData.pool || 0;
 
-    const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
+    const countRes = await lotteryStub.fetch(`https://do/total-ticket-count?chatId=${chatId}`);
     const countData = await countRes.json() as CountResponse;
     const totalTicketCount = countData.count || 0;
 
     // 获取用户的所有彩票
-    const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}`);
+    const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}&chatId=${chatId}`);
     const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
     const userTicketNumbers = userTicketsData.ticketNumbers || [];
     const newUserTicketCount = userTicketNumbers.length;
@@ -294,16 +294,16 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
     if (!sub) {
         try {
             // 获取奖池和购买人数
-            const poolRes = await lotteryStub.fetch("https://do/get-pool");
+            const poolRes = await lotteryStub.fetch(`https://do/get-pool?chatId=${chatId}`);
             const poolData = await poolRes.json() as PoolResponse;
             const poolAmount = poolData.pool || 0;
 
-            const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
+            const countRes = await lotteryStub.fetch(`https://do/total-ticket-count?chatId=${chatId}`);
             const countData = await countRes.json() as CountResponse;
             const totalTicketCount = countData.count || 0;
 
             // 获取用户已购买的彩票
-            const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}`);
+            const userTicketsRes = await lotteryStub.fetch(`https://do/get-user-tickets?userId=${encodeURIComponent(userId)}&chatId=${chatId}`);
             const userTicketsData = await userTicketsRes.json() as UserTicketsResponse;
             const userTicketNumbers = userTicketsData.ticketNumbers || [];
             const userTicketCount = userTicketNumbers.length;
@@ -315,7 +315,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
             const totalPrizePool = poolAmount + (totalTicketCount * TICKET_PRICE);
 
             // 获取上期开奖信息
-            const lastDrawRes = await lotteryStub.fetch("https://do/last-draw");
+            const lastDrawRes = await lotteryStub.fetch(`https://do/last-draw?chatId=${chatId}`);
             const lastDrawData = await lastDrawRes.json() as LastDrawResponse;
 
             let message = `<b>🎰 大乐透彩票系统</b>\n\n`;
@@ -430,7 +430,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
         }
 
         try {
-            const listRes = await lotteryStub.fetch("https://do/list-all-tickets");
+            const listRes = await lotteryStub.fetch(`https://do/list-all-tickets?chatId=${chatId}`);
             const listData = await listRes.json() as ListTicketsResponse;
             const tickets = listData.tickets || [];
 
@@ -531,7 +531,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
 
         try {
             // 首先检查是否有购买记录
-            const countRes = await lotteryStub.fetch("https://do/total-ticket-count");
+            const countRes = await lotteryStub.fetch(`https://do/total-ticket-count?chatId=${chatId}`);
             const countData = await countRes.json() as CountResponse;
             const totalTicketCount = countData.count || 0;
 
@@ -553,7 +553,7 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
             const drawRes = await lotteryStub.fetch("https://do/draw", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ winningNumber })
+                body: JSON.stringify({ chatId, winningNumber })
             });
 
             const drawResult = await drawRes.json() as DrawResponse;
@@ -588,11 +588,11 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
 
                         // 发放奖金（从国库转账给用户）
                         const totalPrize = drawResult.exactPrize * data.count;
-                        await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
+                        await transfer(env, env.COIN_DO, chatId, "__treasury__", userId, totalPrize, true);
                     } catch (e) {
                         resultMessage += `• 用户${userId}：${data.count} 张\n`;
                         const totalPrize = drawResult.exactPrize * data.count;
-                        await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
+                        await transfer(env, env.COIN_DO, chatId, "__treasury__", userId, totalPrize, true);
                     }
                 }
                 resultMessage += `\n`;
@@ -624,11 +624,11 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
 
                         // 发放奖金（从国库转账给用户）
                         const totalPrize = drawResult.firstTwoPrize * data.count;
-                        await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
+                        await transfer(env, env.COIN_DO, chatId, "__treasury__", userId, totalPrize, true);
                     } catch (e) {
                         resultMessage += `• 用户${userId}：${data.count} 张\n`;
                         const totalPrize = drawResult.firstTwoPrize * data.count;
-                        await transfer(env, env.COIN_DO, "__treasury__", userId, totalPrize, true);
+                        await transfer(env, env.COIN_DO, chatId, "__treasury__", userId, totalPrize, true);
                     }
                 }
                 resultMessage += `\n`;
@@ -685,7 +685,9 @@ export async function handleLottery(parsedMessage: ParsedUpdate, env: LotteryEnv
 
         try {
             const cleanRes = await lotteryStub.fetch("https://do/clean", {
-                method: "POST"
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ chatId })
             });
             const cleanData = await cleanRes.json() as CleanResponse;
 

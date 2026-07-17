@@ -80,8 +80,8 @@ describe('/rose', () => {
 
 		await handleRose(makeMsg({ args: ['send'], isReply: true, replyToMessage: { from: { id: 2 } } }), MKV as any);
 
-		expect(coinService.getBalance).toHaveBeenCalledWith(MKV.COIN_DO, '1');
-		expect(coinService.addToTreasury).toHaveBeenCalledWith(MKV, MKV.COIN_DO, '1', 30, '送花消费');
+		expect(coinService.getBalance).toHaveBeenCalledWith(MKV.COIN_DO, -100999, '1');
+		expect(coinService.addToTreasury).toHaveBeenCalledWith(MKV, MKV.COIN_DO, -100999, '1', 30, '送花消费');
 		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
 		expect(text).toContain('支付 30');
 		expect(text).toContain('额外送出了一朵');

@@ -92,13 +92,14 @@ export function nowDateYMD(): string {
 }
 
 // ── KV 记录操作（命令版和网页版共用）────────────────────
-// 统一 key = ${FISH_RECORD_PREFIX}${userId}
+// 统一 key = ${FISH_RECORD_PREFIX}${chatId}:${userId}（按群组隔离）
 
 export async function getFishingRecord(
 	kv: KVNamespace,
+	chatId: string | number,
 	userId: string,
 ): Promise<FishingRecord> {
-	const key = `${FISH_RECORD_PREFIX}${userId}`;
+	const key = `${FISH_RECORD_PREFIX}${chatId}:${userId}`;
 	const raw = await kv.get(key);
 	const today = nowDateYMD();
 	if (!raw) return { date: today, count: 0, results: [] };
@@ -113,10 +114,11 @@ export async function getFishingRecord(
 
 export async function setFishingRecord(
 	kv: KVNamespace,
+	chatId: string | number,
 	userId: string,
 	record: FishingRecord,
 ): Promise<void> {
-	const key = `${FISH_RECORD_PREFIX}${userId}`;
+	const key = `${FISH_RECORD_PREFIX}${chatId}:${userId}`;
 	await kv.put(key, JSON.stringify(record));
 }
 

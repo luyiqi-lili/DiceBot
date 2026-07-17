@@ -1,19 +1,21 @@
 // lib/coinService.ts
 import TgMessage, { EnvLike } from '../lib/telegram';
 import { COIN_LOG_CHAT_ID, COIN_LOG_THREAD_ID } from './coinLogTarget';
+import { scopeKey } from './groupScope';
 
 /**
- * coinService (DO-based)
+ * coinService (DO-based) —— 按群组 chat_id 隔离
  *
  * Exposes:
- *  - getBalance(doNs, id, name?)
- *  - transfer(envOrNull, doNs, from, to, amount, allowNegativeTreasury?, name?)
- *  - addToTreasury(envOrNull, doNs, from, amount, event?, name?)
- *  - takeFromTreasury(envOrNull, doNs, to, amount, event?, allowNegativeTreasury?, name?)
- *  - mintToTreasury(envOrNull, doNs, amount, name?)   <-- 新增：直接向国库虚空注入（不扣任何账户）
- *  - getTreasury(doNs, name?)
- *  - sumAllUserBalances(doNs, name?)
- *  - addRoomCount(envOrNull, doNs, roomKey, delta, name?)
+ *  - getBalance(doNs, chatId, id, name?)
+ *  - transfer(envOrNull, doNs, chatId, from, to, amount, allowNegativeTreasury?, name?)
+ *  - addToTreasury(envOrNull, doNs, chatId, from, amount, event?, name?)
+ *  - takeFromTreasury(envOrNull, doNs, chatId, to, amount, event?, allowNegativeTreasury?, name?)
+ *  - getTreasury(doNs, chatId, name?)
+ *  - sumAllUserBalances(doNs, chatId, name?)
+ *
+ * 账户 key 在 DO 内部按 `${chatId}:${id}` 作用域化（含 __treasury__）；
+ * 已带 "||" 的房间募捐箱 key 保持原样（本身已含 chat 上下文）。
  *
  * All state-changing ops use the DO atomic endpoints (/transfer or /incr).
  */
@@ -29,10 +31,10 @@ function getDOStub(doNs: DurableObjectNamespace, name = "coins") {
   return doNs.get(id);
 }
 
-export async function getBalance(doNs: DurableObjectNamespace, id: string, name = "coins"): Promise<number> {
+export async function getBalance(doNs: DurableObjectNamespace, chatId: string | number, id: string, name = "coins"): Promise<number> {
   try {
     const stub = getDOStub(doNs, name);
-    const url = `https://do/get?key=${encodeURIComponent(id)}`;
+    const url = `https://do/get?key=${encodeURIComponent(scopeKey(chatId, id))}`;
     const res = await stub.fetch(url, { method: "GET" });
     if (!res.ok) {
       console.warn("[coinService] getBalance: DO responded non-ok", await res.text());
@@ -51,6 +53,7 @@ export async function getBalance(doNs: DurableObjectNamespace, id: string, name 
 export async function transfer(
   envOrNull: EnvLike | null,
   doNs: DurableObjectNamespace,
+  chatId: string | number,
   from: string,
   to: string,
   amount: number,
@@ -61,7 +64,12 @@ export async function transfer(
     if (!doNs) throw new Error("doNs required");
     const stub = getDOStub(doNs, name);
     const url = `https://do/transfer`;
-    const body = JSON.stringify({ from, to, amount, allowNegativeTreasury });
+    const body = JSON.stringify({
+      from: scopeKey(chatId, from),
+      to: scopeKey(chatId, to),
+      amount,
+      allowNegativeTreasury,
+    });
     const res = await stub.fetch(url, {
       method: "POST",
       body,
@@ -89,7 +97,7 @@ export async function transfer(
       if (envOrNull) {
         TgMessage.sendText(envOrNull, {
           chat_id: COIN_LOG_CHAT_ID,
-          text: `⚠️ coin transfer failed: ${String(e?.message ?? e)}\nfrom=${from} to=${to} amount=${amount}`,
+          text: `⚠️ coin transfer failed: ${String(e?.message ?? e)}\nchat=${chatId} from=${from} to=${to} amount=${amount}`,
           parse_mode: "HTML",
           message_thread_id: COIN_LOG_THREAD_ID
         }).catch(() => { });
@@ -102,36 +110,40 @@ export async function transfer(
 export async function addToTreasury(
   envOrNull: EnvLike | null,
   doNs: DurableObjectNamespace,
+  chatId: string | number,
   from: string,
   amount: number,
   event?: string,
   name = "coins"
 ): Promise<TransferResult> {
-  return await transfer(envOrNull, doNs, from, TREASURY_KEY, amount, false, name);
+  return await transfer(envOrNull, doNs, chatId, from, TREASURY_KEY, amount, false, name);
 }
 
 export async function takeFromTreasury(
   envOrNull: EnvLike | null,
   doNs: DurableObjectNamespace,
+  chatId: string | number,
   to: string,
   amount: number,
   event?: string,
   allowNegativeTreasury = false,
   name = "coins"
 ): Promise<TransferResult> {
-  return await transfer(envOrNull, doNs, TREASURY_KEY, to, amount, allowNegativeTreasury, name);
+  return await transfer(envOrNull, doNs, chatId, TREASURY_KEY, to, amount, allowNegativeTreasury, name);
 }
 
 
-export async function getTreasury(doNs: DurableObjectNamespace, name = "coins"): Promise<number> {
-  return await getBalance(doNs, TREASURY_KEY, name);
+export async function getTreasury(doNs: DurableObjectNamespace, chatId: string | number, name = "coins"): Promise<number> {
+  return await getBalance(doNs, chatId, TREASURY_KEY, name);
 }
 
 /**
- * sumAllUserBalances
+ * sumAllUserBalances —— 仅统计本群（chatId 前缀）内的用户账户余额。
  */
-export async function sumAllUserBalances(doNs: DurableObjectNamespace, name = "coins"): Promise<number> {
+export async function sumAllUserBalances(doNs: DurableObjectNamespace, chatId: string | number, name = "coins"): Promise<number> {
   let total = 0;
+  const prefix = `${chatId}:`;
+  const scopedTreasury = `${chatId}:${TREASURY_KEY}`;
   try {
     const stub = getDOStub(doNs, name);
     let cursor = "";
@@ -151,10 +163,12 @@ export async function sumAllUserBalances(doNs: DurableObjectNamespace, name = "c
       for (const k of keys) {
         if (typeof k.name !== "string") continue;
         const nameKey = k.name;
-        if (nameKey === TREASURY_KEY) continue;
+        if (nameKey === scopedTreasury) continue;
         if (nameKey.includes("||")) continue;
-        if (/^\d+$/.test(nameKey)) {
-          const bal = await getBalance(doNs, nameKey, name);
+        if (!nameKey.startsWith(prefix)) continue;
+        const rawId = nameKey.slice(prefix.length);
+        if (/^\d+$/.test(rawId)) {
+          const bal = await getBalance(doNs, chatId, rawId, name);
           total += bal;
         }
       }
@@ -165,7 +179,7 @@ export async function sumAllUserBalances(doNs: DurableObjectNamespace, name = "c
   }
   return total;
 }
- 
+
 export default {
   TREASURY_KEY,
   getBalance,

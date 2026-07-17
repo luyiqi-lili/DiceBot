@@ -13,6 +13,7 @@ import {
   TREASURY_KEY,
   sumAllUserBalances,
 } from "../lib/coinService";
+import { scopeKey } from "../lib/groupScope";
 import type { Env } from "../index";
 type CoinEnv = Env;
 
@@ -62,17 +63,21 @@ export async function handleCoinList(
       const keys: { name: string }[] = data.keys || [];
       cursor = data.cursor || "";
 
+      const chatPrefix = `${chatId}:`;
       for (const { name } of keys) {
-        if (name.includes("||") || name === TREASURY_KEY) continue;
-        if (name.startsWith("coin_pray:")) {
-          const prayUserId = name.replace("coin_pray:", "");
+        if (name.includes("||")) continue; // 房间募捐箱
+        if (!name.startsWith(chatPrefix)) continue; // 其他群组的数据
+        const raw = name.slice(chatPrefix.length);
+        if (raw === "__treasury__") continue;
+        if (raw.startsWith("coin_pray:")) {
+          const prayUserId = raw.slice("coin_pray:".length);
           const prayDate = await doGetRawFromStub(stub, name);
           if (prayDate) prayRecords[prayUserId] = prayDate;
           continue;
         }
-        const bal = await getBalance(doNs, name);
+        const bal = await getBalance(doNs, chatId, raw);
         if (bal === 0) continue;
-        allBalances[name] = bal;
+        allBalances[raw] = bal;
       }
       if (!cursor) break;
     }
@@ -109,9 +114,9 @@ export async function handleCoinList(
           const userIds = pageData.map(([uid]) => uid).filter(uid => !isNaN(Number(uid)));
           if (userIds.length > 0) {
             const placeholders = userIds.map(() => "?").join(",");
-            const query = `SELECT user_id, last_active_at FROM user_last_active WHERE user_id IN (${placeholders})`;
+            const query = `SELECT user_id, last_active_at FROM user_last_active WHERE chat_id = ? AND user_id IN (${placeholders})`;
             let stmt = env.DB.prepare(query);
-            stmt = stmt.bind(...userIds);
+            stmt = stmt.bind(chatId, ...userIds);
             const result = await stmt.all();
             result.results.forEach((row: any) => {
               userLastActiveTimes[String(row.user_id)] = row.last_active_at;
@@ -125,8 +130,8 @@ export async function handleCoinList(
             if (isNaN(Number(uid))) continue;
             try {
               const result = await env.DB.prepare(
-                "SELECT last_active_at FROM user_last_active WHERE user_id = ?",
-              ).bind(uid).first();
+                "SELECT last_active_at FROM user_last_active WHERE chat_id = ? AND user_id = ?",
+              ).bind(chatId, uid).first();
               if (result) {
                 userLastActiveTimes[uid] = (result as any).last_active_at;
               }
@@ -239,22 +244,26 @@ async function handleCoinListRepair(chatId: number, threadId: number | undefined
       const data = await res.json() as { keys?: { name: string }[]; cursor?: string };
       const keys: { name: string }[] = data.keys || [];
       cursor = data.cursor || "";
+      const chatPrefix = `${chatId}:`;
       for (const { name } of keys) {
-        if (name.includes("||") || name === TREASURY_KEY || name.startsWith("coin_pray:")) continue;
-        const bal = await getBalance(doNs, name);
-        const uidNum = Number(name);
+        if (name.includes("||")) continue; // 房间募捐箱
+        if (!name.startsWith(chatPrefix)) continue; // 其他群组的数据
+        const raw = name.slice(chatPrefix.length);
+        if (raw === "__treasury__" || raw.startsWith("coin_pray:")) continue;
+        const bal = await getBalance(doNs, chatId, raw);
+        const uidNum = Number(raw);
         const isUidValid = !isNaN(uidNum) && uidNum > 0;
-        if (!isUidValid) { usersToClean.push({ uid: name, bal, reason: "invalid_id" }); continue; }
-        if (bal < 0) { usersToClean.push({ uid: name, bal, reason: "negative_balance" }); continue; }
+        if (!isUidValid) { usersToClean.push({ uid: raw, bal, reason: "invalid_id" }); continue; }
+        if (bal < 0) { usersToClean.push({ uid: raw, bal, reason: "negative_balance" }); continue; }
         if (bal > 0) {
           try {
             const inTargetGroup = await TgMessage.isUserInChat(env, TARGET_CHAT_ID, uidNum);
-            if (!inTargetGroup) usersToClean.push({ uid: name, bal, reason: "not_in_group" });
+            if (!inTargetGroup) usersToClean.push({ uid: raw, bal, reason: "not_in_group" });
           } catch {
-            usersToClean.push({ uid: name, bal, reason: "not_in_group" });
+            usersToClean.push({ uid: raw, bal, reason: "not_in_group" });
           }
         }
-        allBalances[name] = bal;
+        allBalances[raw] = bal;
       }
       if (!cursor) break;
     }
@@ -296,18 +305,22 @@ async function handleCoinListConfirm(chatId: number, threadId: number | undefine
     let cleanedCount = 0;
     let totalAmount = 0;
     const cleanupLog: string[] = [];
-    const originalTreasury = await getTreasury(doNs);
+    const originalTreasury = await getTreasury(doNs, chatId);
 
     while (true) {
       const res = await stub.fetch(`https://do/list?limit=1000&cursor=${encodeURIComponent(cursor)}`);
       const data = await res.json() as { keys?: { name: string }[]; cursor?: string };
       const keys: { name: string }[] = data.keys || [];
       cursor = data.cursor || "";
+      const chatPrefix = `${chatId}:`;
 
       for (const { name } of keys) {
-        if (name.includes("||") || name === TREASURY_KEY || name.startsWith("coin_pray:")) continue;
-        const bal = await getBalance(doNs, name);
-        const uidNum = Number(name);
+        if (name.includes("||")) continue; // 房间募捐箱
+        if (!name.startsWith(chatPrefix)) continue; // 其他群组的数据
+        const raw = name.slice(chatPrefix.length);
+        if (raw === "__treasury__" || raw.startsWith("coin_pray:")) continue;
+        const bal = await getBalance(doNs, chatId, raw);
+        const uidNum = Number(raw);
         const isUidValid = !isNaN(uidNum) && uidNum > 0;
         let needCleanup = false;
         let reason = "";
@@ -322,7 +335,7 @@ async function handleCoinListConfirm(chatId: number, threadId: number | undefine
         }
 
         if (needCleanup) {
-          const newTreasury = await getTreasury(doNs);
+          const newTreasury = await getTreasury(doNs, chatId);
           const doGetRawFn = async (k: string) => {
             const r = await stub.fetch(`https://do/get?key=${encodeURIComponent(k)}`, { method: "GET" });
             return r.ok ? r.text() : null;
@@ -330,7 +343,7 @@ async function handleCoinListConfirm(chatId: number, threadId: number | undefine
           const doPutRawFn = async (k: string, v: string) => {
             await stub.fetch("https://do/put", { method: "POST", body: JSON.stringify({ key: k, value: v }), headers: { "Content-Type": "application/json" } });
           };
-          await doPutRawFn(TREASURY_KEY, String(newTreasury + bal));
+          await doPutRawFn(scopeKey(chatId, TREASURY_KEY), String(newTreasury + bal));
           await doPutRawFn(name, "0");
           cleanedCount++;
           totalAmount += Math.abs(bal);
@@ -341,7 +354,7 @@ async function handleCoinListConfirm(chatId: number, threadId: number | undefine
       if (!cursor) break;
     }
 
-    const finalTreasury = await getTreasury(doNs);
+    const finalTreasury = await getTreasury(doNs, chatId);
     const treasuryChange = finalTreasury - originalTreasury;
     let reportText = `✅ 清理完成\n────────────────\n`;
     reportText += `清理用户数: ${cleanedCount} 个\n`;

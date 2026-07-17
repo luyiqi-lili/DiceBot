@@ -166,7 +166,7 @@ export async function handleTopicEdited(parsedMessage: ParsedUpdate, env: TopicE
     };
 
     // --- KV key + 读取 ---
-    const KV_KEY = 'topic_status:single';
+    const KV_KEY = `topic_status:${chatId}`;
     const kv = env.TOPIC_KV;
     if (!kv || !shouldUpdateTopicStatus) {
       if (!kv) console.error("[topicEdit] 未绑定 TOPIC_KV，跳过状态提示");

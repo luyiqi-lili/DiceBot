@@ -18,7 +18,7 @@ describe('coinService coin log target', () => {
 			}),
 		} as any;
 
-		const result = await transfer({ TOKEN: 'token' } as any, doNs, 'alice', 'bob', 1);
+		const result = await transfer({ TOKEN: 'token' } as any, doNs, -100999, 'alice', 'bob', 1);
 		await Promise.resolve();
 
 		expect(result).toMatchObject({ ok: false, reason: 'internal_error' });

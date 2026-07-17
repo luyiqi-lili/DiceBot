@@ -54,7 +54,7 @@ describe('pray', () => {
 
 		await handleCoin(makeAllowedPrayParsed(), env);
 
-		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, '12345', 50, '祈祷', true);
+		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, -1002970430696, '12345', 50, '祈祷', true);
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('50');
 	});
 	it('6 月 29 日不再作为紫罗兰周年庆固定 50 coin', async () => {
@@ -65,9 +65,9 @@ describe('pray', () => {
 
 		await handleCoin(makeAllowedPrayParsed(), env);
 
-		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, '12345', 8, '祈祷', true);
+		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, -1002970430696, '12345', 8, '祈祷', true);
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('你祈祷获得了 8 💰');
-		expect(env.COIN_DO.store.get('coin_pray_fix:2026-06-29:12345')).toBe('done');
+		expect(env.COIN_DO.store.get('-1002970430696:coin_pray_fix:2026-06-29:12345')).toBe('done');
 
 		vi.clearAllMocks();
 		await handleCoin(makeAllowedPrayParsed(), env);
@@ -80,24 +80,24 @@ describe('pray', () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-06-29T12:00:00.000Z'));
 		vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0);
-		const env = { COIN_DO: makeCoinDo({ 'coin_pray:12345': '2026-06-29' }) } as any;
+		const env = { COIN_DO: makeCoinDo({ '-1002970430696:coin_pray:12345': '2026-06-29' }) } as any;
 
 		await handleCoin(makeAllowedPrayParsed(), env);
 
-		expect(coinService.addToTreasury).toHaveBeenCalledWith(env, env.COIN_DO, '12345', 50, '祈祷奖励修正');
-		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, '12345', 8, '祈祷', true);
+		expect(coinService.addToTreasury).toHaveBeenCalledWith(env, env.COIN_DO, -1002970430696, '12345', 50, '祈祷奖励修正');
+		expect(coinService.takeFromTreasury).toHaveBeenCalledWith(env, env.COIN_DO, -1002970430696, '12345', 8, '祈祷', true);
 		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
 		expect(text).toContain('多发的 50 💰');
 		expect(text).toContain('你祈祷获得了 8 💰');
-		expect(env.COIN_DO.store.get('coin_pray_fix:2026-06-29:12345')).toBe('done');
+		expect(env.COIN_DO.store.get('-1002970430696:coin_pray_fix:2026-06-29:12345')).toBe('done');
 	});
 	it('6 月 29 日错误签到已修正后不会重复扣回', async () => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date('2026-06-29T12:00:00.000Z'));
 		const env = {
 			COIN_DO: makeCoinDo({
-				'coin_pray:12345': '2026-06-29',
-				'coin_pray_fix:2026-06-29:12345': 'done',
+				'-1002970430696:coin_pray:12345': '2026-06-29',
+				'-1002970430696:coin_pray_fix:2026-06-29:12345': 'done',
 			}),
 		} as any;
 
@@ -114,7 +114,7 @@ describe('pray', () => {
 
 		await handleCoin(makeAllowedPrayParsed(), env);
 
-		const gain = vi.mocked(coinService.takeFromTreasury).mock.calls[0]?.[3];
+		const gain = vi.mocked(coinService.takeFromTreasury).mock.calls[0]?.[4];
 		expect(gain).not.toBe(50);
 		expect(gain).toBeGreaterThanOrEqual(8);
 		expect(gain).toBeLessThanOrEqual(12);
@@ -126,7 +126,7 @@ describe('pray', () => {
 
 		await handleCoin(makeAllowedPrayParsed(), env);
 
-		const gain = vi.mocked(coinService.takeFromTreasury).mock.calls[0]?.[3];
+		const gain = vi.mocked(coinService.takeFromTreasury).mock.calls[0]?.[4];
 		expect(gain).toBeGreaterThanOrEqual(8);
 		expect(gain).toBeLessThanOrEqual(12);
 	});
@@ -175,7 +175,7 @@ describe('check', () => {
 			},
 		}), MOCK_ENV);
 
-		expect(coinService.getBalance).not.toHaveBeenCalledWith(MOCK_ENV.COIN_DO, '111');
+		expect(coinService.getBalance).not.toHaveBeenCalledWith(MOCK_ENV.COIN_DO, expect.anything(), '111');
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('艾丽莎宝库：5000');
 	});
 	it('非管理员', async () => { await handleCoin(makeParsed({ args: ['check'] }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('权限'); });

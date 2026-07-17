@@ -85,7 +85,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     }
 
     // 从数据库（或 KV 回退）获取排行榜
-    const rows = await getAffectionRanking(env.DB!, env.AFFECTION_KV, targetId);
+    const rows = await getAffectionRanking(env.DB!, env.AFFECTION_KV, chatId, targetId);
 
     if (rows.length === 0) {
       await TgMessage.sendText(env, {
@@ -155,10 +155,10 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
   if (isSend) {
     const todayUTC = nowUTCDateYMD();
-    const isFreeSend = await claimDailyFreeRoseSend(env.DB, env.AFFECTION_KV, fromId, todayUTC);
+    const isFreeSend = await claimDailyFreeRoseSend(env.DB, env.AFFECTION_KV, chatId, fromId, todayUTC);
 
     if (isFreeSend) {
-      const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, fromId, targetId, targetName, 160);
+      const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, chatId, fromId, targetId, targetName, 160);
       if (!incrementResult.ok) {
         await TgMessage.sendText(env, {
           chat_id: chatId,
@@ -182,7 +182,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
 
     // 非免费时间：尝试支付 30 💰（扣钱并将款项记入国库）
     const amount = 30;
-    const bal = await getBalance(env.COIN_DO, String(fromId));
+    const bal = await getBalance(env.COIN_DO, chatId, String(fromId));
     if (bal < 30) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -195,10 +195,10 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       return;
 
     }
-    const result = await addToTreasury(env, env.COIN_DO, String(fromId), amount, "送花消费");
+    const result = await addToTreasury(env, env.COIN_DO, chatId, String(fromId), amount, "送花消费");
     if (!result.ok) {
       // 查询余额并提示
-      const bal = await getBalance(env.COIN_DO, String(fromId));
+      const bal = await getBalance(env.COIN_DO, chatId, String(fromId));
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `❌ ${fromName} 扣费失败：${result.reason || "未知错误"}。如需额外送花需支付 ${amount} 💰，你当前余额 ${bal} 💰。`,
@@ -210,7 +210,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
       return;
     }
 
-    const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, fromId, targetId, targetName, 160);
+    const incrementResult = await incrementAffection(env.DB, env.AFFECTION_KV, chatId, fromId, targetId, targetName, 160);
     if (!incrementResult.ok) {
       // coin 已扣除，但好感度写入失败：提示用户联系管理员
       await TgMessage.sendText(env, {
@@ -224,7 +224,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
     }
 
     // 获取新的余额显示
-    const newBal = await getBalance(env.COIN_DO, String(fromId));
+    const newBal = await getBalance(env.COIN_DO, chatId, String(fromId));
     const emoji = scoreToEmoji(incrementResult.value || 0);
 
     await TgMessage.sendText(env, {
@@ -240,7 +240,7 @@ export async function handleRose(parsedMessage: ParsedUpdate, env: RoseEnv): Pro
   }
 
   // 读取当前好感地图（优先数据库，回退 KV）
-  const map = await readAffectionMap(env.DB!, env.AFFECTION_KV, fromId);
+  const map = await readAffectionMap(env.DB!, env.AFFECTION_KV, chatId, fromId);
   const key = String(targetId);
   const rec = map[key] ?? { firstName: targetName, value: 0 };
   const score = Number(rec.value || 0);

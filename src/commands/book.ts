@@ -3,8 +3,8 @@ import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { deleteMarkup } from "../lib/util";
 import type { Env } from '../index';
 
-function getUserKey(userId: number): string {
-  return `book:user:${userId}`;
+function getUserKey(chatId: number, userId: number): string {
+  return `book:${chatId}:user:${userId}`;
 }
 
 function makeMessageLink(chatId: number, messageId: number): string {
@@ -34,7 +34,7 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
 
   // KV helpers
   async function loadList(uid: number) {
-    const raw = await env.BOOK_STORE.get(getUserKey(uid));
+    const raw = await env.BOOK_STORE.get(getUserKey(chatId, uid));
     const list = raw
       ? JSON.parse(raw) as Array<{ remark: string; link: string; timestamp: string }>
       : [];
@@ -42,7 +42,7 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     return list;
   }
   async function saveList(uid: number, list: any[]) {
-    await env.BOOK_STORE.put(getUserKey(uid), JSON.stringify(list));
+    await env.BOOK_STORE.put(getUserKey(chatId, uid), JSON.stringify(list));
     console.log(`[Book] saveList ${uid}, new count=${list.length}`);
   }
 
@@ -114,10 +114,10 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
   // 3. 查看全部用户书签： param === "all"
   if (param === "all") {
     console.log("[Book] 查看 all");
-    const listRes = await env.BOOK_STORE.list({ prefix: "book:user:" });
+    const listRes = await env.BOOK_STORE.list({ prefix: `book:${chatId}:user:` });
     let body = "";
     for (const { name } of listRes.keys) {
-      const uid = parseInt(name.split(":")[2], 10);
+      const uid = parseInt(name.split(":")[3], 10);
       const list = await loadList(uid);
       if (list.length === 0) continue;
       const member = await TgMessage.fetchChatMember(env, chatId, uid);
@@ -153,10 +153,10 @@ export async function handleBook(parsed: ParsedUpdate, env: Env) {
     console.log("[Book] 查看他人书签 param:", param);
     const targetUsername = param.slice(1).toLowerCase();
 
-    const listRes = await env.BOOK_STORE.list({ prefix: "book:user:" });
+    const listRes = await env.BOOK_STORE.list({ prefix: `book:${chatId}:user:` });
     let targetId: number | null = null;
     for (const { name } of listRes.keys) {
-      const uid = parseInt(name.split(":")[2], 10);
+      const uid = parseInt(name.split(":")[3], 10);
       const member = await TgMessage.fetchChatMember(env, chatId, uid);
       if ((member.username || "").toLowerCase() === targetUsername) {
         targetId = uid;

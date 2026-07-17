@@ -19,16 +19,18 @@ export async function incrementUsageCount(parsedMessage: ParsedUpdate, env: Env)
 
 	const userId = from.id;
 	const firstName = from.first_name ?? "";
+	const chatId = parsedMessage.chatId ?? parsedMessage.message.chat?.id;
+	if (!chatId) return;
 
 	try {
 		await env.DB!.prepare(
-			`INSERT INTO user_usage_count (user_id, first_name, usage_count, updated_at)
-			 VALUES (?, ?, 1, datetime('now'))
-			 ON CONFLICT(user_id) DO UPDATE SET
+			`INSERT INTO user_usage_count (chat_id, user_id, first_name, usage_count, updated_at)
+			 VALUES (?, ?, ?, 1, datetime('now'))
+			 ON CONFLICT(chat_id, user_id) DO UPDATE SET
 			   first_name = excluded.first_name,
 			   usage_count = usage_count + 1,
 			   updated_at = datetime('now')`
-		).bind(userId, firstName).run();
+		).bind(chatId, userId, firstName).run();
 	} catch (e) {
 		console.error("[incrementUsageCount] DB 写入失败", e);
 	}
@@ -50,9 +52,10 @@ export async function handleLike(parsedMessage: ParsedUpdate, env: Env) {
 		const { results } = await env.DB!.prepare(
 			`SELECT user_id, first_name, usage_count
 			 FROM user_usage_count
+			 WHERE chat_id = ?
 			 ORDER BY usage_count DESC
 			 LIMIT 10`
-		).all<{ user_id: number; first_name: string; usage_count: number }>();
+		).bind(chatId).all<{ user_id: number; first_name: string; usage_count: number }>();
 
 		const rows = (results ?? []).map(r => {
 			const name = r.first_name ? escapeHtml(r.first_name) : `ID ${r.user_id}`;
@@ -80,8 +83,8 @@ export async function handleLike(parsedMessage: ParsedUpdate, env: Env) {
 
 	const userId = from.id;
 	const row = await env.DB!.prepare(
-		`SELECT usage_count FROM user_usage_count WHERE user_id = ?`
-	).bind(userId).first<{ usage_count: number }>();
+		`SELECT usage_count FROM user_usage_count WHERE chat_id = ? AND user_id = ?`
+	).bind(chatId, userId).first<{ usage_count: number }>();
 
 	const count = row?.usage_count ?? 0;
 

@@ -68,7 +68,8 @@ export async function handleNews(parsed: ParsedUpdate, env: Env): Promise<void> 
       dateKey = maybe;
     }
   }
-  const kvKey = `news:${dateKey}`;
+  const chatId = parsed.chatId!;
+  const kvKey = `news:${chatId}:${dateKey}`;
   console.log("[News] 使用日期 key =", dateKey);
 
   // 中文分词用于截取片段

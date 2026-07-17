@@ -64,7 +64,7 @@ describe('fish web auth', () => {
 		);
 
 		expect(response.status).toBe(200);
-		expect(coinService.getBalance).toHaveBeenCalledWith(expect.anything(), '12345');
+		expect(coinService.getBalance).toHaveBeenCalledWith(expect.anything(), expect.anything(), '12345');
 	});
 
 	it('rejects cast requests without signed Telegram launch auth', async () => {

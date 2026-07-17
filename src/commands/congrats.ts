@@ -161,7 +161,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 	}
 
 	// 先检查余额是否足够
-	const currentBalance = await getBalance(doNs, data.t);
+	const currentBalance = await getBalance(doNs, chatId, data.t);
 	if (currentBalance < data.a) {
 		await TgMessage.answerCallbackQuery(env, callbackQuery.id, {
 			text: `❌ 余额不足，当前只有 ${currentBalance} 💰`,
@@ -173,7 +173,7 @@ export async function handleCongratsCallback(callbackQuery: any, callbackData: a
 	// 转账逻辑 - 使用 coinService 的 transfer 函数
 	try {
 		// 使用 transfer 函数进行转账
-		const transferResult = await transfer(env, doNs, data.t, data.r, data.a, false, 'coins');
+		const transferResult = await transfer(env, doNs, chatId, data.t, data.r, data.a, false, 'coins');
 
 		if (!transferResult.ok) {
 			let errorMsg = '转账失败';

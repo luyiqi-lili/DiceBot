@@ -49,19 +49,18 @@ async function recordUserLastActive(
     const username = from.username || undefined;
     const firstName = from.first_name || from.title || from.name || undefined;
     const lastName = from.last_name || undefined;
-    const chatId = parsed.chatId;
+    const chatId = parsed.chatId ?? 0;
 
-    // 使用 UPSERT 更新或插入记录
+    // 使用 UPSERT 更新或插入记录（按 (chat_id, user_id) 隔离）
     const now = new Date().toISOString();
-    
+
     const result = await env.DB.prepare(`
       INSERT INTO user_last_active (user_id, username, first_name, last_name, chat_id, last_active_at, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET
+      ON CONFLICT(chat_id, user_id) DO UPDATE SET
         username = excluded.username,
         first_name = excluded.first_name,
         last_name = excluded.last_name,
-        chat_id = excluded.chat_id,
         last_active_at = excluded.last_active_at
     `)
     .bind(

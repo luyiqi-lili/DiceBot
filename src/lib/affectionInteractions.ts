@@ -79,6 +79,7 @@ function replyAffectionDelta(parsed: ParsedUpdate): number {
 
 async function incrementInteractionAffection(
 	env: AffectionInteractionEnv,
+	chatId: number,
 	source: any,
 	target: any,
 	delta: number,
@@ -88,7 +89,7 @@ async function incrementInteractionAffection(
 
 	const sourceId = userIdOf(source)!;
 	const targetId = userIdOf(target)!;
-	const result = await incrementAffection(env.DB, env.AFFECTION_KV, sourceId, targetId, displayNameOf(target), delta);
+	const result = await incrementAffection(env.DB, env.AFFECTION_KV, chatId, sourceId, targetId, displayNameOf(target), delta);
 	if (!result.ok) {
 		console.error('[affectionInteractions] increment affection failed', { sourceId, targetId, error: result.error });
 		return false;
@@ -131,7 +132,9 @@ async function findMessageAuthor(
 export async function recordReplyAffection(parsed: ParsedUpdate, env: AffectionInteractionEnv): Promise<void> {
 	try {
 		if (!parsed.isReply || !parsed.replyToMessage?.from) return;
-		await incrementInteractionAffection(env, parsed.from, parsed.replyToMessage.from, replyAffectionDelta(parsed));
+		const chatId = Number(parsed.chatId ?? parsed.message?.chat?.id);
+		if (!Number.isFinite(chatId)) return;
+		await incrementInteractionAffection(env, chatId, parsed.from, parsed.replyToMessage.from, replyAffectionDelta(parsed));
 	} catch (error) {
 		console.error('[affectionInteractions] record reply affection failed', { error });
 	}
@@ -157,7 +160,7 @@ export async function recordReactionAffection(parsed: ParsedUpdate, env: Affecti
 		const target = await findMessageAuthor(env.DB, chatId, messageId);
 		if (!target) return;
 
-		const incremented = await incrementInteractionAffection(env, reactor, target, 1);
+		const incremented = await incrementInteractionAffection(env, chatId, reactor, target, 1);
 		if (!incremented) return;
 
 		await env.AFFECTION_KV.put(markerKey, '1');

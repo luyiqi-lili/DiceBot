@@ -25,6 +25,7 @@ import {
   sumAllUserBalances,
   transfer
 } from "../lib/coinService";
+import { scopeKey } from "../lib/groupScope";
 
 type CoinEnv = Env; // 统一类型，从 ../index 导入
 
@@ -95,40 +96,40 @@ async function doPutRaw(doNs: DurableObjectNamespace, key: string, value: string
  *
  * 返回 { ok, reason?, fee?, fromNew?, toNew? }
  */
-async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: string, amount: number): Promise<{ ok: boolean; reason?: string; fee?: number; fromNew?: number; toNew?: number }> {
+async function atomicTransferUserToUser(env: CoinEnv, chatId: number, fromId: string, toId: string, amount: number): Promise<{ ok: boolean; reason?: string; fee?: number; fromNew?: number; toNew?: number }> {
   const doNs = env.COIN_DO;
   if (!doNs) return { ok: false, reason: "no_do_namespace" };
   if (amount <= 0) return { ok: false, reason: "invalid amount" };
 
   // 前置余额检查
-  const senderBal = await getBalance(doNs, fromId);
+  const senderBal = await getBalance(doNs, chatId, fromId);
   if (senderBal < amount) return { ok: false, reason: "insufficient" };
 
-  const targetBal = await getBalance(doNs, toId);
+  const targetBal = await getBalance(doNs, chatId, toId);
   const rate = calcTransferFeeRate(targetBal+amount);
   const fee = Math.floor(amount * rate);
 
   // if no fee -> single atomic transfer (from -> to amount)
   if (fee === 0) {
-    const res = await transfer(env, doNs, fromId, toId, amount);
+    const res = await transfer(env, doNs, chatId, fromId, toId, amount);
     if (!res.ok) return { ok: false, reason: res.reason || "transfer_failed" };
     return { ok: true, fee: 0, fromNew: res.fromNew, toNew: res.toNew };
   }
 
   // fee > 0: sequence: 1) from->treasury fee ; 2) from->to (amount - fee)
   // Step1: 支付手续费到国库
-  const step1 = await transfer(env, doNs, fromId, TREASURY_KEY, fee);
+  const step1 = await transfer(env, doNs, chatId, fromId, TREASURY_KEY, fee);
   if (!step1.ok) {
     return { ok: false, reason: step1.reason || "charge_fee_failed" };
   }
 
   // Step2: 转账给接收者
   const transferAmount = amount - fee;
-  const step2 = await transfer(env, doNs, fromId, toId, transferAmount);
+  const step2 = await transfer(env, doNs, chatId, fromId, toId, transferAmount);
   if (!step2.ok) {
     // 极端回滚尝试：把已扣的 fee 从宝库退回给发送者
     try {
-      await transfer(env, doNs, TREASURY_KEY, fromId, fee, true);
+      await transfer(env, doNs, chatId, TREASURY_KEY, fromId, fee, true);
       console.warn("[coin] transfer step2 failed, rollback fee attempted");
     } catch (e) {
       console.error("[coin] rollback failed", e);
@@ -137,8 +138,8 @@ async function atomicTransferUserToUser(env: CoinEnv, fromId: string, toId: stri
   }
 
   // 获取最新余额
-  const newFrom = await getBalance(doNs, fromId);
-  const newTo = await getBalance(doNs, toId);
+  const newFrom = await getBalance(doNs, chatId, fromId);
+  const newTo = await getBalance(doNs, chatId, toId);
 
   return { ok: true, fee, fromNew: newFrom, toNew: newTo };
 }
@@ -207,7 +208,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   // — 查询余额（默认无子命令）
   if (!sub) {
-    const bal = await getBalance(doNs, userId);
+    const bal = await getBalance(doNs, chatId, userId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `${userName}，你目前有 ${bal} 💰。`,
@@ -240,8 +241,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const today = new Date().toISOString().split("T")[0];
     const erroneousPrayFixKey = `coin_pray_fix:${ERRONEOUS_PRAY_REWARD_FIX_DATE}:${userId}`;
 
-    const lastPrayDate = await doGetRaw(doNs, prayKey);
-    const erroneousPrayFixDone = await doGetRaw(doNs, erroneousPrayFixKey);
+    const lastPrayDate = await doGetRaw(doNs, scopeKey(chatId, prayKey));
+    const erroneousPrayFixDone = await doGetRaw(doNs, scopeKey(chatId, erroneousPrayFixKey));
     const shouldFixErroneousPrayReward =
       today === ERRONEOUS_PRAY_REWARD_FIX_DATE &&
       lastPrayDate === today &&
@@ -259,7 +260,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     let correctionText = "";
     if (shouldFixErroneousPrayReward) {
-      const correction = await addToTreasury(env, doNs, userId, ERRONEOUS_PRAY_REWARD_AMOUNT, "祈祷奖励修正");
+      const correction = await addToTreasury(env, doNs, chatId, userId, ERRONEOUS_PRAY_REWARD_AMOUNT, "祈祷奖励修正");
       if (!correction.ok) {
         await TgMessage.sendText(env, {
           chat_id: chatId,
@@ -269,8 +270,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         });
         return;
       }
-      await doPutRaw(doNs, erroneousPrayFixKey, "done");
-      await doPutRaw(doNs, prayKey, `${today}:corrected`);
+      await doPutRaw(doNs, scopeKey(chatId, erroneousPrayFixKey), "done");
+      await doPutRaw(doNs, scopeKey(chatId, prayKey), `${today}:corrected`);
       correctionText = `莉莉发现今天早些时候把奖励算多啦，已经先把多发的 ${ERRONEOUS_PRAY_REWARD_AMOUNT} 💰收回；现在可以重新签到一次。`;
     }
 
@@ -280,7 +281,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const gain = duringVioletAnniversary ? VIOLET_ANNIVERSARY_PRAY_REWARD : duringEvent ? randomInt(11, 20) : randomInt(8, 12);
 
     // 祈祷：从国库支付（允许国库为负）到用户账户
-    const payoutSuccess = await takeFromTreasury(env, doNs, userId, gain, "祈祷", true);
+    const payoutSuccess = await takeFromTreasury(env, doNs, chatId, userId, gain, "祈祷", true);
 
     if (!payoutSuccess.ok) {
       await TgMessage.sendText(env, {
@@ -293,12 +294,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 标记今天已祈祷（使用专门的存储，不是余额）
-    await doPutRaw(doNs, prayKey, today);
+    await doPutRaw(doNs, scopeKey(chatId, prayKey), today);
     if (today === ERRONEOUS_PRAY_REWARD_FIX_DATE) {
-      await doPutRaw(doNs, erroneousPrayFixKey, "done");
+      await doPutRaw(doNs, scopeKey(chatId, erroneousPrayFixKey), "done");
     }
 
-    const newBal = await getBalance(doNs, userId);
+    const newBal = await getBalance(doNs, chatId, userId);
     const fortuneText = randomDailyPrayFortune();
     const rewardText = duringVioletAnniversary
       ? `💜 ${userName}，紫罗兰周年庆签到成功！莉莉把今天的奖励换成了 ${gain} 💰，当前余额 ${newBal} 💰。`
@@ -333,7 +334,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const amount = parseInt(args[1] || "", 10);
     if (isNaN(amount)) {
       const roomKey = `${chatId}||${threadId ?? 0}`;
-      const roomBal = await getBalance(doNs, roomKey);
+      const roomBal = await getBalance(doNs, chatId, roomKey);
       const place = cfg.placeName || `房间 ${threadId}`;
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -354,7 +355,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const senderBal = await getBalance(doNs, userId);
+    const senderBal = await getBalance(doNs, chatId, userId);
     if (senderBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -366,10 +367,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const roomKey = `${chatId}||${threadId ?? 0}`;
-    const roomBalBefore = await getBalance(doNs, roomKey);
+    const roomBalBefore = await getBalance(doNs, chatId, roomKey);
 
     // 扣除用户 -> 宝库
-    const deducted = await addToTreasury(env, doNs, userId, amount, "祈福支出");
+    const deducted = await addToTreasury(env, doNs, chatId, userId, amount, "祈福支出");
     if (!deducted.ok) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -384,7 +385,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     //const roomIncr = await addRoomCount(env, doNs, roomKey, amount, "祈福计数");
 
     const roomBalAfter = roomBalBefore + amount;
-    await doPutRaw(doNs, roomKey, String(roomBalAfter))
+    await doPutRaw(doNs, scopeKey(chatId, roomKey), String(roomBalAfter))
 
 
     const place = cfg.placeName || `房间 ${threadId}`;
@@ -433,7 +434,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       }
 
       // 使用原子化组合转账
-      const res = await atomicTransferUserToUser(env, userId, String(targetID), amount);
+      const res = await atomicTransferUserToUser(env, chatId, userId, String(targetID), amount);
       if (!res.ok) {
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${res.reason || "未知原因"}`, parse_mode: "HTML", message_thread_id: threadId });
         return;
@@ -470,7 +471,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const targetFirstName = await resolveFirstName(String(repliedFrom.id));
-    const res = await atomicTransferUserToUser(env, userId, String(repliedFrom.id), amount);
+    const res = await atomicTransferUserToUser(env, chatId, userId, String(repliedFrom.id), amount);
     if (!res.ok) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${res.reason || "未知原因"}`, parse_mode: "HTML", message_thread_id: threadId });
       return;
@@ -510,7 +511,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     const repliedFrom = parsedMessage.message?.reply_to_message?.from;
     if (repliedFrom && parsedMessage.isReply) {
       const targetId = String(repliedFrom.id);
-      const bal = await getBalance(doNs, targetId);
+      const bal = await getBalance(doNs, chatId, targetId);
       const targetName = await resolveFirstName(targetId);
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -523,8 +524,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 否则返回艾丽莎宝库与所有用户合计
     try {
-      const treasuryBal = await getTreasury(doNs);
-      const totalUserBal = await sumAllUserBalances(doNs);
+      const treasuryBal = await getTreasury(doNs, chatId);
+      const totalUserBal = await sumAllUserBalances(doNs, chatId);
 
       const text =
         `🏦 艾丽莎宝库：${treasuryBal} 💰。\n` +
@@ -597,7 +598,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 从目标 -> 宝库（允许目标变为负值）
-    const deducted = await addToTreasury(env, doNs, targetUid, amount, "内务部税款");
+    const deducted = await addToTreasury(env, doNs, chatId, targetUid, amount, "内务部税款");
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -645,7 +646,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       targetLabel = await resolveFirstName(targetUid);
     }
 
-    const treasuryBal = await getTreasury(doNs);
+    const treasuryBal = await getTreasury(doNs, chatId);
     if (treasuryBal < amount) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
@@ -657,9 +658,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     // 直接把国库 -> 目标
-    await takeFromTreasury(env, doNs, targetUid, amount, "宝库取款");
-    const newTargetBal = await getBalance(doNs, targetUid);
-    const newTreasuryBal = await getTreasury(doNs);
+    await takeFromTreasury(env, doNs, chatId, targetUid, amount, "宝库取款");
+    const newTargetBal = await getBalance(doNs, chatId, targetUid);
+    const newTreasuryBal = await getTreasury(doNs, chatId);
 
     await TgMessage.sendText(env, {
       chat_id: chatId,
@@ -696,9 +697,9 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
     // 直接注入国库
 
-    const oldTre = await getTreasury(doNs);
-    await doPutRaw(doNs, TREASURY_KEY, String(amount + oldTre))
-    const newTre = await getTreasury(doNs);
+    const oldTre = await getTreasury(doNs, chatId);
+    await doPutRaw(doNs, scopeKey(chatId, TREASURY_KEY), String(amount + oldTre))
+    const newTre = await getTreasury(doNs, chatId);
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text: `✨ ${userName} 从虚空中召唤出了 ${amount} 💰，投入了艾丽莎宝库。<blockquote>「能力越大，责任亦随之而来……」虚空造币，或将撕裂秩序，引来无法逆转的通胀风暴。不过，你一定是经过深思熟虑才踏出了这一步吧。</blockquote>艾丽莎宝库的结余，如今已达 ${newTre} 💰。`,

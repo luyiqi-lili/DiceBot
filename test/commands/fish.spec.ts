@@ -36,7 +36,7 @@ describe('fish', () => {
 
 		await handleFish(makeParsed({ args: ['add', '🐟测试鱼', '13'] }), { COIN_DO: {} as any, FISH_KV: fishKv } as any);
 
-		expect(coinService.addToTreasury).toHaveBeenCalledWith(expect.anything(), expect.anything(), '12345', FISH_ADD_COST, '添加鱼');
+		expect(coinService.addToTreasury).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), '12345', FISH_ADD_COST, '添加鱼');
 		const saved = JSON.parse(String(await fishKv.get(FISH_CATALOG_KEY)));
 		expect(saved[0]).toMatchObject({ name: '<a href="tg://user?id=12345" >🐟测试鱼</a>', hookRate: 0.1, value: 13 });
 		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('添加成功');

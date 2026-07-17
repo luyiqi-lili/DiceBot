@@ -15,6 +15,7 @@ import {
 } from "../../lib/fishCore";
 import { getBalance as coinGetBalance, addToTreasury, takeFromTreasury } from "../../lib/coinService";
 import { getVerifiedWebGameUserId } from "../../lib/telegramAuth";
+import { LEGACY_CHAT_ID } from "../../lib/groupScope";
 
 // 最大钓鱼次数 - 统一使用 fishCore 的常量
 // 记录类型 FishingRecord 由 fishCore 导出
@@ -44,10 +45,10 @@ export async function handleFishData(request: Request, env: Env): Promise<Respon
         }
 
         // 获取余额
-        const balance = await coinGetBalance(env.COIN_DO, userId);
-        
+        const balance = await coinGetBalance(env.COIN_DO, LEGACY_CHAT_ID, userId);
+
         // 获取今日钓鱼记录（与 /f 命令共用同一 KV key）
-        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userId);
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, LEGACY_CHAT_ID, userId);
 
         // 计算可用钓鱼次数
         const remainingAttempts = MAX_FISH_ATTEMPTS - fishingRecord.count;
@@ -95,18 +96,18 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
         const userIdStr = String(userId);
         
         // 检查余额
-        const currentBal = await coinGetBalance(env.COIN_DO, userIdStr);
+        const currentBal = await coinGetBalance(env.COIN_DO, LEGACY_CHAT_ID, userIdStr);
         if (currentBal < baitCost) {
-            return jsonResponse({ 
-                ok: false, 
+            return jsonResponse({
+                ok: false,
                 error: '余额不足',
                 currentBalance: currentBal,
                 required: baitCost
             }, 400);
         }
-        
+
         // 检查今日钓鱼次数（与 /f 命令共用 KV）
-        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, LEGACY_CHAT_ID, userIdStr);
         if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             return jsonResponse({ 
                 ok: false, 
@@ -116,7 +117,7 @@ export async function handleFishCast(request: Request, env: Env): Promise<Respon
         }
         
         // 扣除鱼饵费用
-        await addToTreasury(env, env.COIN_DO, userIdStr, baitCost, "鱼饵（游戏）");
+        await addToTreasury(env, env.COIN_DO, LEGACY_CHAT_ID, userIdStr, baitCost, "鱼饵（游戏）");
         
         // 生成抛竿数据
         const strength = Math.floor(Math.random() * 100) + 11; // 11-110
@@ -199,7 +200,7 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
         const score = Math.floor(rawScore);
         
         // 获取今日钓鱼记录（与 /f 命令共用 KV）
-        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, userIdStr);
+        const fishingRecord = await getFishingRecord(env.FISHING_RECORD_KV, LEGACY_CHAT_ID, userIdStr);
         if (fishingRecord.count >= MAX_FISH_ATTEMPTS) {
             await env.FISHING_RECORD_KV.delete(castKey); // 清理抛竿记录
             return jsonResponse({ 
@@ -229,20 +230,20 @@ export async function handleFishPull(request: Request, env: Env): Promise<Respon
             result.fishName = stripHtml(fishResult.fishName).trim();
             result.fishValue = fishResult.fishValue;
             if (fishResult.hooked) {
-                await takeFromTreasury(env, env.COIN_DO, userIdStr, fishResult.fishValue, "渔获（游戏）");
+                await takeFromTreasury(env, env.COIN_DO, LEGACY_CHAT_ID, userIdStr, fishResult.fishValue, "渔获（游戏）");
             }
         }
         
         // 更新钓鱼记录（与 /f 命令共用 KV）
         fishingRecord.results.push(result as any);
         fishingRecord.count += 1;
-        await setFishingRecord(env.FISHING_RECORD_KV, userIdStr, fishingRecord);
-        
+        await setFishingRecord(env.FISHING_RECORD_KV, LEGACY_CHAT_ID, userIdStr, fishingRecord);
+
         // 删除抛竿记录
         await env.FISHING_RECORD_KV.delete(castKey);
-        
+
         // 获取最新余额
-        const newBalance = await coinGetBalance(env.COIN_DO, userIdStr);
+        const newBalance = await coinGetBalance(env.COIN_DO, LEGACY_CHAT_ID, userIdStr);
         
         return jsonResponse({
             ok: true,
