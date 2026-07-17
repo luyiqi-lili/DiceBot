@@ -96,8 +96,7 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DevDiceBot",
-				"DEEPSEEK_MODEL": "deepseek-v4-pro"
+				"BOT_USERNAME": "lili_DevDiceBot"
 			}
 		},
 		"prod": {
@@ -187,8 +186,7 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DiceBot",
-				"DEEPSEEK_MODEL": "deepseek-v4-pro"
+				"BOT_USERNAME": "lili_DiceBot"
 			}
 		}
 	}

@@ -2,7 +2,7 @@
 
 English source: [README.md](README.md)
 
-DiceBot 是运行在 Cloudflare Workers 上的 Telegram 群组机器人，提供群工具、游戏、轻量 DND 跑团、本地 wish 自动化和 Telegram Web 小游戏。运行时使用 TypeScript、KV、Durable Objects、D1、Telegram Bot API，以及兼容 DeepSeek 的聊天 API。
+DiceBot 是运行在 Cloudflare Workers 上的 Telegram 群组机器人，提供群工具、游戏、轻量 DND 跑团和 Telegram Web 小游戏。运行时使用 TypeScript、KV、Durable Objects、D1 和 Telegram Bot API。不依赖任何外部 AI API。
 
 ## 当前状态
 
@@ -29,7 +29,6 @@ HTTP request
   |
   +-- /api/*  -> handleExternalAPI()
   |              /api/coin/* -> CoinDO HTTP facade
-  |              /api/wish/* -> src/lib/wishApi.ts
   |              /api/health
   |
   +-- non-POST -> "I am alive"
@@ -37,12 +36,10 @@ HTTP request
   +-- POST Telegram update
          |
          +-- TgMessage.parseUpdate()
-         +-- ALLOWED_CHAT_IDS check
-         +-- inline_query       -> aiAssistInline
          +-- topic_edited       -> topicEditHandler
          +-- callback_query     -> game launch, delete_message, loadCallback()
          +-- command message    -> loadCommand()
-         +-- non-command text   -> wish approval, *skill/*weapon/*spell, backup
+         +-- non-command text   -> *skill/*weapon/*spell, backup
 ```
 
 Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts` 使用显式 switch-case `import()`，即使项目里也存在 `src/routes.ts`。
@@ -51,11 +48,10 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 
 - 骰子与游戏：`/roll`、`/r`、`/rd`、`/rh`、`/groll`、`/21`、`/duel`。
 - 经济：`/coin`、`/lottery`、`/congrats`、`/恭喜发财`。
-- 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/trans`、`/ask`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`、`/report`。
+- 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`。
 - 权限控制：机器人在其被加入的任意群组都会响应（无群组白名单；数据按 `chat_id` 隔离）。群主自动拥有全部管理命令权限，并可用 `/perm` 为具体用户授予/移除权限（存于 D1 `permission_grants` 表）。详见 [docs/zh-CN/commands.md](docs/zh-CN/commands.md)。
 - 钓鱼：`/f`、`/f check`、`/f add`、`/f list`、`/f remove`。
 - 好感度：`/rose`、`/rose send`、`/rose check`。
-- Wish 自动化：`/wish`；管理员回复汇总消息批准任务。
 - DND：`/dnd`、`/new`、`/char`、`/skill`、`/skills`、`/rest`、`/gm`、`/item`、`/attack`、`/atk`、`/cast`、`/lvup`、`/level`。
 - 星号快捷方式：以 `*` 开头的普通消息会根据角色状态和 D1 技能数据分发到武器攻击、魔法施放或技能检定。
 
@@ -69,7 +65,7 @@ Cloudflare 绑定定义在 `src/index.ts` 和 `wrangler.jsonc`。
 
 - KV：`NEWS_STORE`、`TOPIC_KV`、`BOOK_STORE`、`FISHING_RECORD_KV`、`FISH_KV`、`TGBOTCOUNT`、`AFFECTION_KV`、`COIN_KV`、`ITEM_STORE`。
 - Durable Objects：`COIN_DO`、`LOTTERY_DO`。
-- D1：生产环境中的 `DB`，用于 DND、物品、好感度、wish、备份、调用统计、规则、汇报和消息历史等功能。
+- D1：生产环境中的 `DB`，用于 DND、物品、好感度、备份、调用统计、规则、权限授予、主题访问和消息历史等功能。
 
 兼容/遗留绑定：
 
@@ -91,7 +87,7 @@ src/
   durableObjects/           CoinDO 和 LotteryDO
   cron/                     定时任务
   web/                      Telegram Web 游戏与分数 API
-scripts/                    本地 wish 自动化和部署通知
+scripts/                    部署通知
 test/                       Vitest 单元/e2e/脚本测试
 docs/                       项目手册和实现记录
 wrangler.jsonc              Cloudflare 环境绑定和部署配置
@@ -153,7 +149,6 @@ E2E 测试需要真实外部变量，包括 `WORKER_BASE_URL` 和 `EXTERNAL_API_
 
 - `npm run deploy` 执行 `wrangler deploy`。
 - `scripts/notify-deploy.sh` 发送部署通知，但当前包含字面量 Telegram 通知配置，应迁移到 secrets 后再视为安全。
-- `scripts/wish-local.sh` 管理本地 wish 自动化 cron。
 
 ## 文档索引
 
@@ -168,7 +163,6 @@ E2E 测试需要真实外部变量，包括 `WORKER_BASE_URL` 和 `EXTERNAL_API_
 - [货币与彩票](docs/zh-CN/coin-system.md)
 - [钓鱼系统](docs/zh-CN/fish-system.md)
 - [好感度系统](docs/zh-CN/affection-system.md)
-- [Wish 自动化](docs/zh-CN/wish-automation.md)
 - [莉莉与拉斐尔背景故事](docs/zh-CN/lily-raphael-background.md)
 - [巫妖的规则书](docs/zh-CN/lich-rulebook.md)
 

@@ -18,10 +18,6 @@ vi.mock('../src/lib/backup', () => ({
 	handleBackup: mocks.handleBackup,
 }));
 
-vi.mock('../src/commands/wish', () => ({
-	handleWishApproval: mocks.handleWishApproval,
-}));
-
 vi.mock('../src/commands/like', () => ({
 	incrementUsageCount: mocks.incrementUsageCount,
 }));

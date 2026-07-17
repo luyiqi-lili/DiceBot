@@ -4,25 +4,24 @@ Chinese translation: [zh-CN/commands.md](zh-CN/commands.md)
 
 This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/routes.ts` is incomplete, so use this document and `loadCommand()` as the source of truth.
 
+> The bot no longer depends on any external AI API. Features that relied on the DeepSeek-compatible chat API have been removed (`/trans`, `/ask`, `/report`, inline `@bot` AI assist, `/wish`). `/echo` now returns a static dice-based verdict, and `/fate` only draws cards (no AI interpretation).
+
 ## General Commands
 
 | Command | Handler | Notes |
 |---------|---------|-------|
 | `/help` | `handleHelp` | Main help text |
 | `/whoami` | `handleWhoami` | Shows Telegram user/chat details |
-| `/echo` | `handleEcho` | Bot evaluates the user's text |
+| `/echo` | `handleEcho` | Rolls a die and gives the user's text a static attitude verdict |
 | `/em`, `/me`, `/emote` | `handleEmote` | Action text |
 | `/like` | `handleLike` | Usage count backed by D1 |
 | `/book` | `handleBook` | Bookmark storage in `BOOK_STORE` |
 | `/news` | `handleNews` | Daily group news in `NEWS_STORE` |
 | `/rule` | `handleRule` | Group rule storage in D1 |
-| `/trans` | `handleTrans` | Translate replied text with DeepSeek |
-| `/ask` | `handleAsk` | Comment on replied content with DeepSeek |
-| `/check <question>` | `handleCheck` | Explains currently implemented bot rule logic when the question is specific enough |
+| `/check <question>` | `handleCheck` | Explains currently implemented bot rule logic (local canned answers) |
 | `/act` | `handleAct` | Activity/session recording in D1 |
 | `/top` | `handleTop` | Admin topic ranking by message count over the last 7 days |
-| `/report` | `handleReport` | AI group report generation |
-| `/fate` | `handleFate` | Tarot-style draw |
+| `/fate` | `handleFate` | Tarot-style 3-card draw |
 | `/perm` | `handlePerm` | Group owner grants/revokes admin permissions per user (see below) |
 | `/topic` | `handleTopic` | Group owner configures which topics the topic-gated features run in (see below) |
 
@@ -117,15 +116,6 @@ Fish admin is currently user `8080375150`.
 | `/rose` | `handleRose` | Reply to view your affection toward the target |
 | `/rose send` | `handleRose` | Reply to send a flower; first daily send is free |
 | `/rose check` | `handleRose` | Show incoming affection ranking for replied user or self |
-
-## Wish Automation
-
-| Command | Handler | Notes |
-|---------|---------|-------|
-| `/wish <text>` | `handleWish` | Stores a meaningful wish in D1 |
-| admin reply to digest with numbers | `handleWishApproval` | Non-command message path; admin id `8080375150` |
-
-See [wish-automation.md](wish-automation.md).
 
 ## DND Commands
 

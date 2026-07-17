@@ -4,25 +4,24 @@ English source: [../commands.md](../commands.md)
 
 本参考以 `src/index.ts` 的运行时分发为准。`src/routes.ts` 的元数据不完整，因此命令可用性以 `loadCommand()` 为准。
 
+> 机器人不再依赖任何外部 AI API。依赖 DeepSeek 兼容聊天 API 的功能已移除（`/trans`、`/ask`、`/report`、内联 `@bot` 智能回复、`/wish`）。`/echo` 现在返回基于掷骰的静态评价，`/fate` 只抽牌（不再有 AI 解读）。
+
 ## 通用命令
 
 | 命令 | Handler | 说明 |
 |------|---------|------|
 | `/help` | `handleHelp` | 主帮助文本 |
 | `/whoami` | `handleWhoami` | 显示 Telegram 用户/聊天信息 |
-| `/echo` | `handleEcho` | 让机器人评价用户文本 |
+| `/echo` | `handleEcho` | 掷骰给用户文本一个静态态度评价 |
 | `/em`, `/me`, `/emote` | `handleEmote` | 动作文本 |
 | `/like` | `handleLike` | D1 调用统计 |
 | `/book` | `handleBook` | `BOOK_STORE` 书签 |
 | `/news` | `handleNews` | `NEWS_STORE` 每日群消息 |
 | `/rule` | `handleRule` | D1 群规则 |
-| `/trans` | `handleTrans` | DeepSeek 翻译回复文本 |
-| `/ask` | `handleAsk` | DeepSeek 评论回复内容 |
-| `/check <问题>` | `handleCheck` | 查询当前实现里的功能规则判断逻辑 |
+| `/check <问题>` | `handleCheck` | 查询当前实现里的功能规则（本地预置回答）|
 | `/act` | `handleAct` | D1 活动/会话记录 |
 | `/top` | `handleTop` | 管理员查看最近 7 天主题消息排行 |
-| `/report` | `handleReport` | AI 群汇报 |
-| `/fate` | `handleFate` | 塔罗式抽取 |
+| `/fate` | `handleFate` | 塔罗式抽 3 张牌 |
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
 
@@ -117,13 +116,6 @@ English source: [../commands.md](../commands.md)
 | `/rose` | 回复查看自己对目标的好感度 |
 | `/rose send` | 回复送花；每日首次免费 |
 | `/rose check` | 查看自己或被回复用户收到的好感度排行 |
-
-## Wish 自动化
-
-| 命令 | 说明 |
-|------|------|
-| `/wish <text>` | 将有意义的愿望写入 D1 |
-| 管理员回复汇总编号 | 非命令路径批准任务，管理员 id 为 `8080375150` |
 
 ## DND 命令
 

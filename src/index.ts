@@ -41,10 +41,6 @@ export type Env = {
 	DB?: D1Database;
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
-	DEEPSEEK_API_KEY?: string;
-	DEEPSEEK_API_KEYS?: string;
-	DEEPSEEK_MODEL?: string;
-	DEEPSEEK_BASE_URL?: string;
 	TELEGRAM_WEBHOOK_SECRET?: string;
 	TELEGRAM_API_BASE_URL?: string;
 };
@@ -72,11 +68,6 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 
 	if (path.startsWith('/api/lottery')) {
 		return handleLotteryAPI(request, env, path);
-	}
-
-	if (path.startsWith('/api/wish')) {
-		const { handleWishAPI } = await import('./lib/wishApi');
-		return handleWishAPI(request, env, path);
 	}
 
 	if (path === '/api/health') {
@@ -142,8 +133,6 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'lottery': { const { handleLottery } = await import('./commands/lottery'); return handleLottery; }
 		case 'act':     { const { handleAct } = await import('./commands/act'); return handleAct; }
 		case 'top':     { const { handleTop } = await import('./commands/top'); return handleTop; }
-		case 'report':  { const { handleReport } = await import('./commands/report'); return handleReport; }
-		case 'ask':     { const { handleAsk } = await import('./commands/ask'); return handleAsk; }
 		case 'book':    { const { handleBook } = await import('./commands/book'); return handleBook; }
 		case 'whoami':  { const { handleWhoami } = await import('./commands/whoami'); return handleWhoami; }
 		case 'perm':    { const { handlePerm } = await import('./commands/perm'); return handlePerm; }
@@ -160,9 +149,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'help':    { const { handleHelp } = await import('./commands/help'); return handleHelp; }
 		case 'check':   { const { handleCheck } = await import('./commands/check'); return handleCheck; }
 		case 'f': case 'fish': { const { handleFish } = await import('./commands/fish'); return handleFish; }
-		case 'wish':    { const { handleWish } = await import('./commands/wish'); return handleWish; }
 		case 'coin':    { const { handleCoin } = await import('./commands/coin'); return handleCoin; }
-		case 'trans':   { const { handleTrans } = await import('./commands/trans'); return handleTrans; }
 		case 'echo':    { const { handleEcho } = await import('./commands/echo'); return handleEcho; }
 		case 'like':    { const { handleLike } = await import('./commands/like'); return handleLike; }
 		case 'duel':    { const { handleDuel } = await import('./commands/duel'); return handleDuel; }
@@ -222,17 +209,6 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 	console.log('index:parsedMessage.type', parsedMessage.type);
 
 	switch (parsedMessage.type) {
-		case 'inline_query': {
-			console.log('index: 检测到 inline_query，进入 AI 辅助逻辑');
-			try {
-				const { handleInlineAI } = await import('./commands/aiAssistInline');
-				await handleInlineAI(parsedMessage, env);
-			} catch (e) {
-				console.error('❌ handleInlineAI 失败', e);
-			}
-			return;
-		}
-
 		case 'topic_created':
 		case 'topic_edited': {
 			console.log('index: 检测到 topic 事件', parsedMessage.type);
@@ -342,10 +318,6 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 					return;
 				}
 			} else {
-				const { handleWishApproval } = await import('./commands/wish');
-				const wishHandled = await handleWishApproval(parsedMessage, env);
-				if (wishHandled) return;
-
 				const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
 				if (rawText.startsWith('*') && !rawText.startsWith('**')) {
 					const starName = rawText.slice(1).trim();

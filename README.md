@@ -2,7 +2,7 @@
 
 Chinese translation: [README.zh-CN.md](README.zh-CN.md)
 
-DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, local wish automation, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, Telegram Bot API, and DeepSeek-compatible chat APIs.
+DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, and the Telegram Bot API. It has no external AI API dependency.
 
 This README is the entry point. Detailed manuals live in `docs/`.
 
@@ -31,7 +31,6 @@ HTTP request
   |
   +-- /api/*  -> handleExternalAPI()
   |              /api/coin/* -> CoinDO HTTP facade
-  |              /api/wish/* -> src/lib/wishApi.ts
   |              /api/health
   |
   +-- non-POST -> "I am alive"
@@ -39,12 +38,10 @@ HTTP request
   +-- POST Telegram update
          |
          +-- TgMessage.parseUpdate()
-         +-- ALLOWED_CHAT_IDS check
-         +-- inline_query       -> aiAssistInline
          +-- topic_edited       -> topicEditHandler
          +-- callback_query     -> game launch, delete_message, loadCallback()
          +-- command message    -> loadCommand()
-         +-- non-command text   -> wish approval, *skill/*weapon/*spell, backup
+         +-- non-command text   -> *skill/*weapon/*spell, backup
 ```
 
 Cloudflare requires statically analyzable module imports. `src/index.ts` therefore uses explicit switch-case `import()` calls even though `src/routes.ts` also exists.
@@ -55,11 +52,10 @@ Main command groups:
 
 - Dice and party games: `/roll`, `/r`, `/rd`, `/rh`, `/groll`, `/21`, `/duel`.
 - Economy: `/coin`, `/lottery`, `/congrats`, `/恭喜发财`.
-- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/trans`, `/ask`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/report`.
+- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`.
 - Access control: the bot responds in any group it is added to (no chat allowlist; data isolated per `chat_id`). Group owners implicitly hold every admin permission and can grant/revoke per-user permissions with `/perm` (stored in D1 `permission_grants`). See [docs/commands.md](docs/commands.md#access-control-and-permissions).
 - Fish: `/f`, `/f check`, `/f add`, `/f list`, `/f remove`.
 - Affection: `/rose`, `/rose send`, `/rose check`.
-- Wish automation: `/wish`; admin replies to digest messages approve tasks.
 - DND: `/dnd`, `/new`, `/char`, `/skill`, `/skills`, `/rest`, `/gm`, `/item`, `/attack`, `/atk`, `/cast`, `/lvup`, `/level`.
 - Star shortcuts: messages starting with `*` dispatch to weapon attack, magic cast, or skill check depending on character state and D1 skill data.
 
@@ -73,7 +69,7 @@ Active storage:
 
 - KV: `NEWS_STORE`, `TOPIC_KV`, `BOOK_STORE`, `FISHING_RECORD_KV`, `FISH_KV`, `TGBOTCOUNT`, `AFFECTION_KV`, `COIN_KV`, `ITEM_STORE`.
 - Durable Objects: `COIN_DO`, `LOTTERY_DO`.
-- D1: `DB` in production, used by DND, item, affection, wish, backup, usage, rules, reports, and message history features.
+- D1: `DB` in production, used by DND, item, affection, backup, usage, rules, permission grants, topic access, and message history features.
 
 Legacy bindings remain for compatibility:
 
@@ -95,7 +91,7 @@ src/
   durableObjects/           CoinDO and LotteryDO
   cron/                     Scheduled coin check
   web/                      Telegram game pages and score APIs
-scripts/                    Local wish automation and deploy notification
+scripts/                    Deploy notification
 test/                       Vitest unit/e2e/script tests
 docs/                       Project manuals and implementation records
 wrangler.jsonc              Cloudflare env bindings and deployment config
@@ -159,7 +155,6 @@ Scripts:
 
 - `npm run deploy` runs `wrangler deploy`.
 - `scripts/notify-deploy.sh` sends deployment notifications, but currently contains literal Telegram notification configuration and should be moved to secrets before being treated as safe.
-- `scripts/wish-local.sh` manages local wish automation cron entries.
 
 ## Documentation Index
 
@@ -174,7 +169,6 @@ Scripts:
 - [Coin and lottery](docs/coin-system.md)
 - [Fish system](docs/fish-system.md)
 - [Affection system](docs/affection-system.md)
-- [Wish automation](docs/wish-automation.md)
 - [Lily and Raphael background story](docs/lily-raphael-background.md)
 - [Lich rulebook](docs/lich-rulebook.md)
 

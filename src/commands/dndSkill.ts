@@ -6,7 +6,6 @@
 
 import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { escapeHtml, deleteMarkup } from '../lib/util';
-import { callAIChat, hasAIChatProvider } from '../lib/aiClient';
 import type { Env } from '../index';
 import {
   getCharacter,
@@ -29,48 +28,6 @@ async function findSkill(
   return await env.DB.prepare(
     `SELECT * FROM dnd_skills WHERE chat_id = ? AND skill_name = ?`
   ).bind(String(chatId), skillName).first<DndSkillRow>() ?? null;
-}
-
-// ── 内部: AI RP 描述 ──────────────────────────────────────
-
-async function generateFlavor(
-  env: Env,
-  skillName: string,
-  skillDesc: string,
-  charName: string,
-  charRace: string,
-  charClass: string,
-  myResult: number,
-  gap: number,
-  success: boolean | null,
-  oppName?: string,
-): Promise<string> {
-  if (!hasAIChatProvider(env)) return '';
-
-  let gapDesc = '';
-  if (gap > 10) gapDesc = `以巨大优势（超出${gap}点）碾压成功`;
-  else if (gap > 5) gapDesc = `轻松取胜（超出${gap}点）`;
-  else if (gap > 0) gapDesc = `险胜，仅差${gap}点，非常接近`;
-  else if (gap === 0) gapDesc = `刚好持平，惊险万分`;
-  else if (gap > -5) gapDesc = `惜败，只差${Math.abs(gap)}点，功亏一篑`;
-  else gapDesc = `惨败，差距${Math.abs(gap)}点，完全被压制`;
-
-  try {
-    const text = await callAIChat(env, {
-      messages: [{
-        role: 'system',
-        content: '你是跑团叙事主持人。攻击方主动施展技能，成功则对手中招，失败则攻击方自己失误或被闪避——永远不要描述成攻击方被对方反击。根据技能描述判断是物理还是魔法：物理技能用拳脚武器描写，魔法技能才用法术描写。角色的职业标签不影响技能性质。输出1-2句纯中文第三人称。\n\n✅ 正确样例：\n物理技-成功：「弓身一记扫腿，精准勾住对手脚踝将其撂倒」\n物理技-失败：「伸腿横扫却失了准头，只擦过对方护胫，反因惯性踉跄半步」\n魔法技-成功：「指尖绽开冰蓝符文，寒气如蛇缠上对手双腿」\n魔法技-失败：「咒文念到一半气息紊乱，指间的火花噗地熄灭了」\n\n❌ 错误样例：\n「被对手一记反手摔在地上」— 攻击方不能被反击\n「拉斐尔在魔法塔中挥动法杖」— 不要虚构环境\n「法师用魔力一拳打去」— 物理技能不要加魔法',
-      },
-      {
-        role: 'user',
-        content: `${charName}是攻击方，${oppName || '目标'}是防守方。\n\n技能「${skillName}」：${skillDesc}\n攻击方掷点${myResult}，${gapDesc}\n\n请写出攻击方${charName}施展${skillName}的动作，纯中文：`,
-      }],
-      maxTokens: 200,
-      temperature: 0.8,
-      timeoutMs: 30000,
-    });
-    return text.replace(/^(描述[：:]|情景[：:]|\d+[\.、])\s*/i, '').trim();
-  } catch { return ''; }
 }
 
 // ── 内部: 计算角色对某技能的加成 ──────────────────────────
@@ -193,16 +150,6 @@ export async function performSkillCheck(
     }
   }
 
-  // RP 描述
-  let flavorLine = '';
-  if (hasAIChatProvider(env)) {
-    const gap = oppValue !== null ? myTotal - oppValue
-      : (dcInfo?.dc_value ?? 0) > 0 ? myTotal - (dcInfo?.dc_value ?? 0)
-      : 0;
-    const flavor = await generateFlavor(env, skillName, skill.description || '', char.char_name, char.race, char.class, myTotal, gap, success, oppName || undefined);
-    if (flavor) flavorLine = `\n📝 ${escapeHtml(flavor)}`;
-  }
-
   // 组装发起者检定行
   const myParts: string[] = [];
   if (isProficient) myParts.push(`熟练(+${my.attrMod >= 0 ? '+' : ''}${my.attrMod})`);
@@ -213,8 +160,7 @@ export async function performSkillCheck(
   const text =
     `🎲 <b>${escapeHtml(skillName)}</b>检定：${dieLabel}(${baseRoll})${formulaStr} = <b>${myTotal}</b>` +
     oppLine +
-    dcLine +
-    flavorLine;
+    dcLine;
 
   // 发送
   const sendOpts: any = {

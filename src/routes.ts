@@ -45,12 +45,6 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 主题消息排行 ── */
 	top:      { module: './commands/top', handler: 'handleTop' },
 
-	/* ── 群聊汇报 ── */
-	report:   { module: './commands/report', handler: 'handleReport' },
-
-	/* ── 问题检查 ── */
-	ask:      { module: './commands/ask', handler: 'handleAsk' },
-
 	/* ── 书签 ── */
 	book:     { module: './commands/book', handler: 'handleBook' },
 
@@ -93,14 +87,8 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	f:        { module: './commands/fish', handler: 'handleFish' },
 	fish:     { module: './commands/fish', handler: 'handleFish' },
 
-	/* ── 愿望池 ── */
-	wish:     { module: './commands/wish', handler: 'handleWish', deleteMsg: false },
-
 	/* ── 货币 ── */
 	coin:     { module: './commands/coin', handler: 'handleCoin' },
-
-	/* ── 翻译 ── */
-	trans:    { module: './commands/trans', handler: 'handleTrans' },
 
 	/* ── 回声 ── */
 	echo:     { module: './commands/echo', handler: 'handleEcho' },

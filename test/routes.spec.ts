@@ -13,13 +13,6 @@ describe('COMMAND_ROUTES', () => {
 		expect(COMMAND_ROUTES['钓鱼']).toBeUndefined();
 	});
 
-	it('/ask 注册到问题检查命令', () => {
-		expect(COMMAND_ROUTES.ask).toMatchObject({
-			module: './commands/ask',
-			handler: 'handleAsk',
-		});
-	});
-
 	it('/check 注册到规则查询命令', () => {
 		expect(COMMAND_ROUTES.check).toMatchObject({
 			module: './commands/check',
@@ -27,12 +20,11 @@ describe('COMMAND_ROUTES', () => {
 		});
 	});
 
-	it('/wish 不删除用户原始许愿消息', () => {
-		expect(COMMAND_ROUTES.wish).toMatchObject({
-			module: './commands/wish',
-			handler: 'handleWish',
-			deleteMsg: false,
-		});
+	it('已下线的 AI/wish 命令不再注册', () => {
+		expect(COMMAND_ROUTES.ask).toBeUndefined();
+		expect(COMMAND_ROUTES.trans).toBeUndefined();
+		expect(COMMAND_ROUTES.report).toBeUndefined();
+		expect(COMMAND_ROUTES.wish).toBeUndefined();
 	});
 
 	it('DND 命令元数据与静态 import switch 保持同步', () => {

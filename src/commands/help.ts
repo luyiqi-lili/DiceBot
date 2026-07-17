@@ -37,7 +37,6 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/f check</code> — 查看今日钓鱼情况
  <code>/f add 名称 价值</code> — 花费 10c 添加鱼（价值 1-13）
  <code>/f list</code> / <code>/f remove 序号</code> — 管理鱼种（管理员）
- <code>/wish 想法</code> — 提交功能愿望
  <code>/fate</code> — 塔罗占卜（抽3张牌）
  <code>/em</code> / <code>/me</code> / <code>/emote</code> — 动作指令，如 /em 开心地跳了起来
  <code>/duel 赌注</code> — 回复某人发起赌注决斗
@@ -49,19 +48,16 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/item</code> — 查看物品列表
  <code>/item create</code> — 回复消息创建物品
 
-<b>📰 信息 & 翻译</b>
+<b>📰 信息</b>
  <code>/news</code> — 查看当日小道消息
  <code>/news YYYYMMDD</code> — 查看指定日期消息
- <code>/trans 日语</code> — 回复消息翻译（默认简体中文）
- <code>/ask</code> — 回复消息，评论内容真假和合理性
  <code>/check 问题</code> — 查询莉莉当前功能规则
- <code>/echo 内容</code> — 让骰娘评判你的话
+ <code>/echo 内容</code> — 掷骰给你的话一个态度评价
  <code>/like</code> — 查看召唤骰娘次数
  <code>/like all</code> — 查看使用排行榜
  <code>/whoami</code> — 查看用户信息（回复查看他人）
  <code>/act start</code> — 开始记录会话
  <code>/act end</code> — 结束记录并生成摘要
- <code>/report</code> — AI 生成昨日群聊汇报
  <code>/rule</code> — 查看/设置群组规则
  <code>/top</code> — （管理）最近 7 天主题消息排行
 
@@ -106,8 +102,6 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/news", switch_inline_query_current_chat: `/news` },
-        { text: "/trans", switch_inline_query_current_chat: `/trans English` },
-        { text: "/ask", switch_inline_query_current_chat: `/ask` },
         { text: "/check", switch_inline_query_current_chat: `/check 每日签到周年庆 50c 的触发逻辑是什么` }
       ],
       [
@@ -116,7 +110,6 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
         { text: "/f", switch_inline_query_current_chat: `/f 3` },
         { text: "/f add", switch_inline_query_current_chat: `/f add 🐟新鱼 1` },
         { text: "/f list", switch_inline_query_current_chat: `/f list` },
-        { text: "/wish", switch_inline_query_current_chat: `/wish ` },
       ],
       [
         { text: "/coin ", switch_inline_query_current_chat: `/coin ` },
