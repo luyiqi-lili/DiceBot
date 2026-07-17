@@ -1,7 +1,6 @@
 // src/durableObjects/coin_do.ts
 import TgMessage, { EnvLike } from '../lib/telegram';
 import { COIN_LOG_CHAT_ID, COIN_LOG_THREAD_ID } from '../lib/coinLogTarget';
-import { LEGACY_CHAT_ID } from '../lib/groupScope';
 
 /**
  * Durable Object: CoinDO (修正版)
@@ -31,37 +30,9 @@ export class CoinDO {
     '-1002848481881||66': "紫罗兰教堂的募捐箱(测试)"
   };
 
-  private scopeMigrated = false;
-
   constructor(state: DurableObjectState, env: any) {
     this.state = state;
     this.env = env;
-  }
-
-  /**
-   * 惰性一次性迁移：把未作用域的全局 key 重写为 `${LEGACY_CHAT_ID}:${key}`。
-   * DO 的请求按实例串行执行，故在 fetch 入口守卫执行是安全的。
-   */
-  private async ensureScopeMigrated(): Promise<void> {
-    if (this.scopeMigrated) return;
-    const map = await this.readMap();
-    if (map["__scope_migrated__"] === "1") {
-      this.scopeMigrated = true;
-      return;
-    }
-    const prefix = `${LEGACY_CHAT_ID}:`;
-    const next: Record<string, string> = {};
-    for (const [k, v] of Object.entries(map)) {
-      if (k === "__scope_migrated__") continue;
-      if (k.includes("||") || k.startsWith(prefix)) {
-        next[k] = v;
-        continue;
-      }
-      next[`${prefix}${k}`] = v;
-    }
-    next["__scope_migrated__"] = "1";
-    await this.writeMap(next);
-    this.scopeMigrated = true;
   }
 
   private async readMap(): Promise<Record<string, string>> {
@@ -207,7 +178,6 @@ export class CoinDO {
   }
 
   async fetch(req: Request) {
-    await this.ensureScopeMigrated();
     const url = new URL(req.url);
     const path = url.pathname;
 

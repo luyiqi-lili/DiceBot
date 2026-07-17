@@ -5,9 +5,6 @@
  * - pools:       Record<chatId, number>            每个群独立奖池
  * - ticketsAll:  Record<chatId, Record<userId, string[]>>  每个群独立彩票
  * - lastWinners: Record<chatId, any>               每个群上期开奖信息
- *
- * 兼容迁移：旧的全局 "pool"/"tickets"/"lastWinner" 首次加载时归入
- * LEGACY_CHAT_ID 对应的群桶。
  */
 
 import { LEGACY_CHAT_ID } from '../lib/groupScope';
@@ -47,32 +44,11 @@ export class LotteryDO {
   constructor(state: DurableObjectState, env: any) {
     this.state = state;
 
-    // 从持久化存储加载数据（V2 分桶；缺失时从旧全局 key 迁移到 LEGACY 群桶）
+    // 从持久化存储加载数据（V2 分桶，按群隔离）
     this.state.blockConcurrencyWhile(async () => {
-      const pools = await this.state.storage.get<Record<string, number>>("poolsV2");
-      const ticketsAll = await this.state.storage.get<Record<string, Record<string, string[]>>>("ticketsV2");
-      const lastWinners = await this.state.storage.get<Record<string, any>>("lastWinnersV2");
-
-      if (pools || ticketsAll || lastWinners) {
-        this.pools = pools || {};
-        this.ticketsAll = ticketsAll || {};
-        this.lastWinners = lastWinners || {};
-        return;
-      }
-
-      // 迁移旧全局数据到 LEGACY 群桶
-      const legacyKey = String(LEGACY_CHAT_ID);
-      const oldPool = await this.state.storage.get<number>("pool");
-      const oldTickets = await this.state.storage.get<Record<string, string[]>>("tickets");
-      const oldLastWinner = await this.state.storage.get<any>("lastWinner");
-
-      if (oldPool !== undefined && oldPool !== null) this.pools[legacyKey] = oldPool;
-      if (oldTickets) this.ticketsAll[legacyKey] = oldTickets;
-      if (oldLastWinner) this.lastWinners[legacyKey] = oldLastWinner;
-
-      if (oldPool !== undefined || oldTickets || oldLastWinner) {
-        await this.saveAll();
-      }
+      this.pools = (await this.state.storage.get<Record<string, number>>("poolsV2")) || {};
+      this.ticketsAll = (await this.state.storage.get<Record<string, Record<string, string[]>>>("ticketsV2")) || {};
+      this.lastWinners = (await this.state.storage.get<Record<string, any>>("lastWinnersV2")) || {};
     });
   }
 

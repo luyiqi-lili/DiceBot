@@ -42,14 +42,10 @@ async function makeLottery(initial: Record<string, unknown> = {}) {
 describe('LotteryDO recovery diagnostics', () => {
 	it('returns current lottery state and bookmark without mutating storage', async () => {
 		const { lottery, state } = await makeLottery({
-			pool: 6446,
-			tickets: { alice: ['970'], bob: ['123', '124'] },
-			lastWinner: { winningNumber: '111' },
+			poolsV2: { '-1002970430696': 6446 },
+			ticketsV2: { '-1002970430696': { alice: ['970'], bob: ['123', '124'] } },
+			lastWinnersV2: { '-1002970430696': { winningNumber: '111' } },
 		});
-
-		// 构造期会把旧全局数据一次性迁移到 LEGACY 群桶（会写一次）；
-		// 清掉这些迁移写入，验证 debug-state 请求本身是只读的。
-		state.storage.put.mockClear();
 
 		const response = await lottery.fetch(new Request('https://do/debug-state'));
 		const body = await response.json() as any;
