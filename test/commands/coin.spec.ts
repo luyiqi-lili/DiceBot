@@ -46,7 +46,7 @@ describe('balance', () => {
 describe('pray', () => {
 	beforeEach(() => vi.clearAllMocks());
 	afterEach(() => vi.useRealTimers());
-	it('祈祷', async () => { await handleCoin(makeParsed({ args: ['pray'] }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalled(); });
+	it('祈祷（非许可主题被拦截）', async () => { await handleCoin(makeParsed({ args: ['pray'], chatId: -1002970430696, threadId: 999 }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalled(); });
 	it.each(['2026-06-19', '2026-06-21'])('紫罗兰周年庆 %s 签到固定奖励 50 coin', async (date) => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date(`${date}T12:00:00.000Z`));

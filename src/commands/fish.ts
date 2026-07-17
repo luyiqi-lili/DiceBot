@@ -19,6 +19,7 @@ import {
 	hasProcessedMessage,
 	FishingRecord,
 } from '../lib/fishCore';
+import { isFeatureAllowed } from '../lib/topicAccess';
 
 type FishEnv = Env;
 
@@ -556,12 +557,8 @@ export async function handleFish(parsedMessage: ParsedUpdate, env: FishEnv) {
 	const ownerIdStr = String(ownerId);
 	const userName = escapeHtml(String(from.first_name ?? from.username ?? '你'));
 
-	// 检查是否在允许钓鱼的房间（使用你原来的 allowed 规则）
-	const allowed =
-		(chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
-		(chatId === -1002970430696 && [89].includes(threadId ?? 0)) ||
-		(chatId === -1002970430696 && [166].includes(threadId ?? 0)) ||
-		(chatId === -1002742074355 && [454656].includes(threadId ?? 0));
+	// 检查是否在允许钓鱼的主题（可由群主通过 /topic 配置，默认沿用历史限制）
+	const allowed = await isFeatureAllowed(env, chatId, threadId, 'fish');
 	if (!allowed) {
 		if (chatId === -1002970430696) {
 			await TgMessage.sendText(env, {

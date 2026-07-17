@@ -24,6 +24,7 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/report` | `handleReport` | AI group report generation |
 | `/fate` | `handleFate` | Tarot-style draw |
 | `/perm` | `handlePerm` | Group owner grants/revokes admin permissions per user (see below) |
+| `/topic` | `handleTopic` | Group owner configures which topics the topic-gated features run in (see below) |
 
 ## Access Control And Permissions
 
@@ -52,6 +53,27 @@ Reply to the target user's message, then run one of:
 Instead of replying, a numeric user id may be appended (e.g. `/perm grant coin_take 12345`).
 
 Permission keys: `coin_check`, `coin_take`, `coin_create`, `coin_remove`, `lottery`, `top`, plus `all`. `grant`/`revoke`/`list` require the caller to be the group owner and require the D1 `DB` binding.
+
+### Topic-gated features and `/topic`
+
+Some features only run inside specific forum topics: `/coin pray`, `/fate`, `/f` (fish). The allowed topics are resolved by `isFeatureAllowed()` (`src/lib/topicAccess.ts`) with this precedence:
+
+1. If the group has an explicit config (via `/topic`, stored in D1 `topic_access`, isolated per `chat_id`) → use it.
+2. Else if the group matches a hardcoded historical default → use that default (preserves prior behavior for the original groups).
+3. Else (new/unconfigured group) → open in all topics.
+
+`/topic` lets the **group owner** customize this. Mutations must be run **inside the target topic** (the command uses the current `message_thread_id`):
+
+| Command | Effect |
+|---------|--------|
+| `/topic allow <feature>` | Allow the feature in the current topic (switches to per-topic mode) |
+| `/topic disallow <feature>` | Remove the current topic from the allowed set |
+| `/topic anywhere <feature>` | Allow the feature in every topic of the group |
+| `/topic reset <feature>` | Clear the group's config, reverting to the default |
+| `/topic list [feature]` | Show the effective config (open to everyone) |
+| `/topic features` | List configurable feature names (open to everyone) |
+
+Feature names: `pray`, `fate`, `fish`. `allow`/`disallow`/`anywhere`/`reset` require the group owner and the D1 `DB` binding.
 
 ## Dice And Games
 

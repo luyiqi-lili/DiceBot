@@ -24,6 +24,7 @@ English source: [../commands.md](../commands.md)
 | `/report` | `handleReport` | AI 群汇报 |
 | `/fate` | `handleFate` | 塔罗式抽取 |
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
+| `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
 
 ## 权限控制
 
@@ -52,6 +53,27 @@ English source: [../commands.md](../commands.md)
 也可不回复、在命令末尾附数字用户 ID（例如 `/perm grant coin_take 12345`）。
 
 权限名：`coin_check`、`coin_take`、`coin_create`、`coin_remove`、`lottery`、`top`，以及 `all`。`grant`/`revoke`/`list` 要求调用者为群主，且需要 D1 `DB` 绑定。
+
+### 仅特定主题可用的功能与 `/topic`
+
+部分功能仅在特定论坛主题内可用：`/coin pray`、`/fate`、`/f`（钓鱼）。可用主题由 `isFeatureAllowed()`（`src/lib/topicAccess.ts`）按以下优先级判定：
+
+1. 本群已通过 `/topic` 显式配置（存于 D1 `topic_access`，按 `chat_id` 隔离）→ 以配置为准。
+2. 未配置但命中历史硬编码默认 → 沿用默认（保持原有群组行为不变）。
+3. 未配置且无默认（新群）→ 所有主题放开。
+
+`/topic` 让**群主**自定义。改配置的子命令须**在目标主题内执行**（命令取当前 `message_thread_id`）：
+
+| 命令 | 作用 |
+|------|------|
+| `/topic allow <功能名>` | 允许该功能在当前主题使用（转为按主题限制）|
+| `/topic disallow <功能名>` | 取消当前主题的许可 |
+| `/topic anywhere <功能名>` | 允许在本群所有主题使用 |
+| `/topic reset <功能名>` | 清除本群配置，恢复默认 |
+| `/topic list [功能名]` | 查看生效配置（所有人可用）|
+| `/topic features` | 列出可配置的功能名（所有人可用）|
+
+功能名：`pray`、`fate`、`fish`。`allow`/`disallow`/`anywhere`/`reset` 要求群主，且需要 D1 `DB` 绑定。
 
 ## 骰子与游戏
 

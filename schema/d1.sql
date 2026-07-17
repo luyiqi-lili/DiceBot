@@ -169,6 +169,14 @@ CREATE TABLE IF NOT EXISTS permission_grants (
   PRIMARY KEY (chat_id, user_id, permission)
 );
 
+CREATE TABLE IF NOT EXISTS topic_access (
+  chat_id INTEGER NOT NULL,
+  feature TEXT NOT NULL,
+  thread_id INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (chat_id, feature, thread_id)
+);
+
 CREATE TABLE IF NOT EXISTS message_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER,

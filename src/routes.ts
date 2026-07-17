@@ -60,6 +60,9 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 权限管理（群主）── */
 	perm:     { module: './commands/perm', handler: 'handlePerm' },
 
+	/* ── 主题可用范围（群主）── */
+	topic:    { module: './commands/topic', handler: 'handleTopic' },
+
 	/* ── 塔罗占卜 ── */
 	fate:     { module: './commands/fate', handler: 'handleFate' },
 

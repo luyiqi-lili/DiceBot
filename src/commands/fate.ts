@@ -10,6 +10,7 @@ import TgMessage, { ParsedUpdate } from '../lib/telegram';
 import { MAJOR_ARCANA } from "../lib/liveConfig";
 import { buildLilyFateSystemPrompt } from "../data/lilyPersona";
 import { escapeHtml } from "../lib/util";
+import { isFeatureAllowed } from "../lib/topicAccess";
 import { callAIChat } from "../lib/aiClient";
 
 // 从 coin 模块复用 KV 操作函数
@@ -49,12 +50,8 @@ export async function handleFate(parsed: ParsedUpdate, env: Env): Promise<void> 
 
     // === 流式解析分支：替换你原来的 isInterpret 分支 ===
     if (isInterpret) {
-        // 权限/线程判断（保留你原有的限制）
-        const allowed =
-            (chatId === -1002848481881 && [66].includes(threadId as number)) ||
-            (chatId === -1002970430696 && [89].includes(threadId as number)) ||
-            (chatId === -1002970430696 && [160].includes(threadId as number)) ||
-            (chatId === -1002742074355 && [345].includes(threadId as number));
+        // 权限/线程判断（可由群主通过 /topic 配置，默认沿用历史限制）
+        const allowed = await isFeatureAllowed(env, chatId, threadId, 'fate');
         if (!allowed) {
             await TgMessage.sendText(env, {
                 chat_id: chatId,

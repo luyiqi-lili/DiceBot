@@ -77,6 +77,14 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/perm list</code> — 查看其已获授权
  <code>/perm keys</code> — 查看全部可授予的权限名
  权限名：<code>coin_check</code> 查国库 · <code>coin_take</code> 取款 · <code>coin_create</code> 增发 · <code>coin_remove</code> 扣款 · <code>lottery</code> 彩票管理 · <code>top</code> 主题排行 · <code>all</code> 全部
+
+<b>🧭 主题可用范围（群主）</b>
+ 部分功能（<code>pray</code> 祈祷 · <code>fate</code> 占卜 · <code>fish</code> 钓鱼）默认仅限特定主题，群主可自定义：
+ <code>/topic allow &lt;功能名&gt;</code> — 在“当前主题”内执行，允许该功能
+ <code>/topic disallow &lt;功能名&gt;</code> — 取消当前主题的许可
+ <code>/topic anywhere &lt;功能名&gt;</code> — 允许在本群所有主题使用
+ <code>/topic reset &lt;功能名&gt;</code> — 恢复默认
+ <code>/topic list</code> — 查看本群生效配置
 </blockquote>`;
 
   const reply_markup = {

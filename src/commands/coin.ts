@@ -21,6 +21,7 @@ import {
 } from "../lib/coinService";
 import { scopeKey } from "../lib/groupScope";
 import { hasAdminPermission } from "../lib/permissions";
+import { isFeatureAllowed } from "../lib/topicAccess";
 
 type CoinEnv = Env; // 统一类型，从 ../index 导入
 
@@ -215,12 +216,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   // pray
   if (sub === "pray") {
-    const allowed =
-      (chatId === -1002848481881 && [66].includes(threadId ?? 0)) ||
-      (chatId === -1002970430696 && [89].includes(threadId ?? 0)) ||
-      (chatId === -1002970430696 && [157].includes(threadId ?? 0)) ||
-      (chatId === -1002742074355 && [638714].includes(threadId ?? 0));
-      
+    const allowed = await isFeatureAllowed(env, chatId, threadId, 'pray');
+
     if (!allowed) {
       await TgMessage.sendText(env, {
         chat_id: chatId,
