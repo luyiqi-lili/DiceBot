@@ -52,6 +52,20 @@ describe('DiceBot Worker — 基础请求处理', () => {
 		expect(response.status).toBe(401);
 	});
 
+	it('API key 捐赠入口不接受普通外部 API key 代替专用 bearer token', async () => {
+		const request = new IncomingRequest('https://example.com/api/donations/api-keys', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'X-API-Key': 'external-key',
+			},
+			body: JSON.stringify({ provider: 'openai', apiKey: 'sk-test-value' }),
+		});
+		const response = await worker.fetch(request, { ...env, EXTERNAL_API_KEY: 'external-key', DONATION_INTAKE_KEY: 'donation-key' } as any, createExecutionContext());
+
+		expect(response.status).toBe(401);
+	});
+
 	it('Web 页面 /web/hello 返回 HTML 页面', async () => {
 		const request = new IncomingRequest('http://example.com/web/hello');
 		const ctx = createExecutionContext();

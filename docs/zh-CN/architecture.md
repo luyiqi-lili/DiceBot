@@ -12,7 +12,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` 调用 `src/cron/cron.ts` 中的 `runCoinCheck(env)`。
+`scheduled()` 独立启动 `src/cron/cron.ts` 中的 `runCoinCheck(env)`，以及 `src/lib/githubPrMonitor.ts` 中的只读 PR 扫描。
 
 `fetch()` 处理 Web 页面、外部 API、Telegram webhook update 和健康检查。
 
@@ -32,10 +32,11 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 | 路径 | 处理 |
 |------|------|
 | `/api/coin/*` | 去掉 `/api/coin` 后转发给 `CoinDO` |
-| `/api/wish/*` | `src/lib/wishApi.ts` |
+| `/api/lottery/*` | 去掉 `/api/lottery` 后转发给 `LotteryDO` |
+| `/api/donations/api-keys` | 使用独立 bearer token 接收并加密保存捐赠 API Key |
 | `/api/health` | JSON 状态响应 |
 
-鉴权会读取 `X-API-Key` 或 `api_key` 查询参数，但只有 `env.EXTERNAL_API_KEY` 存在时才校验。secret 缺失时会跳过比较。
+普通 `/api/*` 路由校验 `EXTERNAL_API_KEY`；捐赠入口单独校验 `DONATION_INTAKE_KEY`，不会因此获得其他管理 API 权限。
 
 ## Telegram Update 分发
 
@@ -93,6 +94,6 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`，触发 `runCoinCheck(env)`。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`，触发宝库检查和 GitHub PR 扫描。PR 扫描只读取开放 PR 和文件列表，把快照与静态风险信号写入 D1；不会评论、批准或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
 
 Wish digest/execution 自动化不是 Worker cron，而是由 `scripts/wish-local.sh` 管理的本地 cron。

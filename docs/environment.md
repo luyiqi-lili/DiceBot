@@ -66,7 +66,8 @@ Migrations are defined separately for dev and prod.
 Plain vars in `wrangler.jsonc`:
 
 - `BOT_USERNAME`
-- `DEEPSEEK_MODEL`
+- `GITHUB_REPOSITORY`: `luyiqi-lili/DiceBot` in production.
+- `GITHUB_PR_SCAN_LIMIT`: PR file-list reads per scan, default 20 and capped at 50.
 
 Secrets expected by code or scripts:
 
@@ -74,8 +75,20 @@ Secrets expected by code or scripts:
 - `DEEPSEEK_API_KEY` or `DEEPSEEK_API_KEYS`: AI provider credentials.
 - `DEEPSEEK_BASE_URL`: optional override, default is in `src/lib/deepseekClient.ts`.
 - `EXTERNAL_API_KEY`: optional API key for `/api/*`.
+- `DONATION_INTAKE_KEY`: dedicated bearer token for `/api/donations/api-keys`; it grants no access to other admin APIs.
+- `DONATION_ENCRYPTION_KEY`: base64 representation of a random 32-byte AES master key.
+- `GITHUB_TOKEN`: optional read-only token; public repositories can be scanned anonymously at a lower rate limit.
 
-Security note: `/api/*` rejects unauthorized requests only when `EXTERNAL_API_KEY` is configured. Configure it in production or close the API routes.
+Regular `/api/*` routes reject access when `EXTERNAL_API_KEY` is absent. Donation intake is unavailable when its secrets or D1 are absent. Apply `schema/d1.sql`, then configure donation secrets with `wrangler secret put --env prod`; never commit them to `wrangler.jsonc`.
+
+Current secret placement (names only, never values):
+
+- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ENCRYPTION_KEY`, and existing model-provider keys.
+- GitHub Actions: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BOT_TOKEN`, `TOKEN`, and `DEV_BOT_TOKEN`.
+- Local `.env`: development/operations credentials; local `BOT_TOKEN` maps to Worker `TOKEN`.
+- The high-privilege personal `GH_TOKEN` remains local and is not copied to Cloudflare or GitHub Actions.
+
+External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
 ## Local Wish Automation Env
 

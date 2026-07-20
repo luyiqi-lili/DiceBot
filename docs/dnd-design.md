@@ -31,7 +31,7 @@ Non-command messages beginning with `*` dispatch to weapon attack, spell cast, o
 
 ## Storage
 
-Requires `env.DB`. Dev currently has no D1 binding in `wrangler.jsonc`, so handlers return D1-not-configured messages in that environment unless local config is changed.
+Requires `env.DB`. Dev and prod bind separate D1 databases; tests or temporary environments without the binding still return D1-not-configured messages.
 
 Core D1 tables:
 

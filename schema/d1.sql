@@ -281,3 +281,55 @@ CREATE TABLE IF NOT EXISTS wishes (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS api_key_donations (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  key_fingerprint TEXT NOT NULL,
+  encrypted_key TEXT NOT NULL,
+  encryption_iv TEXT NOT NULL,
+  donor_label TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'invalid', 'disabled', 'revoked')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_validated_at TEXT,
+  validation_error TEXT,
+  UNIQUE(provider, key_fingerprint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_key_donations_provider_status
+ON api_key_donations (provider, status);
+
+CREATE TABLE IF NOT EXISTS pull_request_snapshots (
+  repository TEXT NOT NULL,
+  pr_number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  head_sha TEXT NOT NULL,
+  state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'closed')),
+  is_draft INTEGER NOT NULL DEFAULT 0,
+  changed_files INTEGER NOT NULL DEFAULT 0,
+  additions INTEGER NOT NULL DEFAULT 0,
+  deletions INTEGER NOT NULL DEFAULT 0,
+  risk_level TEXT NOT NULL DEFAULT 'low' CHECK (risk_level IN ('low', 'medium', 'high')),
+  risk_signals_json TEXT NOT NULL DEFAULT '[]',
+  github_updated_at TEXT NOT NULL,
+  last_seen_run_id TEXT NOT NULL,
+  checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (repository, pr_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pull_request_snapshots_state
+ON pull_request_snapshots (repository, state, checked_at);
+
+CREATE TABLE IF NOT EXISTS pr_monitor_runs (
+  id TEXT PRIMARY KEY,
+  repository TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+  open_pr_count INTEGER,
+  error_summary TEXT,
+  checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_pr_monitor_runs_checked_at
+ON pr_monitor_runs (repository, checked_at);

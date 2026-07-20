@@ -61,6 +61,12 @@ Main command groups:
 
 Full command reference: [docs/commands.md](docs/commands.md).
 
+## Self-Evolution Foundation
+
+Stage 1 provides a deliberately limited foundation: the production cron reads open GitHub PRs hourly and stores snapshots plus deterministic risk signals in D1; protected `/api/donations/api-keys` intake encrypts donated keys with AES-GCM. It does not comment, approve, merge, or activate unvalidated donated keys.
+
+See the [self-evolution roadmap](docs/self-evolution-roadmap.md) for scope and later stages.
+
 ## Storage
 
 Cloudflare bindings are defined in `src/index.ts` and `wrangler.jsonc`.
@@ -148,7 +154,7 @@ Testing manual: [docs/testing.md](docs/testing.md).
 
 Configured environments:
 
-- `dev`: Worker `telegram-bot-dev`, bot username `lili_DevDiceBot`, no D1 binding in `wrangler.jsonc`.
+- `dev`: Worker `telegram-bot-dev`, bot username `lili_DevDiceBot`, D1 binding `dicebot-dev-db`.
 - `prod`: Worker `telegram-bot`, bot username `lili_DiceBot`, D1 binding `DB`, cron schedule `59 * * * *`.
 
 Scripts:
@@ -163,6 +169,7 @@ Scripts:
 - [Environment and deployment](docs/environment.md)
 - [Storage](docs/storage.md)
 - [Testing and audit](docs/testing.md)
+- [Self-evolution roadmap](docs/self-evolution-roadmap.md)
 - [Web games](docs/web-games.md)
 - [DND system](docs/dnd-design.md)
 - [Item system](docs/item-system.md)

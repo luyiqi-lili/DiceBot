@@ -57,6 +57,12 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 
 完整命令参考：[docs/zh-CN/commands.md](docs/zh-CN/commands.md)。
 
+## 自进化底座
+
+当前实现第一阶段的安全底座：生产 Cron 每小时只读扫描 GitHub 开放 PR，并将快照和静态风险信号写入 D1；受保护的 `/api/donations/api-keys` 可接收经 AES-GCM 加密的 API Key 捐赠。当前不会自动评论、批准、合并 PR，也不会自动启用未经验证的捐赠密钥。
+
+分阶段范围、验收标准和后续路线见[自进化系统路线图](docs/zh-CN/self-evolution-roadmap.md)。
+
 ## 存储
 
 Cloudflare 绑定定义在 `src/index.ts` 和 `wrangler.jsonc`。
@@ -142,7 +148,7 @@ E2E 测试需要真实外部变量，包括 `WORKER_BASE_URL` 和 `EXTERNAL_API_
 
 配置的环境：
 
-- `dev`：Worker `telegram-bot-dev`，bot username `lili_DevDiceBot`，`wrangler.jsonc` 未绑定 D1。
+- `dev`：Worker `telegram-bot-dev`，bot username `lili_DevDiceBot`，D1 绑定 `dicebot-dev-db`。
 - `prod`：Worker `telegram-bot`，bot username `lili_DiceBot`，D1 绑定 `DB`，cron `59 * * * *`。
 
 脚本：
@@ -157,6 +163,7 @@ E2E 测试需要真实外部变量，包括 `WORKER_BASE_URL` 和 `EXTERNAL_API_
 - [环境与部署](docs/zh-CN/environment.md)
 - [存储](docs/zh-CN/storage.md)
 - [测试与审计](docs/zh-CN/testing.md)
+- [自进化系统路线图](docs/zh-CN/self-evolution-roadmap.md)
 - [Web 游戏](docs/zh-CN/web-games.md)
 - [DND 系统](docs/zh-CN/dnd-design.md)
 - [物品系统](docs/zh-CN/item-system.md)

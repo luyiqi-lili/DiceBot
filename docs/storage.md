@@ -21,7 +21,7 @@ Bindings are declared in `src/index.ts` and configured in `wrangler.jsonc`.
 | `COIN_KV` | KV | legacy coin support |
 | `COIN_DO` | Durable Object | coin balances, treasury, raw coin keys |
 | `LOTTERY_DO` | Durable Object | lottery pool and tickets |
-| `DB` | D1 | DND, item, affection, wish, backup, rules, reports |
+| `DB` | D1 | DND, items, affection, wishes, backup, rules, PR snapshots, encrypted API-key donations |
 
 ## KV
 
@@ -51,7 +51,7 @@ Durable Objects provide serialized state mutation:
 
 ## D1
 
-Production has a D1 binding named `DB`. Dev currently does not bind D1 in `wrangler.jsonc`, so D1-dependent handlers must degrade cleanly.
+Both prod and dev bind D1 as `DB`, targeting `dicebot-db` and `dicebot-dev-db` respectively. Code must still degrade cleanly in tests or temporary environments where the binding is absent.
 
 Major D1 table families:
 
@@ -61,6 +61,9 @@ Major D1 table families:
 - Wish automation: `wishes`, `wish_summaries`, `wish_tasks`.
 - Usage and backup: usage count, user activity, message history, and activity/report tables as used by `src/lib/backup.ts`, `src/commands/act.ts`, and `src/commands/report.ts`.
 - Rules: group rule tables used by `src/commands/rule.ts`.
+- Self-evolution foundation: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `pull_request_snapshots` and `pr_monitor_runs` store read-only scan results.
+
+No HTTP API may return `api_key_donations.encrypted_key`. Future model routing may only consume records with `status = 'active'`; stage 1 always creates records as `pending`.
 
 The repository does not currently keep a single canonical schema migration file for all D1 tables. Schema knowledge is spread across docs and SQL in command/lib modules.
 
@@ -73,5 +76,5 @@ The repository does not currently keep a single canonical schema migration file 
 ## Operational Notes
 
 - Treat Durable Object APIs as internal service boundaries.
-- Treat D1 absence as expected in dev unless config is changed.
+- Dev and prod use separate D1 databases; do not accidentally add `--remote` during local verification.
 - When adding a table, document its owner module and create focused tests around the query contract.

@@ -15,6 +15,8 @@ import { recordReactionAffection, recordReplyAffection } from './lib/affectionIn
 import { COMMAND_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
 import { createWebGameAuth, isTelegramWebhookRequest } from './lib/telegramAuth';
+import { handleApiKeyDonation } from './lib/apiKeyDonations';
+import { scanOpenPullRequests } from './lib/githubPrMonitor';
 
 /**
  * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
@@ -41,6 +43,11 @@ export type Env = {
 	DB?: D1Database;
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
+	DONATION_INTAKE_KEY?: string;
+	DONATION_ENCRYPTION_KEY?: string;
+	GITHUB_REPOSITORY?: string;
+	GITHUB_TOKEN?: string;
+	GITHUB_PR_SCAN_LIMIT?: string;
 	TELEGRAM_WEBHOOK_SECRET?: string;
 	TELEGRAM_API_BASE_URL?: string;
 };
@@ -53,6 +60,9 @@ export { LotteryDO } from './durableObjects/lottery_do';
 async function handleExternalAPI(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const path = url.pathname;
+	if (path === '/api/donations/api-keys') {
+		return handleApiKeyDonation(request, env);
+	}
 
 	const apiKey = request.headers.get('X-API-Key') || url.searchParams.get('api_key');
 	if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
@@ -384,6 +394,7 @@ function createTelegramBot(env: Env, executionCtx: ExecutionContext): Bot {
 export default {
 	async scheduled(controller, env, ctx) {
 		ctx.waitUntil(runCoinCheck(env));
+		ctx.waitUntil(scanOpenPullRequests(env));
 	},
 
 	async fetch(request, env, ctx) {

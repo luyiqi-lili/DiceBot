@@ -12,7 +12,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` calls `runCoinCheck(env)` from `src/cron/cron.ts`.
+`scheduled()` independently starts `runCoinCheck(env)` from `src/cron/cron.ts` and the read-only PR scan in `src/lib/githubPrMonitor.ts`.
 
 `fetch()` handles web pages, external APIs, Telegram webhook updates, and health checks.
 
@@ -34,10 +34,11 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 | Path | Handler |
 |------|---------|
 | `/api/coin/*` | Forwarded to `CoinDO` after stripping `/api/coin` |
-| `/api/wish/*` | `src/lib/wishApi.ts` |
+| `/api/lottery/*` | Forwarded to `LotteryDO` after stripping `/api/lottery` |
+| `/api/donations/api-keys` | Accepts encrypted API-key donations using a dedicated bearer token |
 | `/api/health` | JSON status response |
 
-Authentication checks `X-API-Key` or `api_key` query parameter only when `env.EXTERNAL_API_KEY` exists. If the secret is missing, the comparison is skipped.
+Regular `/api/*` routes validate `EXTERNAL_API_KEY`. Donation intake separately validates `DONATION_INTAKE_KEY`, which grants no access to other admin APIs.
 
 ## Telegram Update Dispatch
 
@@ -120,6 +121,6 @@ Top-level web routes:
 
 ## Scheduled Work
 
-Production `wrangler.jsonc` schedules `59 * * * *`, which invokes `runCoinCheck(env)`.
+Production `wrangler.jsonc` schedules `59 * * * *`, which invokes the treasury check and read-only GitHub PR scan. The scan stores D1 snapshots and deterministic risk signals but never comments, approves, or merges. See the [self-evolution roadmap](self-evolution-roadmap.md).
 
 Wish digest/execution automation is not a Worker cron. It is local cron managed by `scripts/wish-local.sh`.

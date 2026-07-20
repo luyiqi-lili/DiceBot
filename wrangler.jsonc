@@ -186,7 +186,9 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DiceBot"
+				"BOT_USERNAME": "lili_DiceBot",
+				"GITHUB_REPOSITORY": "luyiqi-lili/DiceBot",
+				"GITHUB_PR_SCAN_LIMIT": "20"
 			}
 		}
 	}

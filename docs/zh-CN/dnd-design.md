@@ -24,7 +24,7 @@ DND 子系统是基于 D1 的轻量 Telegram 群跑团系统，覆盖角色创�
 
 ## 存储
 
-DND 需要 `env.DB`。dev 当前未在 `wrangler.jsonc` 中绑定 D1，因此相关 handler 会返回 D1 未配置提示。
+DND 需要 `env.DB`。dev 与 prod 分别绑定独立 D1 数据库；缺少绑定的测试或临时环境仍会返回 D1 未配置提示。
 
 核心表族：
 
