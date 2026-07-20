@@ -18,6 +18,7 @@ import { createWebGameAuth, isTelegramWebhookRequest } from './lib/telegramAuth'
 import { handleApiCredentialAdmin, handleApiKeyDonation } from './lib/apiKeyDonations';
 import { handleModelRoutingApi } from './lib/modelRouting';
 import { handleSelfEvolutionApi, runSelfEvolutionReview } from './lib/selfEvolution';
+import { handlePreCheckoutUpdate, handleSuccessfulPaymentUpdate } from './lib/paymentUpdates';
 
 /**
  * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
@@ -47,6 +48,7 @@ export type Env = {
 	DONATION_INTAKE_KEY?: string;
 	DONATION_ADMIN_KEY?: string;
 	DONATION_ENCRYPTION_KEY?: string;
+	TON_DONATION_ADDRESS?: string;
 	DEEPSEEK_API_KEY?: string;
 	GITHUB_REPOSITORY?: string;
 	GITHUB_TOKEN?: string;
@@ -182,7 +184,10 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'news':    { const { handleNews } = await import('./commands/news'); return handleNews; }
 		case 'rule':    { const { handleRule } = await import('./commands/rule'); return handleRule; }
 		case 'wish': case 'issue': { const { handleWish } = await import('./commands/wish'); return handleWish; }
-		case 'donatetoken': case 'donate': { const { handleDonateToken } = await import('./commands/donateToken'); return handleDonateToken; }
+		case 'donatetoken': { const { handleDonateToken } = await import('./commands/donateToken'); return handleDonateToken; }
+		case 'donate': { const { handleDonate } = await import('./commands/donateMoney'); return handleDonate; }
+		case 'paysupport': { const { handlePaySupport } = await import('./commands/paymentSupport'); return handlePaySupport; }
+		case 'terms': case 'donateterms': { const { handleDonationTerms } = await import('./commands/paymentSupport'); return handleDonationTerms; }
 		case 'dnd':     { const { handleDndHelp } = await import('./commands/dndHelp'); return handleDndHelp; }
 		case 'new':     { const { handleDndNew } = await import('./commands/dndNew'); return handleDndNew; }
 		case 'char':    { const { handleDndChar } = await import('./commands/dndChar'); return handleDndChar; }
@@ -201,6 +206,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 
 async function loadCallback(type: string): Promise<((cq: any, data: any, env: any) => Promise<any>) | null> {
 	switch (type) {
+		case 'donation': { const { handleDonationCallback } = await import('./commands/donateMoney'); return handleDonationCallback; }
 		case 'congrats': { const { handleCongratsCallback } = await import('./commands/congrats'); return handleCongratsCallback; }
 		case '21':       { const { handle21Callback } = await import('./commands/21'); return handle21Callback; }
 		case 'duel':     { const { handleDuelCallback } = await import('./commands/duel'); return handleDuelCallback; }
@@ -216,6 +222,8 @@ async function loadCallback(type: string): Promise<((cq: any, data: any, env: an
 }
 
 async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: ExecutionContext): Promise<void> {
+	if (await handlePreCheckoutUpdate(botCtx, env)) return;
+	if (await handleSuccessfulPaymentUpdate(botCtx, env)) return;
 	const parsedMessage = parsedUpdateFromContext(botCtx, env.BOT_USERNAME);
 
 	if (

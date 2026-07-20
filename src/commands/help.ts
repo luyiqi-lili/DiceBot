@@ -75,6 +75,10 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  请求填写 <code>provider</code>、<code>apiKey</code>、<code>usagePolicy</code>，可选 <code>donorLabel</code>；<code>validation_only</code> 只允许验证，<code>shared_inference</code> 才授权机器人用于共享推理。
  运维方仍可使用受保护的 <code>POST /api/donations/api-keys</code>。支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整说明</a>
 
+<b>💝 Stars / TON 捐赠</b>
+ 与机器人私聊发送 <code>/donate</code> 打开捐赠菜单；也可使用 <code>/donate stars 25</code> 或 <code>/donate ton 0.5</code>。
+ Stars 付款成功后自动记账；TON 会生成专属备注，链上确认上线前保持待核对。支付说明：<code>/terms</code>，支付支持：<code>/paysupport</code>。
+
 <b>🎫 彩票（管理）</b>
  <code>/lottery now</code> — 开奖
  <code>/lottery clean</code> — 清空记录
@@ -120,7 +124,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/wish 提需求", switch_inline_query_current_chat: `/wish ` },
-        { text: "私聊捐赠 Token", url: "https://t.me/lili_DiceBot" }
+        { text: "私聊捐赠", url: "https://t.me/lili_DiceBot" }
       ],
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },

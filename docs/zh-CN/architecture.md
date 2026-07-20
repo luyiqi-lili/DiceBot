@@ -46,10 +46,12 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 |------|------|
 | `topic_edited` | `src/commands/topicEditHandler.ts` |
 | `callback_query` | 游戏启动、删除消息或 `loadCallback()` |
+| `pre_checkout_query` | 校验待支付 Stars 意向，并在 Telegram 支付时限内响应 |
+| `message.successful_payment` | 幂等保存 Telegram 支付编号并发送回执 |
 | 命令消息 | `loadCommand()` |
 | 非命令消息 | 星号快捷方式，然后 D1 备份 |
 
-非命令文本在星号处理后通过 `handleBackup()` 备份。`/wish` 与 `/issue` 是普通命令，仅在默认关闭的写开关开启后创建 GitHub Issue。
+支付 update 在普通消息解析前处理。非命令文本在星号处理后通过 `handleBackup()` 备份。`/wish` 与 `/issue` 是普通命令，仅在默认关闭的写开关开启后创建 GitHub Issue。
 
 ## 静态导入
 

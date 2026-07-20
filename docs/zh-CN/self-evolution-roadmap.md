@@ -2,7 +2,7 @@
 
 English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
-本项目按权限边界分阶段开放自治能力。当前已实现阶段 1 与阶段 2 的可审计基础；自动修改源码、合并、支付或套餐变更仍未启用。
+本项目按权限边界分阶段开放自治能力。当前已实现阶段 1 与阶段 2 的可审计基础，并开放 Stars 收款与可追踪的 TON 转账意向；自动修改源码、合并、对外付款或套餐变更仍未启用。
 
 ## 已实现：阶段 1 可审计底座
 
@@ -96,7 +96,8 @@ Worker 优先尝试自身的 `DEEPSEEK_API_KEY`，再尝试状态为 `active + s
 
 ### 阶段 5：资金闭环
 
-- 先接入只读捐赠流水、月度预算台账和支付建议。
+- 已接入 Stars 成功支付流水，以及带唯一备注的 TON 转账意向；TON 链上自动确认尚未启用。
+- 后续增加月度预算台账和支付建议。
 - 自动支付 Cloudflare、链上转账或套餐升降级需要限额、多方审批、幂等和完整审计，不由当前 Worker 直接控制。
 - 不自动搜集或使用网上来源不明的共享 API Key。
 
@@ -113,6 +114,7 @@ Worker secrets：
 
 Worker vars：
 
+- `TON_DONATION_ADDRESS`：公开的 TON 主网收款地址；缺失时 `/donate ton` 安全关闭。
 - `GITHUB_REPOSITORY`
 - `GITHUB_PR_SCAN_LIMIT`
 - `GITHUB_AUTONOMY_LABEL`（默认 `bot:ready`）

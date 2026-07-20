@@ -50,10 +50,12 @@ Update types:
 |------|----------|
 | `topic_edited` | `src/commands/topicEditHandler.ts` |
 | `callback_query` | game launch, delete message, or `loadCallback()` |
+| `pre_checkout_query` | validates a pending Stars intent and answers within Telegram's checkout deadline |
+| `message.successful_payment` | idempotently records the Telegram charge id and sends a receipt |
 | `message` command | `loadCommand()` |
 | `message` non-command | star shortcut, then D1 backup |
 
-Non-command text is backed up through `handleBackup()` after star handling. `/wish` and `/issue` are regular commands that create GitHub Issues only when the fail-closed write switch is enabled.
+Payment updates are handled before ordinary message parsing. Non-command text is backed up through `handleBackup()` after star handling. `/wish` and `/issue` are regular commands that create GitHub Issues only when the fail-closed write switch is enabled.
 
 ## Static Imports
 

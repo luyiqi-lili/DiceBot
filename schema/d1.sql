@@ -300,6 +300,29 @@ CREATE TABLE IF NOT EXISTS api_key_donations (
 CREATE INDEX IF NOT EXISTS idx_api_key_donations_provider_status
 ON api_key_donations (provider, status);
 
+CREATE TABLE IF NOT EXISTS financial_donations (
+  id TEXT PRIMARY KEY,
+  method TEXT NOT NULL CHECK (method IN ('stars', 'ton')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'awaiting_chain', 'paid', 'failed', 'cancelled')),
+  donor_user_id TEXT NOT NULL,
+  source_chat_id TEXT NOT NULL,
+  amount TEXT,
+  currency TEXT NOT NULL,
+  memo TEXT,
+  invoice_payload TEXT,
+  telegram_payment_charge_id TEXT UNIQUE,
+  provider_payment_charge_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  paid_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_donations_donor_created
+ON financial_donations (donor_user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_financial_donations_method_status
+ON financial_donations (method, status, created_at);
+
 CREATE TABLE IF NOT EXISTS pull_request_snapshots (
   repository TEXT NOT NULL,
   pr_number INTEGER NOT NULL,

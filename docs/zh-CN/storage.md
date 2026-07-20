@@ -55,6 +55,8 @@ prod 和 dev 都有名为 `DB` 的 D1 绑定，分别指向 `dicebot-db` 与 `di
 
 `api_key_donations.encrypted_key` 不能通过 HTTP API 读回。路由只能考虑 `active` 且 profile 为 `shared_inference + healthy` 的记录；接收时默认 `validation_only`。
 
+`financial_donations` 保存 Stars 发票意向、Telegram 成功支付编号，以及带唯一备注的 TON 转账意向；不保存钱包私钥。
+
 `ai_issue_triage_runs` 只保存平台/模型、凭据来源、是否验证到付费余额、置信度、判断理由和 Issue 版本，不保存 API key 或精确余额。
 
 仓库目前没有单一完整 D1 migration 文件，schema 信息分散在文档和命令/库模块 SQL 中。

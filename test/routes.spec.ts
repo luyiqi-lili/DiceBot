@@ -34,7 +34,13 @@ describe('COMMAND_ROUTES', () => {
 			handler: 'handleDonateToken',
 			deleteMsg: false,
 		});
-		expect(COMMAND_ROUTES.donate?.handler).toBe('handleDonateToken');
+		expect(COMMAND_ROUTES.donate).toMatchObject({
+			module: './commands/donateMoney',
+			handler: 'handleDonate',
+			deleteMsg: false,
+		});
+		expect(COMMAND_ROUTES.paysupport?.handler).toBe('handlePaySupport');
+		expect(COMMAND_ROUTES.terms?.handler).toBe('handleDonationTerms');
 	});
 
 	it('DND 命令元数据与静态 import switch 保持同步', () => {

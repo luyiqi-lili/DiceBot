@@ -26,6 +26,8 @@ English source: [../commands.md](../commands.md)
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
 | `/wish <需求>`、`/issue <需求>` | `handleWish` | intake 已开启且 GitHub token 具备 Issues 写权限时创建公开 Issue |
 | `/donatetoken <平台> <授权范围> <Token>`、`/donate_token ...` | `handleDonateToken` | 仅限机器人私聊；先删除原消息，再加密接收 AI Token |
+| `/donate`、`/donate stars <数量>`、`/donate ton [数量]` | `handleDonate` | 私聊生成 Stars 发票，或创建带唯一备注的 TON 转账意向 |
+| `/terms`、`/paysupport` | 支付支持处理器 | 查看捐赠说明和支付支持指南 |
 
 ## 权限控制
 

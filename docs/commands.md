@@ -26,6 +26,8 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/topic` | `handleTopic` | Group owner configures which topics the topic-gated features run in (see below) |
 | `/wish <request>`, `/issue <request>` | `handleWish` | Creates a public GitHub Issue when intake is enabled and a GitHub Issues write token is available |
 | `/donatetoken <provider> <usage-policy> <token>`, `/donate_token ...` | `handleDonateToken` | Private chat only; deletes the source message before encrypting an AI token donation |
+| `/donate`, `/donate stars <amount>`, `/donate ton [amount]` | `handleDonate` | Private Stars invoice or a tracked TON transfer intent with a unique memo |
+| `/terms`, `/paysupport` | payment support handlers | Donation terms and payment-support guidance |
 
 ## Access Control And Permissions
 

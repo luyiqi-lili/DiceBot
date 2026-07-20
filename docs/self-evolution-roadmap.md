@@ -2,7 +2,7 @@
 
 Chinese source: [zh-CN/self-evolution-roadmap.md](zh-CN/self-evolution-roadmap.md)
 
-Autonomy is opened in explicit permission stages. Stages 1 and 2 are now implemented as an auditable foundation. Automatic source edits, merges, payments, and plan changes remain disabled.
+Autonomy is opened in explicit permission stages. Stages 1 and 2 are now implemented as an auditable foundation. Telegram Stars intake and tracked TON transfer intents are enabled; automatic source edits, merges, outgoing payments, and plan changes remain disabled.
 
 ## Implemented: Stage 1 Foundation
 
@@ -36,7 +36,7 @@ The Worker first considers its `DEEPSEEK_API_KEY`, then active donated DeepSeek 
 
 - Stage 3: isolated checkout, tests, AI review, and draft-PR creation.
 - Stage 4: policy-gated merge with branch protection, kill switch, locking, backoff, and rollback.
-- Stage 5: read-only donation ledger first; any payment, crypto transfer, or Cloudflare plan mutation requires limits, multi-party approval, idempotency, and complete audit.
+- Stage 5: Stars receipts and TON transfer intents are recorded in an auditable ledger. Outgoing payments, crypto transfers, conversion, or Cloudflare plan mutation still require limits, multi-party approval, idempotency, and complete audit.
 
 The bot never harvests or uses unknown shared keys found on the internet. See the Chinese source for the complete endpoint and configuration checklist.
 

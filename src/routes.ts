@@ -117,7 +117,10 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 
 	/* ── 私聊 API Token 捐赠（handler 负责立即删除含密钥的消息）── */
 	donatetoken: { module: './commands/donateToken', handler: 'handleDonateToken', deleteMsg: false },
-	donate:      { module: './commands/donateToken', handler: 'handleDonateToken', deleteMsg: false },
+	donate:      { module: './commands/donateMoney', handler: 'handleDonate', deleteMsg: false },
+	paysupport:  { module: './commands/paymentSupport', handler: 'handlePaySupport', deleteMsg: false },
+	terms:       { module: './commands/paymentSupport', handler: 'handleDonationTerms', deleteMsg: false },
+	donateterms: { module: './commands/paymentSupport', handler: 'handleDonationTerms', deleteMsg: false },
 
 	/* ── DND GM（不自动删除命令消息）── */
 	dnd:      { module: './commands/dndHelp', handler: 'handleDndHelp' },

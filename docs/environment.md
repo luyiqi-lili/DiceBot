@@ -83,6 +83,7 @@ Secrets expected by code or scripts:
 - `DONATION_INTAKE_KEY`: dedicated bearer token for `/api/donations/api-keys`; it grants no access to other admin APIs.
 - `DONATION_ADMIN_KEY`: separate bearer token for credential metadata, validation, disable, and revoke.
 - `DONATION_ENCRYPTION_KEY`: base64 representation of a random 32-byte AES master key.
+- `TON_DONATION_ADDRESS`: public mainnet TON wallet address shown by `/donate ton`; when absent or invalid, TON donation is disabled safely.
 - `DEEPSEEK_API_KEY`: optional Worker-owned DeepSeek credential. Automatic approval still requires the official balance API to confirm positive topped-up balance.
 - `GITHUB_TOKEN`: GitHub API token used for authenticated scans and, when intake is enabled without a dedicated token, Issue creation. It must have repository Issues write permission for that fallback.
 - `GITHUB_ISSUE_TOKEN`: optional repository-scoped Issues write token used only by `/wish` and `/issue`. If absent, an explicitly enabled intake reuses `GITHUB_TOKEN` instead of copying the same credential into another Worker secret.

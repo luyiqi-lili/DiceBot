@@ -49,12 +49,16 @@ describe('/help', () => {
 		expect(c.text).toContain('POST /api/donations/api-keys');
 		expect(c.text).toContain('shared_inference');
 		expect(c.text).toContain('AES-GCM');
+		expect(c.text).toContain('Stars / TON 捐赠');
+		expect(c.text).toContain('/donate stars 25');
+		expect(c.text).toContain('/donate ton 0.5');
+		expect(c.text).toContain('/paysupport');
 		expect(c.text).toContain('bot:ready');
 		expect(Array.from(c.text).length).toBeLessThanOrEqual(4096);
 		expect(buttons).toEqual(expect.arrayContaining([
 			expect.objectContaining({ text: '/wish 提需求', switch_inline_query_current_chat: '/wish ' }),
 			expect.objectContaining({
-				text: '私聊捐赠 Token',
+				text: '私聊捐赠',
 				url: 'https://t.me/lili_DiceBot',
 			}),
 		]));

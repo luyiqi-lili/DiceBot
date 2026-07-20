@@ -67,6 +67,7 @@ dev 和 prod 分别定义 Durable Object migrations。
 - `DONATION_INTAKE_KEY`：仅用于 `/api/donations/api-keys` 的 bearer token，不授予其他管理 API 权限。
 - `DONATION_ADMIN_KEY`：查看、验证、禁用和撤销捐赠凭据的独立 bearer token。
 - `DONATION_ENCRYPTION_KEY`：32 字节随机 AES 主密钥的 base64 表示。
+- `TON_DONATION_ADDRESS`：`/donate ton` 展示的主网 TON 公共收款地址；缺失或格式无效时安全关闭 TON 捐赠。
 - `DEEPSEEK_API_KEY`：可选的 Worker 自有 DeepSeek 凭据；自动批准仍要求官方余额接口确认充值余额大于零。
 - `GITHUB_TOKEN`：用于鉴权扫描的 GitHub API token；开启 intake 且没有专用 token 时也用于创建 Issue，因此该回退方式要求仓库 Issues 写权限。
 - `GITHUB_ISSUE_TOKEN`：可选、仅供 `/wish`、`/issue` 创建 Issue 的仓库级 Issues 写 token。未配置时，显式开启的入口复用 `GITHUB_TOKEN`，避免把同一高权限凭据复制成第二份 Worker secret。

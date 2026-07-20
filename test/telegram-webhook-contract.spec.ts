@@ -81,6 +81,111 @@ describe('Telegram webhook user-facing contract', () => {
 		expect(sendMessage?.body.reply_markup.inline_keyboard.at(-1)[0].text).toBe('删除消息');
 	});
 
+	it('creates, validates, and records a private Telegram Stars donation', async () => {
+		const privateMessage = {
+			update_id: 1090,
+			message: {
+				message_id: 90,
+				date: 1,
+				chat: { id: 7654321, type: 'private', first_name: 'Donor' },
+				from: { id: 7654321, is_bot: false, first_name: 'Donor' },
+				text: '/donate stars 50',
+			},
+		};
+		const { response: invoiceResponse } = await postTelegramUpdate(privateMessage);
+		expect(invoiceResponse.status).toBe(200);
+		const invoice = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendInvoice'));
+		expect(invoice?.body).toMatchObject({
+			chat_id: 7654321,
+			currency: 'XTR',
+			provider_token: '',
+			prices: [{ label: 'DiceBot 捐赠', amount: 50 }],
+		});
+		const payload = invoice?.body.payload;
+		expect(payload).toMatch(/^dicebot-stars:v1:/);
+
+		fetchMock.mockClear();
+		await postTelegramUpdate({
+			update_id: 1091,
+			pre_checkout_query: {
+				id: 'pre-checkout-webhook-1',
+				from: { id: 7654321, is_bot: false, first_name: 'Donor' },
+				currency: 'XTR', total_amount: 50, invoice_payload: payload,
+			},
+		});
+		expect(telegramCalls(fetchMock).find(call => call.url.endsWith('/answerPreCheckoutQuery'))?.body)
+			.toMatchObject({ pre_checkout_query_id: 'pre-checkout-webhook-1', ok: true });
+
+		fetchMock.mockClear();
+		await postTelegramUpdate({
+			update_id: 1092,
+			message: {
+				message_id: 91, date: 1,
+				chat: { id: 7654321, type: 'private', first_name: 'Donor' },
+				from: { id: 7654321, is_bot: false, first_name: 'Donor' },
+				successful_payment: {
+					currency: 'XTR', total_amount: 50, invoice_payload: payload,
+					telegram_payment_charge_id: 'tg-charge-webhook-1',
+					provider_payment_charge_id: '',
+				},
+			},
+		});
+		const receipt = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(receipt?.body.text).toContain('已收到 <b>50 Telegram Stars</b>');
+	});
+
+	it('opens the private donation menu and creates an invoice from a Stars button', async () => {
+		await postTelegramUpdate({
+			update_id: 1088,
+			message: {
+				message_id: 88, date: 1,
+				chat: { id: 7654320, type: 'private', first_name: 'Menu Donor' },
+				from: { id: 7654320, is_bot: false, first_name: 'Menu Donor' },
+				text: '/donate',
+			},
+		});
+		const menu = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		const callbackData = menu?.body.reply_markup.inline_keyboard[0][1].callback_data;
+		expect(JSON.parse(callbackData)).toEqual({ type: 'donation', action: 'stars', amount: 50 });
+
+		fetchMock.mockClear();
+		await postTelegramUpdate({
+			update_id: 1089,
+			callback_query: {
+				id: 'donation-stars-button',
+				from: { id: 7654320, is_bot: false, first_name: 'Menu Donor' },
+				message: { message_id: 89, chat: { id: 7654320, type: 'private', first_name: 'Menu Donor' } },
+				data: callbackData,
+			},
+		});
+		const calls = telegramCalls(fetchMock);
+		expect(calls.find(call => call.url.endsWith('/answerCallbackQuery'))?.body)
+			.toMatchObject({ callback_query_id: 'donation-stars-button' });
+		expect(calls.find(call => call.url.endsWith('/sendInvoice'))?.body)
+			.toMatchObject({ chat_id: 7654320, currency: 'XTR', prices: [{ label: 'DiceBot 捐赠', amount: 50 }] });
+	});
+
+	it('creates a tracked TON transfer intent with copy buttons', async () => {
+		const address = 'UQ0123456789012345678901234567890123456789012345';
+		const { response } = await postTelegramUpdate({
+			update_id: 1093,
+			message: {
+				message_id: 92, date: 1,
+				chat: { id: 7654322, type: 'private', first_name: 'TON Donor' },
+				from: { id: 7654322, is_bot: false, first_name: 'TON Donor' },
+				text: '/donate ton 0.5',
+			},
+		}, makeEnv({ TON_DONATION_ADDRESS: address }));
+		expect(response.status).toBe(200);
+		const instructions = telegramCalls(fetchMock).find(call => call.url.endsWith('/sendMessage'));
+		expect(instructions?.body.text).toContain('<b>0.5 TON</b>');
+		expect(instructions?.body.text).toMatch(/dicebot-[0-9a-f]{8}/);
+		expect(instructions?.body.reply_markup.inline_keyboard[0]).toEqual([
+			{ text: '复制 TON 地址', copy_text: { text: address } },
+			expect.objectContaining({ text: '复制备注' }),
+		]);
+	});
+
 	it('/rd10 is parsed as a roll shortcut and replies with a one-die result', async () => {
 		vi.spyOn(Math, 'random').mockReturnValue(0);
 
