@@ -52,12 +52,12 @@ function makeParsed(overrides: Record<string, unknown> = {}) {
 	} as any;
 }
 
-function makeEnv(db = makeDb()) {
+function makeEnv(db = makeDb(), includeIntakeKey = true) {
 	return {
 		TOKEN: 'telegram-token',
 		BOT_USERNAME: 'lili_DiceBot',
 		DB: db,
-		DONATION_INTAKE_KEY: 'donation-intake-secret',
+		...(includeIntakeKey ? { DONATION_INTAKE_KEY: 'donation-intake-secret' } : {}),
 		DONATION_ENCRYPTION_KEY: ENCRYPTION_KEY,
 	} as any;
 }
@@ -76,7 +76,7 @@ describe('/donatetoken', () => {
 			args: ['token', 'deepseek', 'shared_inference', API_KEY],
 		});
 
-		await handleDonateToken(parsed, makeEnv(db));
+		await handleDonateToken(parsed, makeEnv(db, false));
 
 		expect(TgMessage.deleteMessage).toHaveBeenCalledWith(expect.anything(), 123456, 77);
 		expect(vi.mocked(TgMessage.deleteMessage).mock.invocationCallOrder[0])

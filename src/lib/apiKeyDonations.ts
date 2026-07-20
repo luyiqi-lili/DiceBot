@@ -22,6 +22,13 @@ type DonationRecord = {
 	status: 'pending' | 'active' | 'invalid' | 'disabled' | 'revoked';
 };
 
+export type ApiKeyDonationPayload = {
+	provider?: unknown;
+	apiKey?: unknown;
+	donorLabel?: unknown;
+	usagePolicy?: unknown;
+};
+
 const JSON_HEADERS = {
 	'Content-Type': 'application/json; charset=utf-8',
 	'Cache-Control': 'no-store',
@@ -146,16 +153,13 @@ export async function handleApiKeyDonation(request: Request, env: DonationEnv): 
 		return json({ error: 'HTTPS Required' }, 400);
 	}
 	if (!hasBearerToken(request, env.DONATION_INTAKE_KEY)) return json({ error: 'Unauthorized' }, 401);
-	if (!env.DB || !env.DONATION_ENCRYPTION_KEY) return json({ error: 'Donation intake is not configured' }, 503);
-	const masterKey = masterKeyFromEnv(env);
-	if (!masterKey) return json({ error: 'Donation encryption is not configured correctly' }, 503);
 	if (!(request.headers.get('Content-Type') ?? '').toLowerCase().startsWith('application/json')) {
 		return json({ error: 'Content-Type must be application/json' }, 415);
 	}
 	const contentLength = Number(request.headers.get('Content-Length') ?? 0);
 	if (contentLength > 8192) return json({ error: 'Payload Too Large' }, 413);
 
-	let payload: { provider?: unknown; apiKey?: unknown; donorLabel?: unknown; usagePolicy?: unknown };
+	let payload: ApiKeyDonationPayload;
 	try {
 		const rawBody = await request.text();
 		if (new TextEncoder().encode(rawBody).byteLength > 8192) return json({ error: 'Payload Too Large' }, 413);
@@ -165,6 +169,22 @@ export async function handleApiKeyDonation(request: Request, env: DonationEnv): 
 	} catch {
 		return json({ error: 'Invalid JSON' }, 400);
 	}
+	return storeApiKeyDonation(payload, env);
+}
+
+/**
+ * Stores a validated credential for an already-authenticated caller. HTTP
+ * callers must pass the intake bearer check above; Telegram webhook callers
+ * are authenticated by the webhook verifier and use this same function
+ * directly, so they do not depend on an unrelated HTTP bearer secret.
+ */
+export async function storeApiKeyDonation(
+	payload: ApiKeyDonationPayload,
+	env: Pick<Env, 'DB' | 'DONATION_ENCRYPTION_KEY'>,
+): Promise<Response> {
+	if (!env.DB || !env.DONATION_ENCRYPTION_KEY) return json({ error: 'Donation intake is not configured' }, 503);
+	const masterKey = masterKeyFromEnv(env);
+	if (!masterKey) return json({ error: 'Donation encryption is not configured correctly' }, 503);
 
 	const provider = normalizeProvider(payload.provider);
 	const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey.trim() : '';
@@ -228,24 +248,12 @@ export async function handleApiKeyDonation(request: Request, env: DonationEnv): 
 	}
 }
 
-/**
- * Reuse the authenticated HTTP intake from a trusted Telegram webhook handler.
- * The bearer credential stays inside the Worker and is never sent over the
- * network or returned to the caller.
- */
+/** Trusted Telegram webhook intake; it shares validation and storage with HTTP. */
 export async function handleTrustedApiKeyDonation(
-	payload: { provider: string; apiKey: string; donorLabel?: string; usagePolicy: CredentialUsagePolicy },
+	payload: ApiKeyDonationPayload,
 	env: DonationEnv,
 ): Promise<Response> {
-	if (!env.DONATION_INTAKE_KEY) return json({ error: 'Donation intake is not configured' }, 503);
-	return handleApiKeyDonation(new Request('https://telegram-intake.internal/api/donations/api-keys', {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${env.DONATION_INTAKE_KEY}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(payload),
-	}), env);
+	return storeApiKeyDonation(payload, env);
 }
 
 async function updateValidationResult(

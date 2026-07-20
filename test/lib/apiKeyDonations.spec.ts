@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleApiCredentialAdmin, handleApiKeyDonation, validateCredentialDonation } from '../../src/lib/apiKeyDonations';
+import { handleApiCredentialAdmin, handleApiKeyDonation, handleTrustedApiKeyDonation, validateCredentialDonation } from '../../src/lib/apiKeyDonations';
 
 function makeDb(existing = false) {
 	const calls: Array<{ sql: string; values: unknown[] }> = [];
@@ -46,6 +46,20 @@ describe('API key donations', () => {
 		});
 
 		expect(response.status).toBe(401);
+	});
+
+	it('allows a trusted Telegram caller to store without the HTTP intake bearer secret', async () => {
+		const response = await handleTrustedApiKeyDonation({
+			provider: 'deepseek',
+			apiKey: 'sk-trusted-telegram-token',
+			usagePolicy: 'shared_inference',
+		}, {
+			DB: makeDb(),
+			DONATION_ENCRYPTION_KEY: encryptionKey,
+		});
+
+		expect(response.status).toBe(201);
+		expect(await response.json<any>()).toMatchObject({ provider: 'deepseek', status: 'pending' });
 	});
 
 	it('encrypts the key and returns only non-secret metadata', async () => {

@@ -111,7 +111,7 @@ export async function handleDonateToken(parsed: ParsedUpdate, env: Env): Promise
 		return;
 	}
 
-	if (!env.DB || !env.DONATION_ENCRYPTION_KEY || !env.DONATION_INTAKE_KEY) {
+	if (!env.DB || !env.DONATION_ENCRYPTION_KEY) {
 		await sendText(parsed, env, '⚠️ Token 捐赠入口当前未配置，原消息已删除且未保存，请稍后再试。');
 		return;
 	}
