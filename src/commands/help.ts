@@ -58,9 +58,20 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/whoami</code> — 查看用户信息（回复查看他人）
  <code>/act start</code> — 开始记录会话
  <code>/act end</code> — 结束记录并生成摘要
-	 <code>/rule</code> — 查看/设置群组规则
-	 <code>/top</code> — （管理）最近 7 天主题消息排行
-	 <code>/wish 具体需求</code> / <code>/issue 具体需求</code> — 提交公开源码 Issue（入口启用时）
+ <code>/rule</code> — 查看/设置群组规则
+ <code>/top</code> — （管理）最近 7 天主题消息排行
+
+<b>🧬 源码共创与 AI 审核</b>
+ <code>/wish 具体需求</code> / <code>/issue 具体需求</code> — 创建公开源码 Issue
+ 请写清使用场景、期望结果和限制条件（8–2000 字）。Cloudflare 每小时审核尚未标记的 Issue。
+ 只有静态检查为低风险，且 DeepSeek 高级 API 存在平台充值余额时，才会用 <code>deepseek-v4-pro</code> 复核。AI 判定 <code>risk=low</code> 且置信度 ≥ 85%，并确认 Issue 未被修改后，才自动添加 <code>bot:ready</code>。
+ 只有 Gemini 等免费 API、平台赠送额度，或余额无法确认时不会自动批准；维护者仍可手动添加 <code>bot:ready</code>。密钥、资金、权限、部署、工作流、数据库迁移和安全类需求不会自动批准。
+ <a href="https://github.com/luyiqi-lili/DiceBot/issues">查看公开 Issues 与处理进度</a>
+
+<b>🔑 安全捐赠 AI Token</b>
+ 请勿把 Token 发到群聊、Issue 或普通表单。先向维护者领取独立的捐赠接收凭证，再从自己的设备通过 HTTPS 提交到 <code>POST /api/donations/api-keys</code>。
+ 请求填写 <code>provider</code>、<code>apiKey</code>、<code>usagePolicy</code>，可选 <code>donorLabel</code>；<code>validation_only</code> 只允许验证，<code>shared_inference</code> 才授权机器人用于共享推理。
+ 支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整捐赠示例</a>
 
 <b>🎫 彩票（管理）</b>
  <code>/lottery now</code> — 开奖
@@ -104,6 +115,10 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       [
         { text: "/news", switch_inline_query_current_chat: `/news` },
         { text: "/check", switch_inline_query_current_chat: `/check 每日签到周年庆 50c 的触发逻辑是什么` }
+      ],
+      [
+        { text: "/wish 提需求", switch_inline_query_current_chat: `/wish ` },
+        { text: "安全捐赠 Token", url: "https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md" }
       ],
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },
