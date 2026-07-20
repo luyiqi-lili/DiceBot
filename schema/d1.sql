@@ -333,3 +333,77 @@ CREATE TABLE IF NOT EXISTS pr_monitor_runs (
 
 CREATE INDEX IF NOT EXISTS idx_pr_monitor_runs_checked_at
 ON pr_monitor_runs (repository, checked_at);
+
+CREATE TABLE IF NOT EXISTS api_credential_profiles (
+  donation_id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  credential_type TEXT NOT NULL DEFAULT 'api_key',
+  usage_policy TEXT NOT NULL DEFAULT 'validation_only'
+    CHECK (usage_policy IN ('validation_only', 'shared_inference')),
+  available_models_json TEXT NOT NULL DEFAULT '[]',
+  health_status TEXT NOT NULL DEFAULT 'unchecked'
+    CHECK (health_status IN ('unchecked', 'healthy', 'rate_limited', 'error', 'disabled', 'revoked')),
+  last_checked_at TEXT,
+  last_error_code TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_credential_profiles_routing
+ON api_credential_profiles (provider, usage_policy, health_status, last_checked_at);
+
+CREATE TABLE IF NOT EXISTS github_issue_submissions (
+  id TEXT PRIMARY KEY,
+  repository TEXT NOT NULL,
+  issue_number INTEGER NOT NULL,
+  issue_url TEXT NOT NULL,
+  issue_title TEXT NOT NULL,
+  source_chat_id TEXT NOT NULL,
+  source_user_id TEXT NOT NULL,
+  body_fingerprint TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(repository, issue_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_issue_submissions_rate_limit
+ON github_issue_submissions (repository, source_chat_id, source_user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_github_issue_submissions_fingerprint
+ON github_issue_submissions (repository, body_fingerprint, created_at);
+
+CREATE TABLE IF NOT EXISTS github_issue_snapshots (
+  repository TEXT NOT NULL,
+  issue_number INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  url TEXT NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  labels_json TEXT NOT NULL DEFAULT '[]',
+  state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open', 'not_ready')),
+  eligible INTEGER NOT NULL DEFAULT 0,
+  candidate_score INTEGER NOT NULL DEFAULT 0,
+  risk_level TEXT NOT NULL DEFAULT 'low' CHECK (risk_level IN ('low', 'high')),
+  eligibility_reasons_json TEXT NOT NULL DEFAULT '[]',
+  github_created_at TEXT NOT NULL,
+  github_updated_at TEXT NOT NULL,
+  last_seen_run_id TEXT NOT NULL,
+  checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (repository, issue_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_github_issue_snapshots_candidates
+ON github_issue_snapshots (repository, state, eligible, candidate_score, checked_at);
+
+CREATE TABLE IF NOT EXISTS evolution_selection_runs (
+  id TEXT PRIMARY KEY,
+  repository TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'error')),
+  pr_scan_status TEXT NOT NULL,
+  suitable_pr_count INTEGER,
+  ready_issue_count INTEGER,
+  eligible_issue_count INTEGER,
+  selected_issue_number INTEGER,
+  selection_reason TEXT,
+  error_summary TEXT,
+  checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

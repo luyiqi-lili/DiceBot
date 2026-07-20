@@ -12,7 +12,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` independently starts `runCoinCheck(env)` from `src/cron/cron.ts` and the read-only PR scan in `src/lib/githubPrMonitor.ts`.
+`scheduled()` independently starts `runCoinCheck(env)` and `runSelfEvolutionReview(env)`. The latter scans PRs, ranks ready issues, and performs at most one consented credential health check.
 
 `fetch()` handles web pages, external APIs, Telegram webhook updates, and health checks.
 
@@ -24,8 +24,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 2. Paths starting with `/api/` are passed to `handleExternalAPI()`.
 3. Non-POST requests return `I am alive`.
 4. POST requests are parsed as Telegram updates with `TgMessage.parseUpdate()`.
-5. Parsed updates are ignored unless `chatId` is in `ALLOWED_CHAT_IDS`.
-6. The parsed update type determines the handler.
+5. The parsed update type determines the handler; stored group data is isolated by `chat_id`.
 
 ## External API
 
@@ -36,9 +35,12 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 | `/api/coin/*` | Forwarded to `CoinDO` after stripping `/api/coin` |
 | `/api/lottery/*` | Forwarded to `LotteryDO` after stripping `/api/lottery` |
 | `/api/donations/api-keys` | Accepts encrypted API-key donations using a dedicated bearer token |
+| `/api/donations/api-keys/:id/validate`, `.../status` | Separate donation-admin bearer token; validates or changes lifecycle without returning secrets |
+| `/api/ai/models`, `/api/ai/route` | Protected non-secret catalog and routing recommendation |
+| `/api/evolution/candidate` | Protected read-only latest issue candidate |
 | `/api/health` | JSON status response |
 
-Regular `/api/*` routes validate `EXTERNAL_API_KEY`. Donation intake separately validates `DONATION_INTAKE_KEY`, which grants no access to other admin APIs.
+Regular `/api/*` routes validate `EXTERNAL_API_KEY`. Donation intake separately validates `DONATION_INTAKE_KEY`; credential administration uses `DONATION_ADMIN_KEY`.
 
 ## Telegram Update Dispatch
 
@@ -46,13 +48,12 @@ Update types:
 
 | Type | Behavior |
 |------|----------|
-| `inline_query` | `src/commands/aiAssistInline.ts` |
 | `topic_edited` | `src/commands/topicEditHandler.ts` |
 | `callback_query` | game launch, delete message, or `loadCallback()` |
 | `message` command | `loadCommand()` |
-| `message` non-command | wish approval, star shortcut, then D1 backup |
+| `message` non-command | star shortcut, then D1 backup |
 
-Non-command text is backed up through `handleBackup()` after wish/star handling.
+Non-command text is backed up through `handleBackup()` after star handling. `/wish` and `/issue` are regular commands that create GitHub Issues only when the fail-closed write switch is enabled.
 
 ## Static Imports
 
@@ -121,6 +122,4 @@ Top-level web routes:
 
 ## Scheduled Work
 
-Production `wrangler.jsonc` schedules `59 * * * *`, which invokes the treasury check and read-only GitHub PR scan. The scan stores D1 snapshots and deterministic risk signals but never comments, approves, or merges. See the [self-evolution roadmap](self-evolution-roadmap.md).
-
-Wish digest/execution automation is not a Worker cron. It is local cron managed by `scripts/wish-local.sh`.
+Production `wrangler.jsonc` schedules `59 * * * *`. The self-evolution review stores PR and `bot:ready` Issue snapshots, gives suitable community PRs priority, and records one read-only Issue candidate when appropriate. It never edits source, comments, approves, or merges. A consented shared Gemini credential may be checked with the read-only model-list endpoint. See the [self-evolution roadmap](self-evolution-roadmap.md).

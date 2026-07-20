@@ -2,7 +2,7 @@
 
 Chinese translation: [README.zh-CN.md](README.zh-CN.md)
 
-DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, and the Telegram Bot API. It has no external AI API dependency.
+DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, and the Telegram Bot API. Chat features have no external AI dependency; the controlled self-evolution foundation accesses GitHub and can validate donated model credentials.
 
 This README is the entry point. Detailed manuals live in `docs/`.
 
@@ -52,7 +52,7 @@ Main command groups:
 
 - Dice and party games: `/roll`, `/r`, `/rd`, `/rh`, `/groll`, `/21`, `/duel`.
 - Economy: `/coin`, `/lottery`, `/congrats`, `/恭喜发财`.
-- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`.
+- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/wish`, `/issue`.
 - Access control: the bot responds in any group it is added to (no chat allowlist; data isolated per `chat_id`). Group owners implicitly hold every admin permission and can grant/revoke per-user permissions with `/perm` (stored in D1 `permission_grants`). See [docs/commands.md](docs/commands.md#access-control-and-permissions).
 - Fish: `/f`, `/f check`, `/f add`, `/f list`, `/f remove`.
 - Affection: `/rose`, `/rose send`, `/rose check`.
@@ -63,7 +63,7 @@ Full command reference: [docs/commands.md](docs/commands.md).
 
 ## Self-Evolution Foundation
 
-Stage 1 provides a deliberately limited foundation: the production cron reads open GitHub PRs hourly and stores snapshots plus deterministic risk signals in D1; protected `/api/donations/api-keys` intake encrypts donated keys with AES-GCM. It does not comment, approve, merge, or activate unvalidated donated keys.
+Stages 1–2 provide a controlled foundation: the hourly cron evaluates open PRs and, only when no suitable community PR exists, selects a low-risk maintainer-labelled `bot:ready` issue. Fail-closed `/wish` and `/issue` commands can create public requests. Credential intake canonicalizes the provider and consent policy before AES-GCM encryption; Gemini credentials can be checked through the read-only model list. The Worker does not edit source, comment, approve, merge, pay bills, or change Cloudflare plans.
 
 See the [self-evolution roadmap](docs/self-evolution-roadmap.md) for scope and later stages.
 

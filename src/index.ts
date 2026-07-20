@@ -15,8 +15,9 @@ import { recordReactionAffection, recordReplyAffection } from './lib/affectionIn
 import { COMMAND_ROUTES } from './routes';
 import { handleWebRequest } from './web/router';
 import { createWebGameAuth, isTelegramWebhookRequest } from './lib/telegramAuth';
-import { handleApiKeyDonation } from './lib/apiKeyDonations';
-import { scanOpenPullRequests } from './lib/githubPrMonitor';
+import { handleApiCredentialAdmin, handleApiKeyDonation } from './lib/apiKeyDonations';
+import { handleModelRoutingApi } from './lib/modelRouting';
+import { handleSelfEvolutionApi, runSelfEvolutionReview } from './lib/selfEvolution';
 
 /**
  * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
@@ -44,10 +45,16 @@ export type Env = {
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
 	DONATION_INTAKE_KEY?: string;
+	DONATION_ADMIN_KEY?: string;
 	DONATION_ENCRYPTION_KEY?: string;
 	GITHUB_REPOSITORY?: string;
 	GITHUB_TOKEN?: string;
 	GITHUB_PR_SCAN_LIMIT?: string;
+	GITHUB_ISSUE_TOKEN?: string;
+	GITHUB_ISSUE_INTAKE_ENABLED?: string;
+	GITHUB_ISSUE_COOLDOWN_SECONDS?: string;
+	GITHUB_AUTONOMY_LABEL?: string;
+	GITHUB_ISSUE_SCAN_LIMIT?: string;
 	TELEGRAM_WEBHOOK_SECRET?: string;
 	TELEGRAM_API_BASE_URL?: string;
 };
@@ -60,9 +67,10 @@ export { LotteryDO } from './durableObjects/lottery_do';
 async function handleExternalAPI(request: Request, env: Env): Promise<Response> {
 	const url = new URL(request.url);
 	const path = url.pathname;
-	if (path === '/api/donations/api-keys') {
+	if (path === '/api/donations/api-keys' && request.method === 'POST') {
 		return handleApiKeyDonation(request, env);
 	}
+	if (path.startsWith('/api/donations/api-keys')) return handleApiCredentialAdmin(request, env);
 
 	const apiKey = request.headers.get('X-API-Key') || url.searchParams.get('api_key');
 	if (!env.EXTERNAL_API_KEY || apiKey !== env.EXTERNAL_API_KEY) {
@@ -79,6 +87,8 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 	if (path.startsWith('/api/lottery')) {
 		return handleLotteryAPI(request, env, path);
 	}
+	if (path.startsWith('/api/ai/')) return handleModelRoutingApi(request, env);
+	if (path === '/api/evolution/candidate') return handleSelfEvolutionApi(request, env);
 
 	if (path === '/api/health') {
 		return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
@@ -167,6 +177,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case '21':      { const { handle21 } = await import('./commands/21'); return handle21; }
 		case 'news':    { const { handleNews } = await import('./commands/news'); return handleNews; }
 		case 'rule':    { const { handleRule } = await import('./commands/rule'); return handleRule; }
+		case 'wish': case 'issue': { const { handleWish } = await import('./commands/wish'); return handleWish; }
 		case 'dnd':     { const { handleDndHelp } = await import('./commands/dndHelp'); return handleDndHelp; }
 		case 'new':     { const { handleDndNew } = await import('./commands/dndNew'); return handleDndNew; }
 		case 'char':    { const { handleDndChar } = await import('./commands/dndChar'); return handleDndChar; }
@@ -394,7 +405,7 @@ function createTelegramBot(env: Env, executionCtx: ExecutionContext): Bot {
 export default {
 	async scheduled(controller, env, ctx) {
 		ctx.waitUntil(runCoinCheck(env));
-		ctx.waitUntil(scanOpenPullRequests(env));
+		ctx.waitUntil(runSelfEvolutionReview(env));
 	},
 
 	async fetch(request, env, ctx) {

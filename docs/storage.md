@@ -58,12 +58,11 @@ Major D1 table families:
 - DND: `dnd_races`, `dnd_classes`, `dnd_skills`, `dnd_characters`, `dnd_gm`, `dnd_dc`.
 - Items: `dnd_item_templates`, `dnd_inventory`.
 - Affection: `affections`, `rose_sends`.
-- Wish automation: `wishes`, `wish_summaries`, `wish_tasks`.
 - Usage and backup: usage count, user activity, message history, and activity/report tables as used by `src/lib/backup.ts`, `src/commands/act.ts`, and `src/commands/report.ts`.
 - Rules: group rule tables used by `src/commands/rule.ts`.
-- Self-evolution foundation: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `pull_request_snapshots` and `pr_monitor_runs` store read-only scan results.
+- Self-evolution: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `api_credential_profiles` stores canonical provider, consent policy, health, and non-secret model ids. PR/Issue snapshots, private Telegram-to-Issue intake mappings, and selection runs use `pull_request_snapshots`, `pr_monitor_runs`, `github_issue_submissions`, `github_issue_snapshots`, and `evolution_selection_runs`.
 
-No HTTP API may return `api_key_donations.encrypted_key`. Future model routing may only consume records with `status = 'active'`; stage 1 always creates records as `pending`.
+No HTTP API may return `api_key_donations.encrypted_key`. Routing may only consider `active` credentials whose profile is `shared_inference + healthy`; `validation_only` is the intake default.
 
 The repository does not currently keep a single canonical schema migration file for all D1 tables. Schema knowledge is spread across docs and SQL in command/lib modules.
 

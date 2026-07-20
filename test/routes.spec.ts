@@ -20,11 +20,12 @@ describe('COMMAND_ROUTES', () => {
 		});
 	});
 
-	it('已下线的 AI/wish 命令不再注册', () => {
+	it('已下线的聊天 AI 命令不再注册，但源码需求入口已恢复', () => {
 		expect(COMMAND_ROUTES.ask).toBeUndefined();
 		expect(COMMAND_ROUTES.trans).toBeUndefined();
 		expect(COMMAND_ROUTES.report).toBeUndefined();
-		expect(COMMAND_ROUTES.wish).toBeUndefined();
+		expect(COMMAND_ROUTES.wish?.handler).toBe('handleWish');
+		expect(COMMAND_ROUTES.issue?.handler).toBe('handleWish');
 	});
 
 	it('DND 命令元数据与静态 import switch 保持同步', () => {

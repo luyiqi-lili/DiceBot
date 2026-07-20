@@ -5,10 +5,19 @@ type PrMonitorEnv = Pick<Env, 'DB' | 'GITHUB_REPOSITORY' | 'GITHUB_TOKEN' | 'GIT
 type GitHubPull = {
 	number: number;
 	title: string;
+	body?: string | null;
 	user?: { login?: string };
 	head: { sha: string };
 	draft?: boolean;
 	updated_at: string;
+};
+
+export type PullRequestScanResult = {
+	status: 'ok' | 'skipped' | 'error';
+	openPullRequests?: number;
+	suitableCommunityPullRequests?: number;
+	linkedIssueNumbers?: number[];
+	reason?: string;
 };
 
 type GitHubFile = { filename: string; additions?: number; deletions?: number };
@@ -37,6 +46,22 @@ export function assessPullRequestRisk(input: PullRequestRiskInput): { level: 'lo
 	if (input.paths.some((path) => SENSITIVE_PATHS.some((pattern) => pattern.test(path)))) signals.push('sensitive-path');
 	const level = signals.includes('sensitive-path') || signals.includes('large-change') ? 'high' : signals.length ? 'medium' : 'low';
 	return { level, signals };
+}
+
+export function linkedIssueNumbersFromPullBody(body: string | null | undefined, repository: string): number[] {
+	if (!body) return [];
+	const escapedRepository = repository.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const issueReference = new RegExp(`(?:#|https://github\\.com/${escapedRepository}/issues/)(\\d+)`, 'gi');
+	const closingKeyword = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b/i;
+	const found = new Set<number>();
+	for (const line of body.split(/\r?\n/)) {
+		if (!closingKeyword.test(line)) continue;
+		for (const match of line.matchAll(issueReference)) {
+			const issueNumber = Number(match[1]);
+			if (Number.isInteger(issueNumber) && issueNumber > 0) found.add(issueNumber);
+		}
+	}
+	return Array.from(found).sort((a, b) => a - b);
 }
 
 function repositoryIsValid(repository: string): boolean {
@@ -70,7 +95,7 @@ async function fetchAllPages<T>(
 export async function scanOpenPullRequests(
 	env: PrMonitorEnv,
 	options: { fetchFn?: typeof fetch } = {},
-): Promise<{ status: 'ok' | 'skipped' | 'error'; openPullRequests?: number; reason?: string }> {
+): Promise<PullRequestScanResult> {
 	if (!env.DB) return { status: 'skipped', reason: 'D1 is not configured' };
 	if (!env.GITHUB_REPOSITORY || !repositoryIsValid(env.GITHUB_REPOSITORY)) {
 		return { status: 'skipped', reason: 'GITHUB_REPOSITORY is not configured' };
@@ -93,9 +118,12 @@ export async function scanOpenPullRequests(
 			headers,
 			20,
 		);
-		const detailLimit = scanLimit(env.GITHUB_PR_SCAN_LIMIT);
+			const detailLimit = scanLimit(env.GITHUB_PR_SCAN_LIMIT);
+			let suitableCommunityPullRequests = 0;
+			const linkedIssueNumbers = new Set<number>();
 
-		for (const [index, pull] of pulls.entries()) {
+			for (const [index, pull] of pulls.entries()) {
+				for (const issueNumber of linkedIssueNumbersFromPullBody(pull.body, repository)) linkedIssueNumbers.add(issueNumber);
 			let files: GitHubFile[] = [];
 			let incompleteSignal: 'details-not-scanned' | 'github-api-partial' | null = null;
 			if (index < detailLimit) {
@@ -122,10 +150,11 @@ export async function scanOpenPullRequests(
 				deletions,
 				paths: files.map((file) => file.filename),
 			});
-			if (incompleteSignal) {
+				if (incompleteSignal) {
 				risk.signals.push(incompleteSignal);
 				risk.level = 'high';
-			}
+				}
+				if (!pull.draft && risk.level === 'low') suitableCommunityPullRequests += 1;
 
 			await env.DB.prepare(
 				`INSERT INTO pull_request_snapshots
@@ -152,8 +181,18 @@ export async function scanOpenPullRequests(
 			"INSERT INTO pr_monitor_runs (id, repository, status, open_pr_count, checked_at) VALUES (?, ?, 'ok', ?, datetime('now'))",
 		).bind(runId, repository, pulls.length).run();
 
-		console.log('[pr-monitor] scan complete', { repository, openPullRequests: pulls.length, detailScanned: Math.min(pulls.length, detailLimit) });
-		return { status: 'ok', openPullRequests: pulls.length };
+			console.log('[pr-monitor] scan complete', {
+				repository,
+				openPullRequests: pulls.length,
+				suitableCommunityPullRequests,
+				detailScanned: Math.min(pulls.length, detailLimit),
+			});
+			return {
+				status: 'ok',
+				openPullRequests: pulls.length,
+				suitableCommunityPullRequests,
+				linkedIssueNumbers: Array.from(linkedIssueNumbers).sort((a, b) => a - b),
+			};
 	} catch (error) {
 		const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown GitHub scan error';
 		try {

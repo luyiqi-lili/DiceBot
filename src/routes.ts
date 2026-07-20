@@ -111,6 +111,10 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	/* ── 规则 ── */
 	rule:     { module: './commands/rule', handler: 'handleRule' },
 
+	/* ── 公开源码需求（默认关闭，由独立 GitHub Issue token 控制）── */
+	wish:     { module: './commands/wish', handler: 'handleWish', deleteMsg: false },
+	issue:    { module: './commands/wish', handler: 'handleWish', deleteMsg: false },
+
 	/* ── DND GM（不自动删除命令消息）── */
 	dnd:      { module: './commands/dndHelp', handler: 'handleDndHelp' },
 	new:      { module: './commands/dndNew', handler: 'handleDndNew' },

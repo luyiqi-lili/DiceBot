@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { assessPullRequestRisk, scanOpenPullRequests } from '../../src/lib/githubPrMonitor';
+import { assessPullRequestRisk, linkedIssueNumbersFromPullBody, scanOpenPullRequests } from '../../src/lib/githubPrMonitor';
 
 function makeDb() {
 	const calls: Array<{ sql: string; values: unknown[] }> = [];
@@ -18,6 +18,10 @@ function makeDb() {
 }
 
 describe('GitHub PR monitor', () => {
+	it('extracts same-repository issues explicitly closed by an open PR', () => {
+		expect(linkedIssueNumbersFromPullBody('Fixes #12 and resolves https://github.com/owner/repo/issues/15', 'owner/repo')).toEqual([12, 15]);
+		expect(linkedIssueNumbersFromPullBody('Related to #99', 'owner/repo')).toEqual([]);
+	});
 	it('skips safely without repository or D1 configuration', async () => {
 		expect(await scanOpenPullRequests({} as any)).toMatchObject({ status: 'skipped' });
 		expect(await scanOpenPullRequests({ GITHUB_REPOSITORY: 'owner/repo' } as any)).toMatchObject({ status: 'skipped' });

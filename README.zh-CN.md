@@ -2,7 +2,7 @@
 
 English source: [README.md](README.md)
 
-DiceBot 是运行在 Cloudflare Workers 上的 Telegram 群组机器人，提供群工具、游戏、轻量 DND 跑团和 Telegram Web 小游戏。运行时使用 TypeScript、KV、Durable Objects、D1 和 Telegram Bot API。不依赖任何外部 AI API。
+DiceBot 是运行在 Cloudflare Workers 上的 Telegram 群组机器人，提供群工具、游戏、轻量 DND 跑团和 Telegram Web 小游戏。运行时使用 TypeScript、KV、Durable Objects、D1 和 Telegram Bot API。聊天功能不依赖外部 AI；自进化底座会以受控方式访问 GitHub，并可验证捐赠的模型凭据。
 
 ## 当前状态
 
@@ -48,7 +48,7 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 
 - 骰子与游戏：`/roll`、`/r`、`/rd`、`/rh`、`/groll`、`/21`、`/duel`。
 - 经济：`/coin`、`/lottery`、`/congrats`、`/恭喜发财`。
-- 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`。
+- 工具：`/help`、`/whoami`、`/book`、`/news`、`/rule`、`/echo`、`/em`、`/me`、`/emote`、`/like`、`/act`、`/wish`、`/issue`。
 - 权限控制：机器人在其被加入的任意群组都会响应（无群组白名单；数据按 `chat_id` 隔离）。群主自动拥有全部管理命令权限，并可用 `/perm` 为具体用户授予/移除权限（存于 D1 `permission_grants` 表）。详见 [docs/zh-CN/commands.md](docs/zh-CN/commands.md)。
 - 钓鱼：`/f`、`/f check`、`/f add`、`/f list`、`/f remove`。
 - 好感度：`/rose`、`/rose send`、`/rose check`。
@@ -59,7 +59,7 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 
 ## 自进化底座
 
-当前实现第一阶段的安全底座：生产 Cron 每小时只读扫描 GitHub 开放 PR，并将快照和静态风险信号写入 D1；受保护的 `/api/donations/api-keys` 可接收经 AES-GCM 加密的 API Key 捐赠。当前不会自动评论、批准、合并 PR，也不会自动启用未经验证的捐赠密钥。
+当前实现阶段 1–2 的安全底座：生产 Cron 每小时评估开放 PR；无合适社区 PR 时从维护者标记为 `bot:ready` 的低风险 Issue 中选择候选。默认关闭的 `/wish`/`/issue` 可创建公开需求；受保护的捐赠入口会记录规范化平台、授权用途并用 AES-GCM 加密，Gemini 凭据可通过只读模型列表验证。当前不会自动改源码、评论、批准、合并、支付或切换 Cloudflare 套餐。
 
 分阶段范围、验收标准和后续路线见[自进化系统路线图](docs/zh-CN/self-evolution-roadmap.md)。
 

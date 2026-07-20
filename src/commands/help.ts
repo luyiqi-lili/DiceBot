@@ -58,8 +58,9 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/whoami</code> — 查看用户信息（回复查看他人）
  <code>/act start</code> — 开始记录会话
  <code>/act end</code> — 结束记录并生成摘要
- <code>/rule</code> — 查看/设置群组规则
- <code>/top</code> — （管理）最近 7 天主题消息排行
+	 <code>/rule</code> — 查看/设置群组规则
+	 <code>/top</code> — （管理）最近 7 天主题消息排行
+	 <code>/wish 具体需求</code> / <code>/issue 具体需求</code> — 提交公开源码 Issue（入口启用时）
 
 <b>🎫 彩票（管理）</b>
  <code>/lottery now</code> — 开奖

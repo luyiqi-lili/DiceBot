@@ -68,38 +68,33 @@ Plain vars in `wrangler.jsonc`:
 - `BOT_USERNAME`
 - `GITHUB_REPOSITORY`: `luyiqi-lili/DiceBot` in production.
 - `GITHUB_PR_SCAN_LIMIT`: PR file-list reads per scan, default 20 and capped at 50.
+- `GITHUB_AUTONOMY_LABEL`: issues eligible for autonomous consideration, default `bot:ready`.
+- `GITHUB_ISSUE_SCAN_LIMIT`: ready-issue reads per scan, default 100 and capped at 500.
+- `GITHUB_ISSUE_INTAKE_ENABLED`: fail-closed public issue write switch; committed default is `false`.
+- `GITHUB_ISSUE_COOLDOWN_SECONDS`: per Telegram user/chat issue submission cooldown.
 
 Secrets expected by code or scripts:
 
 - `TOKEN`: Telegram bot token.
-- `DEEPSEEK_API_KEY` or `DEEPSEEK_API_KEYS`: AI provider credentials.
-- `DEEPSEEK_BASE_URL`: optional override, default is in `src/lib/deepseekClient.ts`.
 - `EXTERNAL_API_KEY`: optional API key for `/api/*`.
 - `DONATION_INTAKE_KEY`: dedicated bearer token for `/api/donations/api-keys`; it grants no access to other admin APIs.
+- `DONATION_ADMIN_KEY`: separate bearer token for credential metadata, validation, disable, and revoke.
 - `DONATION_ENCRYPTION_KEY`: base64 representation of a random 32-byte AES master key.
 - `GITHUB_TOKEN`: optional read-only token; public repositories can be scanned anonymously at a lower rate limit.
+- `GITHUB_ISSUE_TOKEN`: repository-scoped Issues write token used only by `/wish` and `/issue`.
 
 Regular `/api/*` routes reject access when `EXTERNAL_API_KEY` is absent. Donation intake is unavailable when its secrets or D1 are absent. Apply `schema/d1.sql`, then configure donation secrets with `wrangler secret put --env prod`; never commit them to `wrangler.jsonc`.
 
 Current secret placement (names only, never values):
 
-- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ENCRYPTION_KEY`, `GITHUB_TOKEN`, and existing model-provider keys. Local `.env` `GH_TOKEN` maps to the runtime binding `GITHUB_TOKEN` when uploaded to Cloudflare.
+- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ADMIN_KEY`, `DONATION_ENCRYPTION_KEY`, `GITHUB_TOKEN`, and `GITHUB_ISSUE_TOKEN`. Local `.env` `GH_TOKEN` maps to runtime `GITHUB_TOKEN`; do not reuse it as the issue-write token unless its scope was intentionally designed for both.
 - GitHub Actions: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BOT_TOKEN`, `TOKEN`, and `DEV_BOT_TOKEN`.
 - Local `.env`: development/operations credentials; local `BOT_TOKEN` maps to Worker `TOKEN`.
 - Cross-platform rule: keep the GitHub token in Cloudflare for Worker-to-GitHub calls, and keep the Cloudflare account/token in GitHub Actions for CI deployment. Never reverse these destinations or commit either token. Prefer a repository-scoped read-only GitHub token for the Worker.
 
 External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
-## Local Wish Automation Env
-
-`scripts/wish-local.sh setup` writes `.wish-local.env`, which is ignored by git. It can contain:
-
-- `WORKER_BASE_URL`
-- `EXTERNAL_API_KEY`
-- `BOT_TOKEN`
-- `CHAT_ID`
-- `TOPIC_ID`
-- `WISH_VERIFY_CMD`
+Apply `schema/d1.sql` and configure both dedicated write/admin tokens before changing `GITHUB_ISSUE_INTAKE_ENABLED` to `true`. The committed configuration deliberately keeps this write path disabled.
 
 ## Deployment Notification
 

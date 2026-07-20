@@ -4,7 +4,7 @@ Chinese translation: [zh-CN/commands.md](zh-CN/commands.md)
 
 This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/routes.ts` is incomplete, so use this document and `loadCommand()` as the source of truth.
 
-> The bot no longer depends on any external AI API. Features that relied on the DeepSeek-compatible chat API have been removed (`/trans`, `/ask`, `/report`, inline `@bot` AI assist, `/wish`). `/echo` now returns a static dice-based verdict, and `/fate` only draws cards (no AI interpretation).
+> Chat features no longer depend on the old DeepSeek-compatible API. `/trans`, `/ask`, `/report`, and inline `@bot` AI assist remain removed. `/wish` has been restored with different semantics: it creates a GitHub source request and does not call a chat model.
 
 ## General Commands
 
@@ -24,6 +24,7 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/fate` | `handleFate` | Tarot-style 3-card draw |
 | `/perm` | `handlePerm` | Group owner grants/revokes admin permissions per user (see below) |
 | `/topic` | `handleTopic` | Group owner configures which topics the topic-gated features run in (see below) |
+| `/wish <request>`, `/issue <request>` | `handleWish` | Creates a public GitHub Issue when the fail-closed intake switch and dedicated write token are configured |
 
 ## Access Control And Permissions
 

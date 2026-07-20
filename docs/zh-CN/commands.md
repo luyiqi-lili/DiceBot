@@ -4,7 +4,7 @@ English source: [../commands.md](../commands.md)
 
 本参考以 `src/index.ts` 的运行时分发为准。`src/routes.ts` 的元数据不完整，因此命令可用性以 `loadCommand()` 为准。
 
-> 机器人不再依赖任何外部 AI API。依赖 DeepSeek 兼容聊天 API 的功能已移除（`/trans`、`/ask`、`/report`、内联 `@bot` 智能回复、`/wish`）。`/echo` 现在返回基于掷骰的静态评价，`/fate` 只抽牌（不再有 AI 解读）。
+> 聊天功能已不再依赖旧 DeepSeek 兼容 API。`/trans`、`/ask`、`/report` 和内联 `@bot` 智能回复仍然下线。`/wish` 已以新语义恢复：创建公开源码需求 Issue，不调用聊天模型。
 
 ## 通用命令
 
@@ -24,6 +24,7 @@ English source: [../commands.md](../commands.md)
 | `/fate` | `handleFate` | 塔罗式抽 3 张牌 |
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
+| `/wish <需求>`、`/issue <需求>` | `handleWish` | 仅在默认关闭的 intake 开关与专用 GitHub 写 token 配好后创建公开 Issue |
 
 ## 权限控制
 

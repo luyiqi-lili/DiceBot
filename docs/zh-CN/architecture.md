@@ -12,7 +12,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` 独立启动 `src/cron/cron.ts` 中的 `runCoinCheck(env)`，以及 `src/lib/githubPrMonitor.ts` 中的只读 PR 扫描。
+`scheduled()` 独立启动 `runCoinCheck(env)` 与 `runSelfEvolutionReview(env)`；后者扫描 PR、选择 ready Issue，并至多检查一个已授权共享凭据的健康状态。
 
 `fetch()` 处理 Web 页面、外部 API、Telegram webhook update 和健康检查。
 
@@ -24,8 +24,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 2. `/api/` 开头的路径交给 `handleExternalAPI()`。
 3. 非 POST 请求返回 `I am alive`。
 4. POST 请求按 Telegram update 解析。
-5. 如果 `chatId` 不在 `ALLOWED_CHAT_IDS`，忽略 update。
-6. 根据解析后的 update type 分发。
+5. 根据解析后的 update type 分发；群数据按 `chat_id` 隔离。
 
 ## 外部 API
 
@@ -34,21 +33,23 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 | `/api/coin/*` | 去掉 `/api/coin` 后转发给 `CoinDO` |
 | `/api/lottery/*` | 去掉 `/api/lottery` 后转发给 `LotteryDO` |
 | `/api/donations/api-keys` | 使用独立 bearer token 接收并加密保存捐赠 API Key |
+| `/api/donations/api-keys/:id/validate`、`.../status` | 使用独立管理 token 验证或变更生命周期，不返回秘密 |
+| `/api/ai/models`、`/api/ai/route` | 受保护的非敏感目录与模型路由建议 |
+| `/api/evolution/candidate` | 受保护地读取最新 Issue 候选 |
 | `/api/health` | JSON 状态响应 |
 
-普通 `/api/*` 路由校验 `EXTERNAL_API_KEY`；捐赠入口单独校验 `DONATION_INTAKE_KEY`，不会因此获得其他管理 API 权限。
+普通 `/api/*` 路由校验 `EXTERNAL_API_KEY`；捐赠接收单独校验 `DONATION_INTAKE_KEY`，凭据管理使用 `DONATION_ADMIN_KEY`。
 
 ## Telegram Update 分发
 
 | 类型 | 行为 |
 |------|------|
-| `inline_query` | `src/commands/aiAssistInline.ts` |
 | `topic_edited` | `src/commands/topicEditHandler.ts` |
 | `callback_query` | 游戏启动、删除消息或 `loadCallback()` |
 | 命令消息 | `loadCommand()` |
-| 非命令消息 | wish 批准、星号快捷方式，然后 D1 备份 |
+| 非命令消息 | 星号快捷方式，然后 D1 备份 |
 
-非命令文本在 wish/星号处理后会通过 `handleBackup()` 备份。
+非命令文本在星号处理后通过 `handleBackup()` 备份。`/wish` 与 `/issue` 是普通命令，仅在默认关闭的写开关开启后创建 GitHub Issue。
 
 ## 静态导入
 
@@ -94,6 +95,4 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`，触发宝库检查和 GitHub PR 扫描。PR 扫描只读取开放 PR 和文件列表，把快照与静态风险信号写入 D1；不会评论、批准或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
-
-Wish digest/execution 自动化不是 Worker cron，而是由 `scripts/wish-local.sh` 管理的本地 cron。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`。自进化审视会保存 PR 与 `bot:ready` Issue 快照，优先合适的社区 PR，并在适合时记录一个只读 Issue 候选；不会修改源码、评论、批准或合并。已明确授权共享的 Gemini 凭据可通过只读模型列表做健康检查。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
