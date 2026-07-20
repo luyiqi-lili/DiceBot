@@ -12,7 +12,7 @@ Autonomy is opened in explicit permission stages. Stages 1 and 2 are now impleme
 
 ## Implemented: Stage 2A Issues and Candidate Selection
 
-When explicitly enabled, `/wish` and `/issue` create public GitHub issues using a dedicated issue-write token. Telegram identities stay in private D1 rate-limit records and are not copied into the public issue. User submissions do not receive `bot:ready`; a maintainer must apply that label.
+When explicitly enabled, `/wish` and `/issue` create public GitHub issues using a dedicated issue-write token when configured, otherwise the existing Worker GitHub token. Telegram identities stay in private D1 rate-limit records and are not copied into the public issue. User submissions do not receive `bot:ready`; a maintainer must apply that label.
 
 The hourly review gives suitable low-risk community PRs priority. Only when the PR scan succeeds and finds none does it rank `bot:ready` issues. Assigned, locked, PR-linked, underspecified, blocked, or protected topics (credentials, money, auth, permissions, workflows, deploys, schemas, migrations, encryption, and security) are excluded. `GET /api/evolution/candidate`, protected by `EXTERNAL_API_KEY`, exposes the selected read-only candidate to a future isolated executor.
 

@@ -79,4 +79,20 @@ describe('GitHub issue intake', () => {
 		});
 		expect(result).toMatchObject({ status: 'skipped' });
 	});
+
+	it('reuses the existing Worker GitHub token without creating a duplicate secret', async () => {
+		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			number: 43,
+			html_url: 'https://github.com/owner/repo/issues/43',
+			title: '[Telegram 需求] 增加群组签到开关',
+		}), { status: 201 }));
+		await submitFeatureRequestAsIssue({
+			...env,
+			DB: makeDb(),
+			GITHUB_ISSUE_TOKEN: undefined,
+			GITHUB_TOKEN: 'existing-worker-token',
+		}, { body: '增加一个群组签到开关', chatId: 1, userId: 2 }, { fetchFn });
+
+		expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe('Bearer existing-worker-token');
+	});
 });

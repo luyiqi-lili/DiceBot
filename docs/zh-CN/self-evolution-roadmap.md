@@ -20,9 +20,9 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 /wish 增加一个可按群组关闭的每日签到功能
 ```
 
-`/issue` 是同义命令。机器人使用专用 `GITHUB_ISSUE_TOKEN` 创建公开 GitHub Issue。公开正文只包含需求内容，不包含 Telegram chat/user id；私有映射保存在 D1，用于每用户冷却和 30 天重复检查。
+`/issue` 是同义命令。机器人优先使用专用 `GITHUB_ISSUE_TOKEN` 创建公开 GitHub Issue；未配置时复用现有 `GITHUB_TOKEN`。公开正文只包含需求内容，不包含 Telegram chat/user id；私有映射保存在 D1，用于每用户冷却和 30 天重复检查。
 
-写入口默认关闭。用户创建的 Issue 不自动加自治标签，维护者确认范围后需手动添加 `bot:ready`。
+写入口必须由 `GITHUB_ISSUE_INTAKE_ENABLED=true` 显式开启。用户创建的 Issue 不自动加自治标签，维护者确认范围后需手动添加 `bot:ready`。
 
 ### PR 优先、Issue 回退
 
@@ -98,8 +98,8 @@ Worker secrets：
 - `DONATION_INTAKE_KEY`：捐赠接收专用 bearer token。
 - `DONATION_ADMIN_KEY`：捐赠验证、查看和撤销专用 bearer token。
 - `DONATION_ENCRYPTION_KEY`：解码后 32 字节的 base64 AES 主密钥。
-- `GITHUB_TOKEN`：Worker 只读扫描 PR/Issue；本地 `.env` 的 `GH_TOKEN` 同步到此名称。
-- `GITHUB_ISSUE_TOKEN`：仅 Issue 写权限，和只读扫描 token 分开。
+- `GITHUB_TOKEN`：Worker 鉴权扫描 PR/Issue，并在没有专用 Issue token 时执行写入；本地 `.env` 的 `GH_TOKEN` 同步到此名称。
+- `GITHUB_ISSUE_TOKEN`：可选的专用 Issue 写 token；未配置时显式开启的入口复用现有 `GITHUB_TOKEN`，避免复制秘密。
 
 Worker vars：
 
@@ -107,7 +107,7 @@ Worker vars：
 - `GITHUB_PR_SCAN_LIMIT`
 - `GITHUB_AUTONOMY_LABEL`（默认 `bot:ready`）
 - `GITHUB_ISSUE_SCAN_LIMIT`
-- `GITHUB_ISSUE_INTAKE_ENABLED`（仓库中默认 `false`）
+- `GITHUB_ISSUE_INTAKE_ENABLED`（生产环境显式为 `true`）
 - `GITHUB_ISSUE_COOLDOWN_SECONDS`（默认 3600）
 
 上线前需先执行 `schema/d1.sql`，再配置 secrets，最后才把 Issue intake 开关改为 `true`。推送 `main` 会自动发布，发布后不要再次手动部署。

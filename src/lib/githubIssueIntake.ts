@@ -2,7 +2,7 @@ import type { Env } from '../index';
 
 type IssueIntakeEnv = Pick<
 	Env,
-	'DB' | 'GITHUB_REPOSITORY' | 'GITHUB_ISSUE_TOKEN' | 'GITHUB_ISSUE_INTAKE_ENABLED' | 'GITHUB_ISSUE_COOLDOWN_SECONDS'
+	'DB' | 'GITHUB_REPOSITORY' | 'GITHUB_TOKEN' | 'GITHUB_ISSUE_TOKEN' | 'GITHUB_ISSUE_INTAKE_ENABLED' | 'GITHUB_ISSUE_COOLDOWN_SECONDS'
 >;
 
 export type IssueSubmissionResult =
@@ -92,7 +92,8 @@ export async function submitFeatureRequestAsIssue(
 	if (!env.GITHUB_REPOSITORY || !repositoryIsValid(env.GITHUB_REPOSITORY)) {
 		return { status: 'skipped', reason: 'GitHub repository is not configured' };
 	}
-	if (!env.GITHUB_ISSUE_TOKEN) return { status: 'skipped', reason: 'GitHub issue token is not configured' };
+	const issueToken = env.GITHUB_ISSUE_TOKEN || env.GITHUB_TOKEN;
+	if (!issueToken) return { status: 'skipped', reason: 'GitHub issue token is not configured' };
 	const body = input.body.trim();
 	if (!isMeaningfulFeatureRequest(body)) return { status: 'error', reason: 'Request is too short, too long, or not meaningful' };
 
@@ -141,7 +142,7 @@ export async function submitFeatureRequestAsIssue(
 			signal: AbortSignal.timeout(10_000),
 			headers: {
 				Accept: 'application/vnd.github+json',
-				Authorization: `Bearer ${env.GITHUB_ISSUE_TOKEN}`,
+				Authorization: `Bearer ${issueToken}`,
 				'Content-Type': 'application/json',
 				'User-Agent': 'dicebot-issue-intake',
 				'X-GitHub-Api-Version': '2022-11-28',

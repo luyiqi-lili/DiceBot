@@ -70,7 +70,7 @@ Plain vars in `wrangler.jsonc`:
 - `GITHUB_PR_SCAN_LIMIT`: PR file-list reads per scan, default 20 and capped at 50.
 - `GITHUB_AUTONOMY_LABEL`: issues eligible for autonomous consideration, default `bot:ready`.
 - `GITHUB_ISSUE_SCAN_LIMIT`: ready-issue reads per scan, default 100 and capped at 500.
-- `GITHUB_ISSUE_INTAKE_ENABLED`: fail-closed public issue write switch; committed default is `false`.
+- `GITHUB_ISSUE_INTAKE_ENABLED`: fail-closed public issue write switch; production is explicitly set to `true`.
 - `GITHUB_ISSUE_COOLDOWN_SECONDS`: per Telegram user/chat issue submission cooldown.
 
 Secrets expected by code or scripts:
@@ -80,21 +80,21 @@ Secrets expected by code or scripts:
 - `DONATION_INTAKE_KEY`: dedicated bearer token for `/api/donations/api-keys`; it grants no access to other admin APIs.
 - `DONATION_ADMIN_KEY`: separate bearer token for credential metadata, validation, disable, and revoke.
 - `DONATION_ENCRYPTION_KEY`: base64 representation of a random 32-byte AES master key.
-- `GITHUB_TOKEN`: optional read-only token; public repositories can be scanned anonymously at a lower rate limit.
-- `GITHUB_ISSUE_TOKEN`: repository-scoped Issues write token used only by `/wish` and `/issue`.
+- `GITHUB_TOKEN`: GitHub API token used for authenticated scans and, when intake is enabled without a dedicated token, Issue creation. It must have repository Issues write permission for that fallback.
+- `GITHUB_ISSUE_TOKEN`: optional repository-scoped Issues write token used only by `/wish` and `/issue`. If absent, an explicitly enabled intake reuses `GITHUB_TOKEN` instead of copying the same credential into another Worker secret.
 
 Regular `/api/*` routes reject access when `EXTERNAL_API_KEY` is absent. Donation intake is unavailable when its secrets or D1 are absent. Apply `schema/d1.sql`, then configure donation secrets with `wrangler secret put --env prod`; never commit them to `wrangler.jsonc`.
 
 Current secret placement (names only, never values):
 
-- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ADMIN_KEY`, `DONATION_ENCRYPTION_KEY`, `GITHUB_TOKEN`, and `GITHUB_ISSUE_TOKEN`. Local `.env` `GH_TOKEN` maps to runtime `GITHUB_TOKEN`; do not reuse it as the issue-write token unless its scope was intentionally designed for both.
+- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ADMIN_KEY`, `DONATION_ENCRYPTION_KEY`, and `GITHUB_TOKEN`. A dedicated `GITHUB_ISSUE_TOKEN` is supported but is not currently configured. Local `.env` `GH_TOKEN` maps to runtime `GITHUB_TOKEN`.
 - GitHub Actions: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BOT_TOKEN`, `TOKEN`, and `DEV_BOT_TOKEN`.
 - Local `.env`: development/operations credentials; local `BOT_TOKEN` maps to Worker `TOKEN`.
-- Cross-platform rule: keep the GitHub token in Cloudflare for Worker-to-GitHub calls, and keep the Cloudflare account/token in GitHub Actions for CI deployment. Never reverse these destinations or commit either token. Prefer a repository-scoped read-only GitHub token for the Worker.
+- Cross-platform rule: keep the GitHub token in Cloudflare for Worker-to-GitHub calls, and keep the Cloudflare account/token in GitHub Actions for CI deployment. Never reverse these destinations or commit either token. Grant only the repository permissions required by enabled Worker features.
 
 External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
-Apply `schema/d1.sql` and configure both dedicated write/admin tokens before changing `GITHUB_ISSUE_INTAKE_ENABLED` to `true`. The committed configuration deliberately keeps this write path disabled.
+Apply `schema/d1.sql` and ensure `GITHUB_TOKEN` has Issues write permission before enabling intake. A narrower `GITHUB_ISSUE_TOKEN` remains preferred when one is available.
 
 ## Deployment Notification
 
