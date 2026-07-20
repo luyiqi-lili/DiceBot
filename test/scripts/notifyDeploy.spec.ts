@@ -14,7 +14,12 @@ describe('notify-deploy.sh', () => {
 	});
 
 	it('allows the deploy notification target to be configured from the environment', () => {
-		expect(script).toContain('CHAT_ID="${CHAT_ID:--1002970430696}"');
-		expect(script).toContain('TOPIC_ID="${TOPIC_ID:-89}"');
+		expect(script).toContain('CHAT_ID="${CHAT_ID:-8080375150}"');
+		expect(script).toContain('TOPIC_ID="${TOPIC_ID:-}"');
+	});
+
+	it('omits message_thread_id for private deployment notifications', () => {
+		expect(script).toContain('if [ -n "$TOPIC_ID" ]');
+		expect(script).toContain("'{chat_id: $chat_id, text: $text, parse_mode: $parse_mode}'");
 	});
 });

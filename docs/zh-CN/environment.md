@@ -88,7 +88,7 @@ AI 审批只有在开关、D1、GitHub Issues 写权限、DeepSeek 充值余额�
 
 ## 部署通知
 
-`scripts/notify-deploy.sh` 会发送 Telegram 部署通知。当前脚本包含字面量通知配置，应迁移到环境变量或 secrets。
+`scripts/notify-deploy.sh` 会发送 Telegram 部署通知。生产工作流默认私聊管理员 `8080375150`，开发环境继续发送到开发群话题；可通过 `CHAT_ID` 和可选的 `TOPIC_ID` 覆盖目标。Bot token 必须来自 GitHub Secrets，不能写入仓库。
 
 ## Webhook 设置
 

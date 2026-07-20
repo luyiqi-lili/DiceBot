@@ -160,7 +160,7 @@ Configured environments:
 Scripts:
 
 - `npm run deploy` runs `wrangler deploy`.
-- `scripts/notify-deploy.sh` sends deployment notifications, but currently contains literal Telegram notification configuration and should be moved to secrets before being treated as safe.
+- `scripts/notify-deploy.sh` sends deployment notifications to a configurable target. Production defaults to administrator `8080375150` as a private chat; development retains its group topic. Bot tokens stay in GitHub Secrets.
 
 ## Documentation Index
 

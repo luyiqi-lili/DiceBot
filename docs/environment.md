@@ -104,7 +104,7 @@ AI triage fails closed unless its switch, D1, GitHub Issues write permission, a 
 
 ## Deployment Notification
 
-`scripts/notify-deploy.sh` sends a Telegram deploy notification. It currently contains literal notification bot configuration and should be converted to environment variables/secrets before broader use.
+`scripts/notify-deploy.sh` sends Telegram deploy notifications. Production defaults to a private message to administrator `8080375150`, while development keeps its group topic target. `CHAT_ID` and optional `TOPIC_ID` can override the destination; the bot token must remain in GitHub Secrets.
 
 ## Webhook Setup
 

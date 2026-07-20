@@ -78,8 +78,10 @@ jobs:
             export BOT_TOKEN CHAT_ID TOPIC_ID
           else
             BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-}}"
+            CHAT_ID="8080375150"
+            TOPIC_ID=""
             unset DEV_BOT_TOKEN
-            export BOT_TOKEN
+            export BOT_TOKEN CHAT_ID TOPIC_ID
           fi
           if [ -z "${BOT_TOKEN:-}" ]; then
             echo "跳过 Telegram 部署通知：BOT_TOKEN/TOKEN secret 未配置。"

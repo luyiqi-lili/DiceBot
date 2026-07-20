@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/notify-deploy.sh
-# 部署完成后向 Telegram 群组发送提交消息通知
+# 部署完成后向配置的 Telegram 用户或群组发送提交消息通知
 #
 # 用法: ./scripts/notify-deploy.sh <env> <commit_sha> <commit_msg>
 #   env: prod | dev
@@ -24,8 +24,8 @@ COMMIT_MSG="${3:-}"
 # Telegram 配置
 BOT_TOKEN="${BOT_TOKEN:-${TOKEN:-${DEV_BOT_TOKEN:-}}}"
 : "${BOT_TOKEN:?BOT_TOKEN, TOKEN, or DEV_BOT_TOKEN is required}"
-CHAT_ID="${CHAT_ID:--1002970430696}"
-TOPIC_ID="${TOPIC_ID:-89}"
+CHAT_ID="${CHAT_ID:-8080375150}"
+TOPIC_ID="${TOPIC_ID:-}"
 
 # CI 环境中自动获取 git 信息
 if [ -n "${GITHUB_SHA:-}" ]; then
@@ -60,15 +60,26 @@ ${ENV_EMOJI} <b>DiceBot 已部署</b> — ${ENV_LABEL}
 EOF
 )
 
-# 发送消息
-TG_RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-    -H "Content-Type: application/json" \
-    -d "$(jq -n \
+# 私聊不能携带 message_thread_id；仅群组话题显式配置 TOPIC_ID 时添加。
+if [ -n "$TOPIC_ID" ]; then
+    PAYLOAD=$(jq -n \
         --arg chat_id "$CHAT_ID" \
         --arg text "$TEXT" \
         --argjson message_thread_id "$TOPIC_ID" \
         --arg parse_mode "HTML" \
-        '{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id, parse_mode: $parse_mode}')")
+        '{chat_id: $chat_id, text: $text, message_thread_id: $message_thread_id, parse_mode: $parse_mode}')
+else
+    PAYLOAD=$(jq -n \
+        --arg chat_id "$CHAT_ID" \
+        --arg text "$TEXT" \
+        --arg parse_mode "HTML" \
+        '{chat_id: $chat_id, text: $text, parse_mode: $parse_mode}')
+fi
+
+# 发送消息
+TG_RESPONSE=$(curl -sS -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    -d "$PAYLOAD")
 
 if ! jq -e '.ok == true' >/dev/null <<<"$TG_RESPONSE"; then
     DESCRIPTION=$(jq -r '.description // "unknown error"' <<<"$TG_RESPONSE")
