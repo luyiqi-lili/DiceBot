@@ -67,10 +67,10 @@ dev 和 prod 分别定义 Durable Object migrations。
 
 当前 secret 放置（只记录名称，不记录值）：
 
-- Cloudflare Worker：`TOKEN`、`EXTERNAL_API_KEY`、`DONATION_INTAKE_KEY`、`DONATION_ENCRYPTION_KEY` 和现有模型 provider keys。
+- Cloudflare Worker：`TOKEN`、`EXTERNAL_API_KEY`、`DONATION_INTAKE_KEY`、`DONATION_ENCRYPTION_KEY`、`GITHUB_TOKEN` 和现有模型 provider keys。本地 `.env` 的 `GH_TOKEN` 写入 Cloudflare 时映射为运行时代码使用的 `GITHUB_TOKEN`。
 - GitHub Actions：`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_API_TOKEN`、`BOT_TOKEN`、`TOKEN`、`DEV_BOT_TOKEN`。
 - 本地 `.env`：保留开发/运维需要的凭据；`BOT_TOKEN` 映射到 Worker 的 `TOKEN`。
-- 高权限个人 `GH_TOKEN` 只保留本地，不复制到 Cloudflare 或 GitHub Actions。
+- 跨平台规则：GitHub token 放 Cloudflare，供 Worker 调用 GitHub；Cloudflare account/token 放 GitHub Actions，供 CI 发布。不要把两者目标放反，也不要提交到仓库。用于 Worker 的 GitHub token 应尽量采用仅仓库只读权限。
 
 `EXTERNAL_API_KEY` 有外部调用方依赖，不能未经迁移窗口直接轮换。
 

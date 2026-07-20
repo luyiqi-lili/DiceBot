@@ -83,10 +83,10 @@ Regular `/api/*` routes reject access when `EXTERNAL_API_KEY` is absent. Donatio
 
 Current secret placement (names only, never values):
 
-- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ENCRYPTION_KEY`, and existing model-provider keys.
+- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ENCRYPTION_KEY`, `GITHUB_TOKEN`, and existing model-provider keys. Local `.env` `GH_TOKEN` maps to the runtime binding `GITHUB_TOKEN` when uploaded to Cloudflare.
 - GitHub Actions: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BOT_TOKEN`, `TOKEN`, and `DEV_BOT_TOKEN`.
 - Local `.env`: development/operations credentials; local `BOT_TOKEN` maps to Worker `TOKEN`.
-- The high-privilege personal `GH_TOKEN` remains local and is not copied to Cloudflare or GitHub Actions.
+- Cross-platform rule: keep the GitHub token in Cloudflare for Worker-to-GitHub calls, and keep the Cloudflare account/token in GitHub Actions for CI deployment. Never reverse these destinations or commit either token. Prefer a repository-scoped read-only GitHub token for the Worker.
 
 External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
