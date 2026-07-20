@@ -72,6 +72,9 @@ Plain vars in `wrangler.jsonc`:
 - `GITHUB_ISSUE_SCAN_LIMIT`: ready-issue reads per scan, default 100 and capped at 500.
 - `GITHUB_ISSUE_INTAKE_ENABLED`: fail-closed public issue write switch; production is explicitly set to `true`.
 - `GITHUB_ISSUE_COOLDOWN_SECONDS`: per Telegram user/chat issue submission cooldown.
+- `GITHUB_AI_TRIAGE_ENABLED`: fail-closed paid-premium Issue approval switch; production is explicitly `true`.
+- `GITHUB_AI_TRIAGE_SCAN_LIMIT`: maximum unready Issues inspected per hourly run; production is 50.
+- `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`: minimum low-risk premium-model confidence required before adding `bot:ready`; production is 0.85.
 
 Secrets expected by code or scripts:
 
@@ -80,6 +83,7 @@ Secrets expected by code or scripts:
 - `DONATION_INTAKE_KEY`: dedicated bearer token for `/api/donations/api-keys`; it grants no access to other admin APIs.
 - `DONATION_ADMIN_KEY`: separate bearer token for credential metadata, validation, disable, and revoke.
 - `DONATION_ENCRYPTION_KEY`: base64 representation of a random 32-byte AES master key.
+- `DEEPSEEK_API_KEY`: optional Worker-owned DeepSeek credential. Automatic approval still requires the official balance API to confirm positive topped-up balance.
 - `GITHUB_TOKEN`: GitHub API token used for authenticated scans and, when intake is enabled without a dedicated token, Issue creation. It must have repository Issues write permission for that fallback.
 - `GITHUB_ISSUE_TOKEN`: optional repository-scoped Issues write token used only by `/wish` and `/issue`. If absent, an explicitly enabled intake reuses `GITHUB_TOKEN` instead of copying the same credential into another Worker secret.
 
@@ -87,7 +91,7 @@ Regular `/api/*` routes reject access when `EXTERNAL_API_KEY` is absent. Donatio
 
 Current secret placement (names only, never values):
 
-- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ADMIN_KEY`, `DONATION_ENCRYPTION_KEY`, and `GITHUB_TOKEN`. A dedicated `GITHUB_ISSUE_TOKEN` is supported but is not currently configured. Local `.env` `GH_TOKEN` maps to runtime `GITHUB_TOKEN`.
+- Cloudflare Worker: `TOKEN`, `EXTERNAL_API_KEY`, `DONATION_INTAKE_KEY`, `DONATION_ENCRYPTION_KEY`, `DEEPSEEK_API_KEY`, and `GITHUB_TOKEN`. `DONATION_ADMIN_KEY` and a dedicated `GITHUB_ISSUE_TOKEN` are supported but are not currently configured. Local `.env` `GH_TOKEN` maps to runtime `GITHUB_TOKEN`.
 - GitHub Actions: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `BOT_TOKEN`, `TOKEN`, and `DEV_BOT_TOKEN`.
 - Local `.env`: development/operations credentials; local `BOT_TOKEN` maps to Worker `TOKEN`.
 - Cross-platform rule: keep the GitHub token in Cloudflare for Worker-to-GitHub calls, and keep the Cloudflare account/token in GitHub Actions for CI deployment. Never reverse these destinations or commit either token. Grant only the repository permissions required by enabled Worker features.
@@ -95,6 +99,8 @@ Current secret placement (names only, never values):
 External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
 Apply `schema/d1.sql` and ensure `GITHUB_TOKEN` has Issues write permission before enabling intake. A narrower `GITHUB_ISSUE_TOKEN` remains preferred when one is available.
+
+AI triage fails closed unless its switch, D1, GitHub Issues write permission, a paid-balance DeepSeek credential, and a valid high-confidence `deepseek-v4-pro` response are all present. Gemini and other free-only pools never add `bot:ready`.
 
 ## Deployment Notification
 

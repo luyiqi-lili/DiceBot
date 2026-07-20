@@ -12,7 +12,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` independently starts `runCoinCheck(env)` and `runSelfEvolutionReview(env)`. The latter scans PRs, ranks ready issues, and performs at most one consented credential health check.
+`scheduled()` independently starts `runCoinCheck(env)` and `runSelfEvolutionReview(env)`. The latter scans PRs, triages at most one unready Issue through a paid-premium gate, ranks ready issues, and performs at most one consented credential health check.
 
 `fetch()` handles web pages, external APIs, Telegram webhook updates, and health checks.
 
@@ -122,4 +122,4 @@ Top-level web routes:
 
 ## Scheduled Work
 
-Production `wrangler.jsonc` schedules `59 * * * *`. The self-evolution review stores PR and `bot:ready` Issue snapshots, gives suitable community PRs priority, and records one read-only Issue candidate when appropriate. It never edits source, comments, approves, or merges. A consented shared Gemini credential may be checked with the read-only model-list endpoint. See the [self-evolution roadmap](self-evolution-roadmap.md).
+Production `wrangler.jsonc` schedules `59 * * * *`. Before candidate selection, the review statically filters unready Issues and may add `bot:ready` to at most one. That write is allowed only when DeepSeek reports `is_available=true` with positive topped-up (not granted/free) balance and `deepseek-v4-pro` returns a low-risk decision at or above the configured confidence threshold. Free-only pools never approve. Each decision is stored in `ai_issue_triage_runs`; unchanged rejected Issues are not repeatedly billed. The Worker still does not edit source, comment, create branches, approve PRs, or merge. See the [self-evolution roadmap](self-evolution-roadmap.md).

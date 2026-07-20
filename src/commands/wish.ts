@@ -18,7 +18,7 @@ export async function handleWish(parsedMessage: ParsedUpdate, env: Env): Promise
 
 	let text: string;
 	if (result.status === 'created') {
-		text = `✅ 已创建公开源码需求 <a href="${escapeHtml(result.url)}">#${result.number}</a>。维护者确认并添加 <code>bot:ready</code> 后，机器人会把它纳入自主改进候选。`;
+		text = `✅ 已创建公开源码需求 <a href="${escapeHtml(result.url)}">#${result.number}</a>。付费高级模型的定时 AI 审核或维护者添加 <code>bot:ready</code> 后，机器人会把它纳入自主改进候选。`;
 	} else if (result.status === 'duplicate') {
 		text = `ℹ️ 相同需求近期已经提交：<a href="${escapeHtml(result.url)}">#${result.number}</a>。`;
 	} else if (result.retryAfterSeconds) {

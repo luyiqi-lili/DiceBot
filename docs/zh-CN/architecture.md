@@ -12,7 +12,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` 独立启动 `runCoinCheck(env)` 与 `runSelfEvolutionReview(env)`；后者扫描 PR、选择 ready Issue，并至多检查一个已授权共享凭据的健康状态。
+`scheduled()` 独立启动 `runCoinCheck(env)` 与 `runSelfEvolutionReview(env)`；后者扫描 PR、通过付费高级模型门禁审核至多一个未 ready Issue、选择 ready Issue，并至多检查一个已授权共享凭据的健康状态。
 
 `fetch()` 处理 Web 页面、外部 API、Telegram webhook update 和健康检查。
 
@@ -95,4 +95,4 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`。自进化审视会保存 PR 与 `bot:ready` Issue 快照，优先合适的社区 PR，并在适合时记录一个只读 Issue 候选；不会修改源码、评论、批准或合并。已明确授权共享的 Gemini 凭据可通过只读模型列表做健康检查。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。只有 DeepSeek 返回 `is_available=true`、充值余额（不含赠送/免费余额）大于零，且 `deepseek-v4-pro` 给出达到配置置信度的低风险结论时才允许该写入；只有免费 API 时不会批准。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复消耗模型。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。

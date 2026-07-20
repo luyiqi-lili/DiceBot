@@ -51,9 +51,11 @@ prod 和 dev 都有名为 `DB` 的 D1 绑定，分别指向 `dicebot-db` 与 `di
 - 好感度：`affections`、`rose_sends`。
 - 使用与备份：调用统计、用户活跃、消息历史、活动和汇报相关表。
 - 规则：`src/commands/rule.ts` 使用的群规则表。
-- 自进化：`api_key_donations` 保存 AES-GCM 密文和不可逆指纹；`api_credential_profiles` 保存规范化平台、用途授权、健康状态和非敏感模型 ID。PR/Issue 快照、Telegram 到 Issue 的私有映射与候选运行分别使用 `pull_request_snapshots`、`pr_monitor_runs`、`github_issue_submissions`、`github_issue_snapshots`、`evolution_selection_runs`。
+- 自进化：`api_key_donations` 保存 AES-GCM 密文和不可逆指纹；`api_credential_profiles` 保存规范化平台、用途授权、健康状态和非敏感模型 ID。PR/Issue 快照、Telegram 到 Issue 的私有映射、候选运行与付费高级模型标签审计分别使用 `pull_request_snapshots`、`pr_monitor_runs`、`github_issue_submissions`、`github_issue_snapshots`、`evolution_selection_runs`、`ai_issue_triage_runs`。
 
 `api_key_donations.encrypted_key` 不能通过 HTTP API 读回。路由只能考虑 `active` 且 profile 为 `shared_inference + healthy` 的记录；接收时默认 `validation_only`。
+
+`ai_issue_triage_runs` 只保存平台/模型、凭据来源、是否验证到付费余额、置信度、判断理由和 Issue 版本，不保存 API key 或精确余额。
 
 仓库目前没有单一完整 D1 migration 文件，schema 信息分散在文档和命令/库模块 SQL 中。
 

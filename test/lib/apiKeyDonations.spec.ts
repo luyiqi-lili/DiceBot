@@ -176,6 +176,47 @@ describe('API key donations', () => {
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});
 
+	it('validates a donated DeepSeek credential with the official paid-balance signal', async () => {
+		const calls: Array<{ sql: string; values: unknown[] }> = [];
+		let stored: any = null;
+		const db = {
+			prepare(sql: string) {
+				return {
+					run: async () => ({ success: true }),
+					bind(...values: unknown[]) {
+						calls.push({ sql, values });
+						if (sql.includes('INSERT INTO api_key_donations')) {
+							stored = { id: values[0], provider: values[1], encrypted_key: values[3], encryption_iv: values[4], status: 'pending' };
+						}
+						return {
+							run: async () => ({ success: true }),
+							first: async () => sql.includes('SELECT id, provider, encrypted_key') ? stored : null,
+						};
+					},
+				};
+			},
+		} as any;
+		const donation = await handleApiKeyDonation(request({
+			provider: 'deepseek', apiKey: 'sk-deepseek-donated-secret', usagePolicy: 'shared_inference',
+		}), { DB: db, DONATION_INTAKE_KEY: 'intake-secret', DONATION_ENCRYPTION_KEY: encryptionKey });
+		const { id } = await donation.json<any>();
+		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			is_available: true,
+			balance_infos: [{ currency: 'USD', total_balance: '3', granted_balance: '0', topped_up_balance: '3' }],
+		}), { status: 200 }));
+		const result = await validateCredentialDonation({ DB: db, DONATION_ENCRYPTION_KEY: encryptionKey }, id, { fetchFn });
+
+		expect(result).toEqual({
+			status: 'ok',
+			provider: 'deepseek',
+			models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+			paidBalanceAvailable: true,
+		});
+		expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-deepseek-donated-secret');
+		expect(JSON.stringify(result)).not.toContain('sk-deepseek-donated-secret');
+		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
+	});
+
 	it('keeps intake and administration credentials separate and cannot restore erased ciphertext', async () => {
 		const db = {
 			prepare(sql: string) {

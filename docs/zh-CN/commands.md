@@ -24,7 +24,7 @@ English source: [../commands.md](../commands.md)
 | `/fate` | `handleFate` | 塔罗式抽 3 张牌 |
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
-| `/wish <需求>`、`/issue <需求>` | `handleWish` | 仅在默认关闭的 intake 开关与专用 GitHub 写 token 配好后创建公开 Issue |
+| `/wish <需求>`、`/issue <需求>` | `handleWish` | intake 已开启且 GitHub token 具备 Issues 写权限时创建公开 Issue |
 
 ## 权限控制
 

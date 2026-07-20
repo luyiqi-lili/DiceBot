@@ -7,6 +7,7 @@ import {
 	routableGeminiModels,
 	type CredentialUsagePolicy,
 } from './aiProviderRegistry';
+import { DEEPSEEK_PREMIUM_MODELS, checkDeepSeekPaidBalance } from './deepseekPremium';
 
 type DonationEnv = Pick<
 	Env,
@@ -90,6 +91,15 @@ async function decryptApiKey(record: Pick<DonationRecord, 'encrypted_key' | 'enc
 	const key = await crypto.subtle.importKey('raw', masterKey, { name: 'AES-GCM' }, false, ['decrypt']);
 	const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
 	return new TextDecoder().decode(decrypted);
+}
+
+export async function decryptDonationCredentialForRuntime(
+	env: Pick<Env, 'DONATION_ENCRYPTION_KEY'>,
+	record: Pick<DonationRecord, 'encrypted_key' | 'encryption_iv'>,
+): Promise<string> {
+	const masterKey = masterKeyFromEnv(env);
+	if (!masterKey) throw new Error('Donation encryption is not configured correctly');
+	return decryptApiKey(record, masterKey);
 }
 
 export async function ensureCredentialProfileTable(db: D1Database): Promise<void> {
@@ -240,7 +250,13 @@ export async function validateCredentialDonation(
 	env: DonationEnv,
 	donationId: string,
 	options: { fetchFn?: typeof fetch } = {},
-): Promise<{ status: 'ok' | 'skipped' | 'error'; provider?: string; models?: string[]; reason?: string }> {
+): Promise<{
+	status: 'ok' | 'skipped' | 'error';
+	provider?: string;
+	models?: string[];
+	paidBalanceAvailable?: boolean;
+	reason?: string;
+}> {
 	if (!env.DB) return { status: 'skipped', reason: 'D1 is not configured' };
 	const masterKey = masterKeyFromEnv(env);
 	if (!masterKey) return { status: 'skipped', reason: 'Donation encryption is not configured correctly' };
@@ -260,34 +276,67 @@ export async function validateCredentialDonation(
 
 	try {
 		const apiKey = await decryptApiKey(record, masterKey);
-		const response = await (options.fetchFn ?? fetch)(
-			'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
-			{
-				method: 'GET',
-				signal: AbortSignal.timeout(10_000),
-				headers: {
-					Accept: 'application/json',
-					'x-goog-api-key': apiKey,
-					'User-Agent': 'dicebot-credential-validator',
+		if (provider.validation === 'google-models') {
+			const response = await (options.fetchFn ?? fetch)(
+				'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+				{
+					method: 'GET',
+					signal: AbortSignal.timeout(10_000),
+					headers: {
+						Accept: 'application/json',
+						'x-goog-api-key': apiKey,
+						'User-Agent': 'dicebot-credential-validator',
+					},
 				},
-			},
-		);
-		if (response.ok) {
-			const models = routableGeminiModels(await response.json());
-			await updateValidationResult(env.DB, record, { status: 'active', health: 'healthy', models });
-			console.log('[api-key-donations] validation complete', { id: record.id, provider: record.provider, models: models.length });
-			return { status: 'ok', provider: record.provider, models };
+			);
+			if (response.ok) {
+				const models = routableGeminiModels(await response.json());
+				await updateValidationResult(env.DB, record, { status: 'active', health: 'healthy', models });
+				console.log('[api-key-donations] validation complete', { id: record.id, provider: record.provider, models: models.length });
+				return { status: 'ok', provider: record.provider, models };
+			}
+
+			const errorCode = `http_${response.status}`;
+			if ([400, 401, 403].includes(response.status)) {
+				await updateValidationResult(env.DB, record, { status: 'invalid', health: 'error', errorCode });
+			} else if (response.status === 429) {
+				await updateValidationResult(env.DB, record, { status: record.status, health: 'rate_limited', errorCode });
+			} else {
+				await updateValidationResult(env.DB, record, { status: record.status, health: 'error', errorCode });
+			}
+			return { status: 'error', provider: record.provider, reason: errorCode };
 		}
 
-		const errorCode = `http_${response.status}`;
-		if ([400, 401, 403].includes(response.status)) {
-			await updateValidationResult(env.DB, record, { status: 'invalid', health: 'error', errorCode });
-		} else if (response.status === 429) {
-			await updateValidationResult(env.DB, record, { status: record.status, health: 'rate_limited', errorCode });
-		} else {
-			await updateValidationResult(env.DB, record, { status: record.status, health: 'error', errorCode });
+		const balance = await checkDeepSeekPaidBalance(apiKey, options);
+		if (balance.status === 'error') {
+			const invalid = balance.reason === 'balance_http_401' || balance.reason === 'balance_http_403';
+			await updateValidationResult(env.DB, record, {
+				status: invalid ? 'invalid' : record.status,
+				health: 'error',
+				errorCode: balance.reason,
+			});
+			return { status: 'error', provider: record.provider, reason: balance.reason };
 		}
-		return { status: 'error', provider: record.provider, reason: errorCode };
+		const models = [...DEEPSEEK_PREMIUM_MODELS];
+		const errorCode = balance.apiAvailable ? null : 'balance_unavailable';
+		await updateValidationResult(env.DB, record, {
+			status: 'active',
+			health: balance.apiAvailable ? 'healthy' : 'error',
+			models,
+			errorCode,
+		});
+		console.log('[api-key-donations] validation complete', {
+			id: record.id,
+			provider: record.provider,
+			models: models.length,
+			paidBalanceAvailable: balance.paidBalanceAvailable,
+		});
+		return {
+			status: 'ok',
+			provider: record.provider,
+			models,
+			paidBalanceAvailable: balance.paidBalanceAvailable,
+		};
 	} catch (error) {
 		const reason = error instanceof Error ? error.message.slice(0, 160) : 'Credential validation failed';
 		await updateValidationResult(env.DB, record, { status: record.status, health: 'error', errorCode: 'validation_error' });
@@ -299,7 +348,13 @@ export async function validateCredentialDonation(
 export async function refreshOneSharedCredential(
 	env: DonationEnv,
 	options: { fetchFn?: typeof fetch } = {},
-): Promise<{ status: 'ok' | 'skipped' | 'error'; provider?: string; models?: string[]; reason?: string }> {
+): Promise<{
+	status: 'ok' | 'skipped' | 'error';
+	provider?: string;
+	models?: string[];
+	paidBalanceAvailable?: boolean;
+	reason?: string;
+}> {
 	if (!env.DB) return { status: 'skipped', reason: 'D1 is not configured' };
 	await ensureCredentialProfileTable(env.DB);
 	const row = await env.DB.prepare(`

@@ -133,7 +133,7 @@ export async function submitFeatureRequestAsIssue(
 		'',
 		'- 由 DiceBot 的 Telegram `/wish` 命令提交。',
 		'- Telegram 用户身份未公开写入此 Issue。',
-		'- 此 Issue 不会自动进入开发队列；维护者确认后需添加 `bot:ready` 标签。',
+		'- 此 Issue 不会直接进入开发队列；仅当付费高级模型定时审核通过，或维护者确认后，才会添加 `bot:ready` 标签。',
 	].join('\n');
 	let response: Response;
 	try {

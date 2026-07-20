@@ -60,9 +60,11 @@ Major D1 table families:
 - Affection: `affections`, `rose_sends`.
 - Usage and backup: usage count, user activity, message history, and activity/report tables as used by `src/lib/backup.ts`, `src/commands/act.ts`, and `src/commands/report.ts`.
 - Rules: group rule tables used by `src/commands/rule.ts`.
-- Self-evolution: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `api_credential_profiles` stores canonical provider, consent policy, health, and non-secret model ids. PR/Issue snapshots, private Telegram-to-Issue intake mappings, and selection runs use `pull_request_snapshots`, `pr_monitor_runs`, `github_issue_submissions`, `github_issue_snapshots`, and `evolution_selection_runs`.
+- Self-evolution: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `api_credential_profiles` stores canonical provider, consent policy, health, and non-secret model ids. PR/Issue snapshots, private Telegram-to-Issue intake mappings, selection runs, and paid-premium label audits use `pull_request_snapshots`, `pr_monitor_runs`, `github_issue_submissions`, `github_issue_snapshots`, `evolution_selection_runs`, and `ai_issue_triage_runs`.
 
 No HTTP API may return `api_key_donations.encrypted_key`. Routing may only consider `active` credentials whose profile is `shared_inference + healthy`; `validation_only` is the intake default.
+
+`ai_issue_triage_runs` stores only the provider/model, credential source, paid-balance boolean, confidence, decision reason, and Issue version. It never stores the API key or exact provider balance.
 
 The repository does not currently keep a single canonical schema migration file for all D1 tables. Schema knowledge is spread across docs and SQL in command/lib modules.
 

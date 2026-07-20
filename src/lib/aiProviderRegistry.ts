@@ -7,7 +7,7 @@ export interface AiProviderDefinition {
 	displayName: string;
 	aliases: readonly string[];
 	credentialType: 'api_key';
-	validation: 'google-models' | 'not-implemented';
+	validation: 'google-models' | 'deepseek-balance' | 'not-implemented';
 }
 
 export interface FreeModelSeed {
@@ -47,7 +47,7 @@ export const AI_PROVIDERS: readonly AiProviderDefinition[] = [
 		displayName: 'DeepSeek',
 		aliases: ['deepseek'],
 		credentialType: 'api_key',
-		validation: 'not-implemented',
+		validation: 'deepseek-balance',
 	},
 	{
 		id: 'openrouter',

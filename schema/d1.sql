@@ -407,3 +407,23 @@ CREATE TABLE IF NOT EXISTS evolution_selection_runs (
   error_summary TEXT,
   checked_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS ai_issue_triage_runs (
+  id TEXT PRIMARY KEY,
+  repository TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('approved', 'rejected', 'skipped', 'error')),
+  issue_number INTEGER,
+  issue_updated_at TEXT,
+  provider TEXT,
+  model TEXT,
+  credential_source TEXT,
+  donation_id TEXT,
+  paid_balance_verified INTEGER NOT NULL DEFAULT 0,
+  confidence REAL,
+  decision_reason TEXT NOT NULL,
+  error_summary TEXT,
+  checked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_issue_triage_runs_repository
+ON ai_issue_triage_runs (repository, checked_at);
