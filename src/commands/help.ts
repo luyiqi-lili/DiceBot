@@ -69,9 +69,11 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <a href="https://github.com/luyiqi-lili/DiceBot/issues">查看公开 Issues 与处理进度</a>
 
 <b>🔑 安全捐赠 AI Token</b>
- 请勿把 Token 发到群聊、Issue 或普通表单。先向维护者领取独立的捐赠接收凭证，再从自己的设备通过 HTTPS 提交到 <code>POST /api/donations/api-keys</code>。
+ 请勿把 Token 发到群聊、Issue 或普通表单。与机器人单独聊天并发送：
+ <code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
+ 也兼容 <code>/donate_token</code>。机器人必须先删除含 Token 的原消息，才会加密入库；删除失败则拒绝保存。每位用户 24 小时最多捐赠 5 个 Token。
  请求填写 <code>provider</code>、<code>apiKey</code>、<code>usagePolicy</code>，可选 <code>donorLabel</code>；<code>validation_only</code> 只允许验证，<code>shared_inference</code> 才授权机器人用于共享推理。
- 支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整捐赠示例</a>
+ 运维方仍可使用受保护的 <code>POST /api/donations/api-keys</code>。支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整说明</a>
 
 <b>🎫 彩票（管理）</b>
  <code>/lottery now</code> — 开奖
@@ -118,7 +120,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
       ],
       [
         { text: "/wish 提需求", switch_inline_query_current_chat: `/wish ` },
-        { text: "安全捐赠 Token", url: "https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md" }
+        { text: "私聊捐赠 Token", url: "https://t.me/lili_DiceBot" }
       ],
       [
         { text: "/rose", switch_inline_query_current_chat: `/rose` },

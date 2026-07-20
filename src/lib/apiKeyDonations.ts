@@ -228,6 +228,26 @@ export async function handleApiKeyDonation(request: Request, env: DonationEnv): 
 	}
 }
 
+/**
+ * Reuse the authenticated HTTP intake from a trusted Telegram webhook handler.
+ * The bearer credential stays inside the Worker and is never sent over the
+ * network or returned to the caller.
+ */
+export async function handleTrustedApiKeyDonation(
+	payload: { provider: string; apiKey: string; donorLabel?: string; usagePolicy: CredentialUsagePolicy },
+	env: DonationEnv,
+): Promise<Response> {
+	if (!env.DONATION_INTAKE_KEY) return json({ error: 'Donation intake is not configured' }, 503);
+	return handleApiKeyDonation(new Request('https://telegram-intake.internal/api/donations/api-keys', {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${env.DONATION_INTAKE_KEY}`,
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify(payload),
+	}), env);
+}
+
 async function updateValidationResult(
 	db: D1Database,
 	record: DonationRecord,

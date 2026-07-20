@@ -115,6 +115,10 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 	wish:     { module: './commands/wish', handler: 'handleWish', deleteMsg: false },
 	issue:    { module: './commands/wish', handler: 'handleWish', deleteMsg: false },
 
+	/* ── 私聊 API Token 捐赠（handler 负责立即删除含密钥的消息）── */
+	donatetoken: { module: './commands/donateToken', handler: 'handleDonateToken', deleteMsg: false },
+	donate:      { module: './commands/donateToken', handler: 'handleDonateToken', deleteMsg: false },
+
 	/* ── DND GM（不自动删除命令消息）── */
 	dnd:      { module: './commands/dndHelp', handler: 'handleDndHelp' },
 	new:      { module: './commands/dndNew', handler: 'handleDndNew' },

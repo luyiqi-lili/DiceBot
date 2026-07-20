@@ -28,6 +28,15 @@ describe('COMMAND_ROUTES', () => {
 		expect(COMMAND_ROUTES.issue?.handler).toBe('handleWish');
 	});
 
+	it('注册私聊 Token 捐赠命令及下划线兼容路由', () => {
+		expect(COMMAND_ROUTES.donatetoken).toMatchObject({
+			module: './commands/donateToken',
+			handler: 'handleDonateToken',
+			deleteMsg: false,
+		});
+		expect(COMMAND_ROUTES.donate?.handler).toBe('handleDonateToken');
+	});
+
 	it('DND 命令元数据与静态 import switch 保持同步', () => {
 		expect(COMMAND_ROUTES.dnd).toMatchObject({ module: './commands/dndHelp', handler: 'handleDndHelp' });
 		expect(COMMAND_ROUTES.new).toMatchObject({ module: './commands/dndNew', handler: 'handleDndNew' });

@@ -25,6 +25,7 @@ English source: [../commands.md](../commands.md)
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
 | `/wish <需求>`、`/issue <需求>` | `handleWish` | intake 已开启且 GitHub token 具备 Issues 写权限时创建公开 Issue |
+| `/donatetoken <平台> <授权范围> <Token>`、`/donate_token ...` | `handleDonateToken` | 仅限机器人私聊；先删除原消息，再加密接收 AI Token |
 
 ## 权限控制
 

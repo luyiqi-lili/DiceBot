@@ -45,15 +45,17 @@ describe('/help', () => {
 		expect(c.text).toContain('deepseek-v4-pro');
 		expect(c.text).toContain('Gemini 等免费 API');
 		expect(c.text).toContain('安全捐赠 AI Token');
+		expect(c.text).toContain('/donatetoken deepseek shared_inference YOUR_TOKEN');
 		expect(c.text).toContain('POST /api/donations/api-keys');
 		expect(c.text).toContain('shared_inference');
 		expect(c.text).toContain('AES-GCM');
 		expect(c.text).toContain('bot:ready');
+		expect(Array.from(c.text).length).toBeLessThanOrEqual(4096);
 		expect(buttons).toEqual(expect.arrayContaining([
 			expect.objectContaining({ text: '/wish 提需求', switch_inline_query_current_chat: '/wish ' }),
 			expect.objectContaining({
-				text: '安全捐赠 Token',
-				url: 'https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md',
+				text: '私聊捐赠 Token',
+				url: 'https://t.me/lili_DiceBot',
 			}),
 		]));
 	});

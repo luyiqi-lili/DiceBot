@@ -8,6 +8,7 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 - 生产 Cron 每小时只读扫描开放 PR，保存提交 SHA、文件统计和静态风险信号。
 - `POST /api/donations/api-keys` 使用独立 intake bearer token 接收密钥，以 AES-GCM 加密、SHA-256 指纹去重，HTTP API 永不返回密文或明文。
+- Telegram 私聊支持 <code>/donatetoken 平台 授权范围 Token</code>（兼容 <code>/donate_token</code>）。含参数消息必须先删除成功才会调用同一受保护 intake；删除失败、非私聊、配置缺失或超过每用户每天 5 个的限制时均拒绝保存。Telegram 用户 ID 只用于生成不可逆 HMAC 标签，不以明文写入捐赠表。
 - 缺少 D1、GitHub 或加密配置时安全跳过，不影响 Telegram 基础功能。
 
 ## 已实现：阶段 2A 需求 Issue 与候选选择
