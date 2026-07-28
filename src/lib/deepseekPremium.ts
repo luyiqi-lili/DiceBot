@@ -7,6 +7,7 @@ export type DeepSeekBalanceCheck =
 		apiAvailable: boolean;
 		paidBalanceAvailable: boolean;
 		currencies: string[];
+		balances: Array<{ currency: string; totalBalance: number; grantedBalance: number; toppedUpBalance: number }>;
 	}
 	| { status: 'error'; reason: string };
 
@@ -23,7 +24,7 @@ export type PremiumIssueDecision =
 function finiteAmount(value: unknown): number {
 	if (typeof value !== 'string' && typeof value !== 'number') return 0;
 	const parsed = Number(value);
-	return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 export function parseDeepSeekBalance(payload: unknown): Exclude<DeepSeekBalanceCheck, { status: 'error' }> | null {
@@ -31,18 +32,21 @@ export function parseDeepSeekBalance(payload: unknown): Exclude<DeepSeekBalanceC
 	const data = payload as { is_available?: unknown; balance_infos?: unknown };
 	if (typeof data.is_available !== 'boolean' || !Array.isArray(data.balance_infos)) return null;
 	let toppedUpBalance = 0;
-	const currencies = new Set<string>();
+	const balances: Array<{ currency: string; totalBalance: number; grantedBalance: number; toppedUpBalance: number }> = [];
 	for (const item of data.balance_infos) {
 		if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-		const balance = item as { currency?: unknown; topped_up_balance?: unknown };
-		if (typeof balance.currency === 'string' && balance.currency.trim()) currencies.add(balance.currency.trim().slice(0, 12));
-		toppedUpBalance += finiteAmount(balance.topped_up_balance);
+		const balance = item as { currency?: unknown; total_balance?: unknown; granted_balance?: unknown; topped_up_balance?: unknown };
+		const currency = typeof balance.currency === 'string' && balance.currency.trim() ? balance.currency.trim().slice(0, 12) : 'credit';
+		const toppedUp = finiteAmount(balance.topped_up_balance);
+		balances.push({ currency, totalBalance: finiteAmount(balance.total_balance), grantedBalance: finiteAmount(balance.granted_balance), toppedUpBalance: toppedUp });
+		toppedUpBalance += toppedUp;
 	}
 	return {
 		status: 'ok',
 		apiAvailable: data.is_available,
 		paidBalanceAvailable: data.is_available && toppedUpBalance > 0,
-		currencies: Array.from(currencies).sort(),
+		currencies: balances.map((balance) => balance.currency).sort(),
+		balances,
 	};
 }
 

@@ -68,7 +68,8 @@ dev 和 prod 分别定义 Durable Object migrations。
 - `DONATION_ADMIN_KEY`：查看、验证、禁用和撤销捐赠凭据的独立 bearer token。
 - `DONATION_ENCRYPTION_KEY`：32 字节随机 AES 主密钥的 base64 表示。
 - `TON_DONATION_ADDRESS`：`/donate ton` 展示的主网 TON 公共收款地址；缺失或格式无效时安全关闭 TON 捐赠。
-- `DEEPSEEK_API_KEY`：可选的 Worker 自有 DeepSeek 凭据；自动批准仍要求官方余额接口确认充值余额大于零。
+- `GEMINI_API_KEY`：`/trans` 使用的 Google AI Studio key；通过 AI Gateway 的 Google 原生通道转发，仍使用该 Google key 自己的免费额度/计费层。
+- `AI_GATEWAY_TOKEN`：仅有 AI Gateway **Run** 权限的窄权限 token，用于 Gemini 原生提供商调用；不得复用 Cloudflare 部署 token。
 - `GITHUB_TOKEN`：用于鉴权扫描的 GitHub API token；开启 intake 且没有专用 token 时也用于创建 Issue，因此该回退方式要求仓库 Issues 写权限。
 - `GITHUB_ISSUE_TOKEN`：可选、仅供 `/wish`、`/issue` 创建 Issue 的仓库级 Issues 写 token。未配置时，显式开启的入口复用 `GITHUB_TOKEN`，避免把同一高权限凭据复制成第二份 Worker secret。
 
@@ -76,7 +77,7 @@ dev 和 prod 分别定义 Durable Object migrations。
 
 当前 secret 放置（只记录名称，不记录值）：
 
-- Cloudflare Worker：`TOKEN`、`EXTERNAL_API_KEY`、`DONATION_INTAKE_KEY`、`DONATION_ENCRYPTION_KEY`、`DEEPSEEK_API_KEY` 与 `GITHUB_TOKEN`。代码支持 `DONATION_ADMIN_KEY` 和专用 `GITHUB_ISSUE_TOKEN`，但当前生产环境未配置。本地 `.env` 的 `GH_TOKEN` 写入 Cloudflare 时映射为 `GITHUB_TOKEN`。
+- Cloudflare Worker：`TOKEN`、`EXTERNAL_API_KEY`、`DONATION_INTAKE_KEY`、`DONATION_ENCRYPTION_KEY`、`GEMINI_API_KEY`、`AI_GATEWAY_TOKEN` 与 `GITHUB_TOKEN`。代码支持 `DONATION_ADMIN_KEY` 和专用 `GITHUB_ISSUE_TOKEN`，但当前生产环境未配置。本地 `.env` 的 `GH_TOKEN` 写入 Cloudflare 时映射为 `GITHUB_TOKEN`。
 - GitHub Actions：`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_API_TOKEN`、`BOT_TOKEN`、`TOKEN`、`DEV_BOT_TOKEN`。
 - 本地 `.env`：保留开发/运维需要的凭据；`BOT_TOKEN` 映射到 Worker 的 `TOKEN`。
 - 跨平台规则：GitHub token 放 Cloudflare，供 Worker 调用 GitHub；Cloudflare account/token 放 GitHub Actions，供 CI 发布。不要把两者目标放反，也不要提交到仓库；只授予已启用 Worker 功能所需的仓库权限。
@@ -85,7 +86,9 @@ dev 和 prod 分别定义 Durable Object migrations。
 
 先执行 `schema/d1.sql` 并确认 `GITHUB_TOKEN` 具备 Issues 写权限，再开启 intake。有条件时仍应换成权限更窄的 `GITHUB_ISSUE_TOKEN`。
 
-AI 审批只有在开关、D1、GitHub Issues 写权限、DeepSeek 充值余额和高置信度 `deepseek-v4-pro` 响应全部满足时才执行；Gemini 等免费池绝不会添加 `bot:ready`。
+AI 审批只有在开关、D1、Workers AI binding、GitHub Issues 写权限和高置信度低风险响应全部满足时才执行。调用经 AI Gateway 记录，只会添加已有的 `bot:ready` 标签，不会改代码、创建 PR 或合并。
+
+`/quota` 只在私聊中检查当前用户捐赠的凭据。DeepSeek 显示余额；OpenRouter 显示总额度、已用和剩余（需要管理 key）；Gemini、OpenAI、Anthropic 使用模型列表检查可用性。凭据只在请求内存中解密，不会回显或写入日志。
 
 ## 部署通知
 

@@ -77,9 +77,9 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 每小时 Cron 会先静态过滤尚未 ready 的 Issue，排除已指派、锁定、已有 PR 关联、描述不足、被阻止以及鉴权、资金、权限、部署、迁移、安全等受保护主题；每轮最多审核一个合格 Issue。唯一允许的 GitHub 自动写入是添加现有的 `bot:ready` 标签。
 
-当前付费资格只采用 DeepSeek 官方[余额接口](https://api-docs.deepseek.com/api/get-user-balance)返回值：必须同时满足 `is_available=true` 和 `topped_up_balance > 0`。赠送余额与免费 API 不算付费余额，也不会触发批准。之后固定使用官方[模型与价格页](https://api-docs.deepseek.com/quick_start/pricing)列出的付费高级模型 `deepseek-v4-pro` 判断，必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。缺少凭据、余额未知、只有免费池、响应格式错误、模型失败或 GitHub 写入失败时全部默认拒绝。
+当前审核使用 Workers AI 的 `@cf/meta/llama-3.2-3b-instruct`，并通过 AI Gateway 记录请求。必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。缺少 binding、响应格式错误、模型失败或 GitHub 写入失败时全部默认拒绝。可用时该调用消耗 Workers AI 免费额度。
 
-Worker 优先尝试自身的 `DEEPSEEK_API_KEY`，再尝试状态为 `active + shared_inference + healthy` 的捐赠 DeepSeek 凭据。所有结果写入 `ai_issue_triage_runs`，不保存密钥或精确余额；未修改的已拒绝 Issue 不会重复消耗模型，Issue 更新后可再次审核。`GET /api/evolution/candidate` 会返回最新非敏感审核记录。
+所有结果写入 `ai_issue_triage_runs`，不保存提示词或密钥；未修改的已拒绝 Issue 不会重复消耗模型，Issue 更新后可再次审核。`GET /api/evolution/candidate` 会返回最新非敏感审核记录。
 
 ## 尚未实现的高风险阶段
 
@@ -108,7 +108,8 @@ Worker secrets：
 - `DONATION_INTAKE_KEY`：捐赠接收专用 bearer token。
 - `DONATION_ADMIN_KEY`：捐赠验证、查看和撤销专用 bearer token。
 - `DONATION_ENCRYPTION_KEY`：解码后 32 字节的 base64 AES 主密钥。
-- `DEEPSEEK_API_KEY`：可选的 Worker 自有 DeepSeek token；只有官方确认存在充值余额时才能用于自动批准。
+- `GEMINI_API_KEY`：`/trans` 的 Google AI Studio key，通过 AI Gateway 原生提供商调用。
+- `AI_GATEWAY_TOKEN`：仅含 AI Gateway Run 权限的 token，供 Gemini 原生调用使用。
 - `GITHUB_TOKEN`：Worker 鉴权扫描 PR/Issue，并在没有专用 Issue token 时执行写入；本地 `.env` 的 `GH_TOKEN` 同步到此名称。
 - `GITHUB_ISSUE_TOKEN`：可选的专用 Issue 写 token；未配置时显式开启的入口复用现有 `GITHUB_TOKEN`，避免复制秘密。
 

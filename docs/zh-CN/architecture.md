@@ -97,4 +97,4 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。只有 DeepSeek 返回 `is_available=true`、充值余额（不含赠送/免费余额）大于零，且 `deepseek-v4-pro` 给出达到配置置信度的低风险结论时才允许该写入；只有免费 API 时不会批准。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复消耗模型。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。只有 Workers AI 给出达到配置置信度的低风险结论时才允许该写入；请求通过 AI Gateway 记录。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复审核。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。

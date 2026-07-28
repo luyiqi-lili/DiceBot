@@ -51,6 +51,11 @@ export type Env = {
 	DONATION_ENCRYPTION_KEY?: string;
 	TON_DONATION_ADDRESS?: string;
 	DEEPSEEK_API_KEY?: string;
+	/** Workers AI binding; also provides the AI Gateway URL resolver. */
+	AI?: Ai;
+	AI_GATEWAY_ID?: string;
+	AI_GATEWAY_TOKEN?: string;
+	GEMINI_API_KEY?: string;
 	GITHUB_REPOSITORY?: string;
 	GITHUB_TOKEN?: string;
 	GITHUB_PR_SCAN_LIMIT?: string;

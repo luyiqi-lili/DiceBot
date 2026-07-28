@@ -16,6 +16,7 @@ describe('DeepSeek premium balance gate', () => {
 			apiAvailable: true,
 			paidBalanceAvailable: true,
 			currencies: ['USD'],
+			balances: [{ currency: 'USD', totalBalance: 9, grantedBalance: 8, toppedUpBalance: 1 }],
 		});
 	});
 

@@ -4,13 +4,15 @@ Chinese translation: [zh-CN/commands.md](zh-CN/commands.md)
 
 This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/routes.ts` is incomplete, so use this document and `loadCommand()` as the source of truth.
 
-> Chat features no longer depend on the old DeepSeek-compatible API. `/trans`, `/ask`, `/report`, and inline `@bot` AI assist remain removed. `/wish` has been restored with different semantics: it creates a GitHub source request and does not call a chat model.
+`/trans` uses Gemini Flash through AI Gateway. `/ask`, `/report`, and inline `@bot` AI assist remain removed. `/wish` creates a GitHub source request and does not call a chat model.
 
 ## General Commands
 
 | Command | Handler | Notes |
 |---------|---------|-------|
 | `/help` | `handleHelp` | Main help text |
+| `/trans <target language> <text>` | `handleTrans` | Gemini Flash translation through AI Gateway |
+| `/quota` | `handleQuota` | Private chat only; checks the caller's donated API balances or lightweight availability endpoints |
 | `/whoami` | `handleWhoami` | Shows Telegram user/chat details |
 | `/echo` | `handleEcho` | Rolls a die and gives the user's text a static attitude verdict |
 | `/em`, `/me`, `/emote` | `handleEmote` | Action text |

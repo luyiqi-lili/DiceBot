@@ -19,6 +19,9 @@
 			"observability": {
 				"enabled": true
 			},
+			"ai": {
+				"binding": "AI"
+			},
 			"triggers": {
 				"crons": [
 					//		"59 7 1 1 1"
@@ -96,7 +99,8 @@
 				}
 			],
 			"vars": {
-				"BOT_USERNAME": "lili_DevDiceBot"
+				"BOT_USERNAME": "lili_DevDiceBot",
+				"AI_GATEWAY_ID": "default"
 			}
 		},
 		"prod": {
@@ -108,6 +112,9 @@
 			],
 			"observability": {
 				"enabled": true
+			},
+			"ai": {
+				"binding": "AI"
 			},
 			"triggers": {
 				"crons": [
@@ -195,7 +202,8 @@
 				"GITHUB_ISSUE_COOLDOWN_SECONDS": "3600",
 				"GITHUB_AI_TRIAGE_ENABLED": "true",
 				"GITHUB_AI_TRIAGE_SCAN_LIMIT": "50",
-				"GITHUB_AI_TRIAGE_MIN_CONFIDENCE": "0.85"
+				"GITHUB_AI_TRIAGE_MIN_CONFIDENCE": "0.85",
+				"AI_GATEWAY_ID": "default"
 			}
 		}
 	}

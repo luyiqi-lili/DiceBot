@@ -1,6 +1,7 @@
 import type { Env } from '../index';
 import { refreshOneSharedCredential } from './apiKeyDonations';
-import { ensureAiIssueTriageTable, runAiIssueTriage } from './aiIssueTriage';
+import { ensureAiIssueTriageTable } from './aiIssueTriage';
+import { runWorkersAiIssueTriage } from './workersAiIssueTriage';
 import { ensureIssueMonitorTables, scanAutonomyIssues } from './githubIssueMonitor';
 import { scanOpenPullRequests } from './githubPrMonitor';
 
@@ -10,7 +11,7 @@ export async function runSelfEvolutionReview(env: Env) {
 		status: 'error' as const,
 		reason: error instanceof Error ? error.message.slice(0, 200) : 'Credential health check failed',
 	}));
-	const aiTriage = await runAiIssueTriage(env, {
+	const aiTriage = await runWorkersAiIssueTriage(env, {
 		linkedIssueNumbers: pullRequests.linkedIssueNumbers,
 	});
 	const issues = await scanAutonomyIssues(env, {

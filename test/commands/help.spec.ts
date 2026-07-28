@@ -41,9 +41,8 @@ describe('/help', () => {
 
 		expect(c.text).toContain('源码共创与 AI 审核');
 		expect(c.text).toContain('/wish 具体需求');
-		expect(c.text).toContain('DeepSeek 高级 API 存在平台充值余额');
-		expect(c.text).toContain('deepseek-v4-pro');
-		expect(c.text).toContain('Gemini 等免费 API');
+		expect(c.text).toContain('Workers AI 会经 AI Gateway 用免费额度复核');
+		expect(c.text).toContain('/trans 目标语言 文本');
 		expect(c.text).toContain('安全捐赠 AI Token');
 		expect(c.text).toContain('/donatetoken deepseek shared_inference YOUR_TOKEN');
 		expect(c.text).toContain('POST /api/donations/api-keys');
