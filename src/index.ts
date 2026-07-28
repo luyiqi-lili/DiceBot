@@ -19,6 +19,7 @@ import { handleApiCredentialAdmin, handleApiKeyDonation } from './lib/apiKeyDona
 import { handleModelRoutingApi } from './lib/modelRouting';
 import { handleSelfEvolutionApi, runSelfEvolutionReview } from './lib/selfEvolution';
 import { handlePreCheckoutUpdate, handleSuccessfulPaymentUpdate } from './lib/paymentUpdates';
+import { LEGACY_CHAT_ID, scopeKey } from './lib/groupScope';
 
 /**
  * 统一定义的 Env 类型 — 所有 handler 均从此处导入。
@@ -118,11 +119,45 @@ async function handleCoinAPI(request: Request, env: Env, path: string): Promise<
 	const doPath = path.replace('/api/coin', '');
 	const doUrl = new URL(request.url);
 	doUrl.pathname = doPath;
+	const queryChatId = doUrl.searchParams.get('chat_id');
+	doUrl.searchParams.delete('chat_id');
+
+	// External clients historically supplied only a Telegram user ID. Keep those
+	// requests pointed at the group that owns the migrated legacy balances, while
+	// allowing callers to opt into another group with chat_id.
+	const scopeAccountKey = (chatId: string | number, key: string): string => {
+		if (key.includes('||') || /^-?\d+:.+$/.test(key)) return key;
+		return scopeKey(chatId, key);
+	};
+	const defaultChatId = queryChatId || String(LEGACY_CHAT_ID);
+
+	if (doPath === '/get' && request.method === 'GET') {
+		const key = doUrl.searchParams.get('key');
+		if (key) doUrl.searchParams.set('key', scopeAccountKey(defaultChatId, key));
+	}
+
+	let scopedBody: string | undefined;
+	if (request.method === 'POST' && ['/transfer', '/incr', '/put'].includes(doPath)) {
+		try {
+			const data = await request.clone().json() as Record<string, unknown>;
+			const chatId = queryChatId || (typeof data.chat_id === 'string' || typeof data.chat_id === 'number' ? String(data.chat_id) : String(LEGACY_CHAT_ID));
+			delete data.chat_id;
+			if (doPath === '/transfer') {
+				if (typeof data.from === 'string') data.from = scopeAccountKey(chatId, data.from);
+				if (typeof data.to === 'string') data.to = scopeAccountKey(chatId, data.to);
+			} else if (typeof data.key === 'string') {
+				data.key = scopeAccountKey(chatId, data.key);
+			}
+			scopedBody = JSON.stringify(data);
+		} catch {
+			// Preserve the Durable Object's existing invalid-body response.
+		}
+	}
 
 	const doRequest = new Request(doUrl, {
 		method: request.method,
 		headers: request.headers,
-		body: request.body,
+		body: scopedBody ?? request.body,
 	});
 
 	return await stub.fetch(doRequest);

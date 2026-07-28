@@ -52,6 +52,48 @@ describe('DiceBot Worker — 基础请求处理', () => {
 		expect(response.status).toBe(401);
 	});
 
+	it('外部余额查询未提供 chat_id 时使用迁移群组的账户作用域', async () => {
+		let forwardedUrl = '';
+		const coinDo = {
+			idFromName: () => ({}),
+			get: () => ({
+				fetch: async (request: Request) => {
+					forwardedUrl = request.url;
+					return new Response('42');
+				},
+			}),
+		};
+		const request = new IncomingRequest('https://example.com/api/coin/get?key=8080375150', {
+			headers: { 'X-API-Key': 'external-key' },
+		});
+
+		const response = await worker.fetch(request, { ...env, EXTERNAL_API_KEY: 'external-key', COIN_DO: coinDo } as any, createExecutionContext());
+
+		expect(response.status).toBe(200);
+		expect(forwardedUrl).toContain('key=-1002970430696%3A8080375150');
+	});
+
+	it('外部余额查询使用指定 chat_id 的账户作用域', async () => {
+		let forwardedUrl = '';
+		const coinDo = {
+			idFromName: () => ({}),
+			get: () => ({
+				fetch: async (request: Request) => {
+					forwardedUrl = request.url;
+					return new Response('42');
+				},
+			}),
+		};
+		const request = new IncomingRequest('https://example.com/api/coin/get?key=8080375150&chat_id=-100123', {
+			headers: { 'X-API-Key': 'external-key' },
+		});
+
+		await worker.fetch(request, { ...env, EXTERNAL_API_KEY: 'external-key', COIN_DO: coinDo } as any, createExecutionContext());
+
+		expect(forwardedUrl).toContain('key=-100123%3A8080375150');
+		expect(forwardedUrl).not.toContain('chat_id=');
+	});
+
 	it('API key 捐赠入口不接受普通外部 API key 代替专用 bearer token', async () => {
 		const request = new IncomingRequest('https://example.com/api/donations/api-keys', {
 			method: 'POST',
