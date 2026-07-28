@@ -32,6 +32,8 @@ The decision uses Workers AI model `@cf/meta/llama-3.2-3b-instruct` and sends th
 
 Every outcome is recorded in `ai_issue_triage_runs` without storing a prompt or credential. An unchanged rejected Issue is not repeatedly reviewed; editing it makes it eligible for a later review. `GET /api/evolution/candidate` includes the latest non-secret triage audit.
 
+`GET /api/evolution/github-auth`, protected by `EXTERNAL_API_KEY`, is a read-only diagnostic for the Worker-held `GITHUB_TOKEN`. It reads the configured repository metadata and reports only authentication plus read/push/admin capability; it never returns the token or calls a mutating GitHub endpoint.
+
 ## Not Yet Implemented
 
 - Stage 3: isolated checkout, tests, AI review, and draft-PR creation.

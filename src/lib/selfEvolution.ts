@@ -57,3 +57,47 @@ export async function handleSelfEvolutionApi(request: Request, env: Pick<Env, 'D
 	}
 	return json({ run: latest, candidate, aiTriage: latestTriage ?? null });
 }
+
+/**
+ * Read-only production diagnostic for the Worker-held GitHub token. The route
+ * is protected by the outer EXTERNAL_API_KEY check in index.ts and deliberately
+ * never returns the token or invokes a mutating GitHub endpoint.
+ */
+export async function handleGithubTokenHealthApi(
+	request: Request,
+	env: Pick<Env, 'GITHUB_REPOSITORY' | 'GITHUB_TOKEN'>,
+	options: { fetchFn?: typeof fetch } = {},
+): Promise<Response> {
+	if (request.method !== 'GET') return json({ error: 'Method Not Allowed' }, 405);
+	if (!env.GITHUB_TOKEN) return json({ authenticated: false, error: 'GitHub token is not configured' }, 503);
+	if (!env.GITHUB_REPOSITORY || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(env.GITHUB_REPOSITORY)) {
+		return json({ authenticated: false, error: 'GitHub repository is not configured' }, 503);
+	}
+	try {
+		const response = await (options.fetchFn ?? fetch)(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}`, {
+			signal: AbortSignal.timeout(10_000),
+			headers: {
+				Accept: 'application/vnd.github+json',
+				Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+				'User-Agent': 'dicebot-github-token-health',
+				'X-GitHub-Api-Version': '2022-11-28',
+			},
+		});
+		if (!response.ok) return json({ authenticated: false, repositoryAccessible: false, error: `github_http_${response.status}` }, 502);
+		const payload = await response.json() as { permissions?: { pull?: unknown; push?: unknown; admin?: unknown } };
+		const pull = payload.permissions?.pull === true;
+		const push = payload.permissions?.push === true;
+		const admin = payload.permissions?.admin === true;
+		return json({
+			authenticated: true,
+			repository: env.GITHUB_REPOSITORY,
+			repositoryAccessible: true,
+			permissions: { pull, push, admin },
+			canReadPullRequests: pull || push || admin,
+			canMergePullRequests: push || admin,
+			checkedAt: new Date().toISOString(),
+		});
+	} catch {
+		return json({ authenticated: false, repositoryAccessible: false, error: 'github_request_failed' }, 502);
+	}
+}

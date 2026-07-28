@@ -81,6 +81,8 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 所有结果写入 `ai_issue_triage_runs`，不保存提示词或密钥；未修改的已拒绝 Issue 不会重复消耗模型，Issue 更新后可再次审核。`GET /api/evolution/candidate` 会返回最新非敏感审核记录。
 
+`GET /api/evolution/github-auth` 受 `EXTERNAL_API_KEY` 保护，用于只读诊断 Worker 内的 `GITHUB_TOKEN`。它只读取配置仓库的元数据，并返回认证及读/推送/admin 权限状态；不会返回 token，也不会调用会修改 GitHub 状态的接口。
+
 ## 尚未实现的高风险阶段
 
 ### 阶段 3：隔离执行与 AI 审阅
