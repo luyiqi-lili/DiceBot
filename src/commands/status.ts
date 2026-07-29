@@ -21,7 +21,7 @@ export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void
 	const chatId = parsed.chatId ?? parsed.message?.chat?.id;
 	if (!chatId) return;
 
-	const geminiKeyReady = configured(env.GEMINI_API_KEY) || configured(env.GOOGLE_API_KEY);
+	const geminiKeyReady = configured(env.GEMINI_API_KEY) || configured(env.GOOGLE_API_KEY) || configured(env.GOOGLE_API_KEYS);
 	const geminiReady = configured(env.AI) && geminiKeyReady && configured(env.AI_GATEWAY_TOKEN);
 	const text = [
 		'🩺 <b>骰娘运行状态</b>',

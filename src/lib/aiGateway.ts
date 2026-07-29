@@ -2,7 +2,7 @@ import type { Env } from '../index';
 
 export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 
-type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY'>;
+type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY' | 'GOOGLE_API_KEYS'>;
 
 type GeminiGatewayResponse =
 	| { status: 'ok'; text: string }
@@ -27,6 +27,29 @@ function responseText(payload: unknown): string | null {
 	return null;
 }
 
+function configuredKey(value: unknown): string | null {
+	return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function geminiApiKeys(env: GeminiGatewayEnv): string[] {
+	const keys = [configuredKey(env.GEMINI_API_KEY), configuredKey(env.GOOGLE_API_KEY)].filter((key): key is string => Boolean(key));
+	const legacyPool = configuredKey(env.GOOGLE_API_KEYS);
+	if (legacyPool) {
+		try {
+			const parsed = JSON.parse(legacyPool);
+			if (Array.isArray(parsed)) {
+				for (const key of parsed) {
+					const value = configuredKey(key);
+					if (value) keys.push(value);
+				}
+			}
+		} catch {
+			// Legacy pools are expected to be JSON. Ignore malformed values safely.
+		}
+	}
+	return [...new Set(keys)];
+}
+
 /**
  * Calls a Google AI Studio key through the Worker-bound AI Gateway. This keeps
  * Gemini's own free-tier accounting while centralizing logs and controls in
@@ -39,36 +62,44 @@ export async function generateGeminiFlash(
 ): Promise<GeminiGatewayResponse> {
 	// Production predates the GEMINI_API_KEY name. Prefer the explicit new name,
 	// while retaining the existing Google AI Studio secret without exposing it.
-	const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
+	const apiKeys = geminiApiKeys(env);
 	const gatewayToken = env.AI_GATEWAY_TOKEN?.trim();
 	if (!env.AI) return { status: 'skipped', reason: 'workers-ai-binding-not-configured' };
-	if (!apiKey) return { status: 'skipped', reason: 'gemini-api-key-not-configured' };
+	if (!apiKeys.length) return { status: 'skipped', reason: 'gemini-api-key-not-configured' };
 	if (!gatewayToken) return { status: 'skipped', reason: 'ai-gateway-token-not-configured' };
 
 	try {
 		const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
 		const baseUrl = await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any);
-		const response = await (options.fetchFn ?? fetch)(`${baseUrl}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
-			method: 'POST',
-			signal: AbortSignal.timeout(30_000),
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-				'cf-aig-authorization': `Bearer ${gatewayToken}`,
-				'x-goog-api-key': apiKey,
-				'User-Agent': 'dicebot-gemini-gateway',
-			},
-			body: JSON.stringify({
-				contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
-				generationConfig: {
-					temperature: options.temperature ?? 0.2,
-					maxOutputTokens: options.maxOutputTokens ?? 1024,
+		let lastReason = 'gemini_gateway_request_failed';
+		for (const apiKey of apiKeys) {
+			const response = await (options.fetchFn ?? fetch)(`${baseUrl}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
+				method: 'POST',
+				signal: AbortSignal.timeout(30_000),
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+					'cf-aig-authorization': `Bearer ${gatewayToken}`,
+					'x-goog-api-key': apiKey,
+					'User-Agent': 'dicebot-gemini-gateway',
 				},
-			}),
-		});
-		if (!response.ok) return { status: 'error', reason: `gemini_gateway_http_${response.status}` };
-		const text = responseText(await response.json());
-		return text ? { status: 'ok', text } : { status: 'error', reason: 'gemini_gateway_missing_text' };
+				body: JSON.stringify({
+					contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
+					generationConfig: {
+						temperature: options.temperature ?? 0.2,
+						maxOutputTokens: options.maxOutputTokens ?? 1024,
+					},
+				}),
+			});
+			if (!response.ok) {
+				lastReason = `gemini_gateway_http_${response.status}`;
+				continue;
+			}
+			const text = responseText(await response.json());
+			if (text) return { status: 'ok', text };
+			lastReason = 'gemini_gateway_missing_text';
+		}
+		return { status: 'error', reason: lastReason };
 	} catch {
 		return { status: 'error', reason: 'gemini_gateway_request_failed' };
 	}

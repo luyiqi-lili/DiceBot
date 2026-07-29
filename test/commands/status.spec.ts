@@ -42,4 +42,11 @@ describe('/status', () => {
 		expect(reply.text).toContain('Gemini API key：✅ 已配置（兼容旧 Google key）');
 		expect(reply.text).not.toContain('legacy-key');
 	});
+
+	it('recognizes the legacy Google key pool without exposing it', async () => {
+		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {}, GOOGLE_API_KEYS: '["legacy-key"]' } as any);
+		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
+		expect(reply.text).toContain('Gemini API key：✅ 已配置（兼容旧 Google key）');
+		expect(reply.text).not.toContain('legacy-key');
+	});
 });

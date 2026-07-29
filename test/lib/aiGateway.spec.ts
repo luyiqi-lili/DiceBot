@@ -48,4 +48,24 @@ describe('AI Gateway Gemini translation', () => {
 
 		expect(fetchFn.mock.calls[0][1].headers).toMatchObject({ 'x-goog-api-key': 'legacy-google-key' });
 	});
+
+	it('falls back to the legacy JSON Google key pool after a rejected direct key', async () => {
+		const fetchFn = vi.fn()
+			.mockResolvedValueOnce(new Response('forbidden', { status: 403 }))
+			.mockResolvedValueOnce(new Response(JSON.stringify({
+				candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+			}), { status: 200 }));
+		const gateway = vi.fn().mockReturnValue({ getUrl: vi.fn().mockResolvedValue('https://gateway.example/google-ai-studio/') });
+
+		const result = await translateWithGemini({
+			AI: { gateway } as any,
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+			GOOGLE_API_KEY: 'rejected-legacy-key',
+			GOOGLE_API_KEYS: JSON.stringify(['working-pooled-key']),
+		} as any, { targetLanguage: 'English', text: '你好' }, { fetchFn });
+
+		expect(result).toEqual({ status: 'ok', text: 'Hello' });
+		expect(fetchFn).toHaveBeenCalledTimes(2);
+		expect(fetchFn.mock.calls[1][1].headers).toMatchObject({ 'x-goog-api-key': 'working-pooled-key' });
+	});
 });
