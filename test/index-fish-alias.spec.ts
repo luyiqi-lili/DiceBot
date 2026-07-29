@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
 	handleFish: vi.fn(async () => undefined),
 	handleEcho: vi.fn(async () => undefined),
+	handleTrans: vi.fn(async () => undefined),
 	incrementUsageCount: vi.fn(async () => undefined),
 }));
 
@@ -13,6 +14,10 @@ vi.mock('../src/commands/fish', () => ({
 
 vi.mock('../src/commands/echo', () => ({
 	handleEcho: mocks.handleEcho,
+}));
+
+vi.mock('../src/commands/trans', () => ({
+	handleTrans: mocks.handleTrans,
 }));
 
 vi.mock('../src/commands/like', () => ({
@@ -101,6 +106,25 @@ describe('DiceBot Worker — fish command routing', () => {
 				isCommand: true,
 				command: 'echo',
 				args: ['今天很不错'],
+			}),
+			expect.anything(),
+		);
+	});
+
+	it('/trans@Bot 会分发到翻译处理器', async () => {
+		const { response } = await postUpdate(
+			'/trans@lili_DiceBot English',
+			makeEnv({ BOT_USERNAME: 'lili_DiceBot' }),
+		);
+
+		expect(response.status).toBe(200);
+		expect(mocks.handleTrans).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'message',
+				chatId: ALLOWED_CHAT_ID,
+				isCommand: true,
+				command: 'trans',
+				args: ['English'],
 			}),
 			expect.anything(),
 		);
