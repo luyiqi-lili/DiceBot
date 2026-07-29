@@ -52,6 +52,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <code>/news</code> — 查看当日小道消息
  <code>/news YYYYMMDD</code> — 查看指定日期消息
  <code>/check 问题</code> — 查询莉莉当前功能规则
+ <code>/status</code> — 查看机器人、存储和 AI 的配置就绪状态（不显示密钥）
  <code>/echo 内容</code> — 掷骰给你的话一个态度评价
  <code>/like</code> — 查看召唤骰娘次数
  <code>/like all</code> — 查看使用排行榜

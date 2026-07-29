@@ -79,6 +79,7 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 
 	/* ── 帮助 ── */
 	help:     { module: './commands/help', handler: 'handleHelp' },
+	status:   { module: './commands/status', handler: 'handleStatus' },
 	trans:    { module: './commands/trans', handler: 'handleTrans', deleteMsg: false },
 	quota:    { module: './commands/quota', handler: 'handleQuota', deleteMsg: false },
 
