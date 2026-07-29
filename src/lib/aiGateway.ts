@@ -1,6 +1,7 @@
 import type { Env } from '../index';
 
 export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
 type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY' | 'GOOGLE_API_KEYS'>;
 
@@ -105,6 +106,18 @@ export async function generateGeminiFlash(
 					lastReason = 'gemini_gateway_request_failed';
 				}
 			}
+		}
+		try {
+			const output = await env.AI.run(WORKERS_AI_TRANSLATION_MODEL, {
+				prompt,
+				max_tokens: options.maxOutputTokens ?? 1024,
+				temperature: options.temperature ?? 0.2,
+			}) as { response?: unknown };
+			const text = typeof output.response === 'string' ? output.response.trim() : '';
+			if (text) return { status: 'ok', text };
+			lastReason = 'workers_ai_missing_text';
+		} catch {
+			lastReason = 'workers_ai_request_failed';
 		}
 		return { status: 'error', reason: lastReason };
 	} catch {

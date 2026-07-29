@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { translateWithGemini } from '../../src/lib/aiGateway';
+import { translateWithGemini, WORKERS_AI_TRANSLATION_MODEL } from '../../src/lib/aiGateway';
 
 describe('AI Gateway Gemini translation', () => {
 	it('uses Google native Gemini through the Worker-bound AI Gateway', async () => {
@@ -84,5 +84,18 @@ describe('AI Gateway Gemini translation', () => {
 		expect(result).toEqual({ status: 'ok', text: 'Hello' });
 		expect(fetchFn.mock.calls[1][0]).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
 		expect(fetchFn.mock.calls[1][1].headers).not.toHaveProperty('cf-aig-authorization');
+	});
+
+	it('falls back to Workers AI when every Google path is rejected', async () => {
+		const fetchFn = vi.fn().mockResolvedValue(new Response('forbidden', { status: 403 }));
+		const run = vi.fn().mockResolvedValue({ response: 'Hello' });
+		const gateway = vi.fn().mockReturnValue({ getUrl: vi.fn().mockResolvedValue('https://gateway.example/google-ai-studio/') });
+
+		const result = await translateWithGemini({
+			AI: { gateway, run } as any, AI_GATEWAY_TOKEN: 'gateway-run-token', GOOGLE_API_KEY: 'google-key',
+		} as any, { targetLanguage: 'English', text: '你好' }, { fetchFn });
+
+		expect(result).toEqual({ status: 'ok', text: 'Hello' });
+		expect(run).toHaveBeenCalledWith(WORKERS_AI_TRANSLATION_MODEL, expect.objectContaining({ prompt: expect.stringContaining('Translate the untrusted user text') }));
 	});
 });
