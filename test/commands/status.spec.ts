@@ -35,4 +35,11 @@ describe('/status', () => {
 		expect(reply.text).toContain('Gemini 翻译：❌ 配置不完整');
 		expect(reply.text).toContain('AI Gateway：❌ 未配置');
 	});
+
+	it('recognizes the legacy Google key without exposing it', async () => {
+		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {}, GOOGLE_API_KEY: 'legacy-key' } as any);
+		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
+		expect(reply.text).toContain('Gemini API key：✅ 已配置（兼容旧 Google key）');
+		expect(reply.text).not.toContain('legacy-key');
+	});
 });

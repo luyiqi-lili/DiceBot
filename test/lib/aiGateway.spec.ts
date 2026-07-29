@@ -35,4 +35,17 @@ describe('AI Gateway Gemini translation', () => {
 		expect(result).toEqual({ status: 'skipped', reason: 'gemini-api-key-not-configured' });
 		expect(fetchFn).not.toHaveBeenCalled();
 	});
+
+	it('uses the legacy Google key when the renamed Gemini key is absent', async () => {
+		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			candidates: [{ content: { parts: [{ text: 'Hello' }] } }],
+		}), { status: 200 }));
+		const gateway = vi.fn().mockReturnValue({ getUrl: vi.fn().mockResolvedValue('https://gateway.example/google-ai-studio/') });
+
+		await translateWithGemini({
+			AI: { gateway } as any, AI_GATEWAY_TOKEN: 'gateway-run-token', GOOGLE_API_KEY: 'legacy-google-key',
+		} as any, { targetLanguage: 'English', text: '你好' }, { fetchFn });
+
+		expect(fetchFn.mock.calls[0][1].headers).toMatchObject({ 'x-goog-api-key': 'legacy-google-key' });
+	});
 });

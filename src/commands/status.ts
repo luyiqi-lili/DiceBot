@@ -21,7 +21,8 @@ export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void
 	const chatId = parsed.chatId ?? parsed.message?.chat?.id;
 	if (!chatId) return;
 
-	const geminiReady = configured(env.AI) && configured(env.GEMINI_API_KEY) && configured(env.AI_GATEWAY_TOKEN);
+	const geminiKeyReady = configured(env.GEMINI_API_KEY) || configured(env.GOOGLE_API_KEY);
+	const geminiReady = configured(env.AI) && geminiKeyReady && configured(env.AI_GATEWAY_TOKEN);
 	const text = [
 		'🩺 <b>骰娘运行状态</b>',
 		'',
@@ -34,6 +35,7 @@ export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void
 		'<b>AI</b>',
 		`☁️ Workers AI：${mark(Boolean(env.AI))}`,
 		`🚪 AI Gateway：${mark(configured(env.AI_GATEWAY_ID) && configured(env.AI_GATEWAY_TOKEN))}`,
+		`🔑 Gemini API key：${geminiKeyReady ? '✅ 已配置（兼容旧 Google key）' : '❌ 未配置'}`,
 		`🌐 Gemini 翻译：${geminiReady ? '✅ 已就绪' : '❌ 配置不完整'}`,
 		`🧠 DeepSeek 审核密钥：${mark(configured(env.DEEPSEEK_API_KEY))}`,
 		'',

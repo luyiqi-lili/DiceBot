@@ -2,7 +2,7 @@ import type { Env } from '../index';
 
 export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 
-type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY'>;
+type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY'>;
 
 type GeminiGatewayResponse =
 	| { status: 'ok'; text: string }
@@ -37,7 +37,9 @@ export async function generateGeminiFlash(
 	prompt: string,
 	options: { fetchFn?: typeof fetch; maxOutputTokens?: number; temperature?: number } = {},
 ): Promise<GeminiGatewayResponse> {
-	const apiKey = env.GEMINI_API_KEY?.trim();
+	// Production predates the GEMINI_API_KEY name. Prefer the explicit new name,
+	// while retaining the existing Google AI Studio secret without exposing it.
+	const apiKey = env.GEMINI_API_KEY?.trim() || env.GOOGLE_API_KEY?.trim();
 	const gatewayToken = env.AI_GATEWAY_TOKEN?.trim();
 	if (!env.AI) return { status: 'skipped', reason: 'workers-ai-binding-not-configured' };
 	if (!apiKey) return { status: 'skipped', reason: 'gemini-api-key-not-configured' };

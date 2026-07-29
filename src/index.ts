@@ -56,6 +56,8 @@ export type Env = {
 	AI_GATEWAY_ID?: string;
 	AI_GATEWAY_TOKEN?: string;
 	GEMINI_API_KEY?: string;
+	/** Legacy Google AI Studio secret retained by the production Worker. */
+	GOOGLE_API_KEY?: string;
 	GITHUB_REPOSITORY?: string;
 	GITHUB_TOKEN?: string;
 	GITHUB_PR_SCAN_LIMIT?: string;
