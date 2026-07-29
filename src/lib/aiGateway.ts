@@ -1,12 +1,13 @@
 import type { Env } from '../index';
 
 export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+export const DEEPSEEK_TRANSLATION_MODEL = 'deepseek-v4-flash';
 export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
-type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY' | 'GOOGLE_API_KEYS'>;
+type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'DEEPSEEK_API_KEY' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY' | 'GOOGLE_API_KEYS'>;
 
 type GeminiGatewayResponse =
-	| { status: 'ok'; text: string }
+	| { status: 'ok'; text: string; provider: 'gemini-gateway' | 'gemini-direct' | 'deepseek' | 'workers-ai' }
 	| { status: 'skipped' | 'error'; reason: string };
 
 function responseText(payload: unknown): string | null {
@@ -30,6 +31,18 @@ function responseText(payload: unknown): string | null {
 
 function configuredKey(value: unknown): string | null {
 	return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function chatCompletionText(payload: unknown): string | null {
+	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+	const choices = (payload as { choices?: unknown }).choices;
+	if (!Array.isArray(choices)) return null;
+	for (const choice of choices) {
+		if (!choice || typeof choice !== 'object') continue;
+		const content = (choice as { message?: { content?: unknown } }).message?.content;
+		if (typeof content === 'string' && content.trim()) return content.trim();
+	}
+	return null;
 }
 
 function geminiApiKeys(env: GeminiGatewayEnv): string[] {
@@ -64,26 +77,37 @@ export async function generateGeminiFlash(
 	// Production predates the GEMINI_API_KEY name. Prefer the explicit new name,
 	// while retaining the existing Google AI Studio secret without exposing it.
 	const apiKeys = geminiApiKeys(env);
-	const gatewayToken = env.AI_GATEWAY_TOKEN?.trim();
-	if (!env.AI) return { status: 'skipped', reason: 'workers-ai-binding-not-configured' };
-	if (!apiKeys.length) return { status: 'skipped', reason: 'gemini-api-key-not-configured' };
-	if (!gatewayToken) return { status: 'skipped', reason: 'ai-gateway-token-not-configured' };
+	const gatewayToken = configuredKey(env.AI_GATEWAY_TOKEN);
+	const deepSeekKey = configuredKey(env.DEEPSEEK_API_KEY);
+	const fetchFn = options.fetchFn ?? fetch;
+	let lastReason = 'translation-provider-not-configured';
+	let providerConfigured = false;
 
-	try {
-		const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
-		const gatewayBaseUrl = await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any);
-		const baseUrls = [gatewayBaseUrl, 'https://generativelanguage.googleapis.com/'];
-		let lastReason = 'gemini_gateway_request_failed';
+	if (apiKeys.length) {
+		providerConfigured = true;
+		const baseUrls: Array<{ url: string; provider: 'gemini-gateway' | 'gemini-direct' }> = [];
+		if (env.AI && gatewayToken) {
+			try {
+				const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
+				baseUrls.push({
+					url: await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any),
+					provider: 'gemini-gateway',
+				});
+			} catch {
+				lastReason = 'gemini_gateway_url_failed';
+			}
+		}
+		baseUrls.push({ url: 'https://generativelanguage.googleapis.com/', provider: 'gemini-direct' });
 		for (const baseUrl of baseUrls) {
 			for (const apiKey of apiKeys) {
 				try {
-					const response = await (options.fetchFn ?? fetch)(`${baseUrl}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
+					const response = await fetchFn(`${baseUrl.url}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
 						method: 'POST',
 						signal: AbortSignal.timeout(30_000),
 						headers: {
 							Accept: 'application/json',
 							'Content-Type': 'application/json',
-							...(baseUrl === gatewayBaseUrl ? { 'cf-aig-authorization': `Bearer ${gatewayToken}` } : {}),
+							...(baseUrl.provider === 'gemini-gateway' ? { 'cf-aig-authorization': `Bearer ${gatewayToken}` } : {}),
 							'x-goog-api-key': apiKey,
 							'User-Agent': 'dicebot-gemini-gateway',
 						},
@@ -96,17 +120,53 @@ export async function generateGeminiFlash(
 						}),
 					});
 					if (!response.ok) {
-						lastReason = `gemini_gateway_http_${response.status}`;
+						lastReason = `${baseUrl.provider.replace('-', '_')}_http_${response.status}`;
 						continue;
 					}
 					const text = responseText(await response.json());
-					if (text) return { status: 'ok', text };
-					lastReason = 'gemini_gateway_missing_text';
+					if (text) return { status: 'ok', text, provider: baseUrl.provider };
+					lastReason = `${baseUrl.provider.replace('-', '_')}_missing_text`;
 				} catch {
-					lastReason = 'gemini_gateway_request_failed';
+					lastReason = `${baseUrl.provider.replace('-', '_')}_request_failed`;
 				}
 			}
 		}
+	}
+
+	if (deepSeekKey) {
+		providerConfigured = true;
+		try {
+			const response = await fetchFn('https://api.deepseek.com/chat/completions', {
+				method: 'POST',
+				signal: AbortSignal.timeout(20_000),
+				headers: {
+					Accept: 'application/json',
+					Authorization: `Bearer ${deepSeekKey}`,
+					'Content-Type': 'application/json',
+					'User-Agent': 'dicebot-translation-fallback',
+				},
+				body: JSON.stringify({
+					model: DEEPSEEK_TRANSLATION_MODEL,
+					messages: [{ role: 'user', content: prompt.slice(0, 20_000) }],
+					thinking: { type: 'disabled' },
+					max_tokens: options.maxOutputTokens ?? 1024,
+					temperature: options.temperature ?? 0.2,
+				}),
+			});
+			if (response.ok) {
+				const text = chatCompletionText(await response.json());
+				if (text) return { status: 'ok', text, provider: 'deepseek' };
+				lastReason = 'deepseek_missing_text';
+			} else {
+				lastReason = `deepseek_http_${response.status}`;
+			}
+		} catch {
+			lastReason = 'deepseek_request_failed';
+		}
+	}
+
+	if (env.AI) {
+		providerConfigured = true;
 		try {
 			const output = await env.AI.run(WORKERS_AI_TRANSLATION_MODEL, {
 				prompt,
@@ -114,15 +174,16 @@ export async function generateGeminiFlash(
 				temperature: options.temperature ?? 0.2,
 			}) as { response?: unknown };
 			const text = typeof output.response === 'string' ? output.response.trim() : '';
-			if (text) return { status: 'ok', text };
+			if (text) return { status: 'ok', text, provider: 'workers-ai' };
 			lastReason = 'workers_ai_missing_text';
 		} catch {
 			lastReason = 'workers_ai_request_failed';
 		}
-		return { status: 'error', reason: lastReason };
-	} catch {
-		return { status: 'error', reason: 'gemini_gateway_request_failed' };
 	}
+
+	return providerConfigured
+		? { status: 'error', reason: lastReason }
+		: { status: 'skipped', reason: lastReason };
 }
 
 export async function translateWithGemini(
