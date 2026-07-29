@@ -70,7 +70,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  <a href="https://github.com/luyiqi-lili/DiceBot/issues">查看公开 Issues 与处理进度</a>
 
 <b>🌐 翻译</b>
- <code>/trans 目标语言 文本</code> — 通过 AI Gateway 调用 Gemini Flash 翻译，例如 <code>/trans English 你好，世界</code>
+ 回复一条文字后发送 <code>/trans [目标语言]</code> — 通过 AI Gateway 调用 Gemini Flash 翻译，默认译为简体中文；也支持 <code>/trans English 你好，世界</code>
  <code>/quota</code> — 仅私聊：查询自己捐赠 API 的余额或可用性
 
 <b>🔑 安全捐赠 AI Token</b>
