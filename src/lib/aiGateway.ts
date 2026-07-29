@@ -70,34 +70,41 @@ export async function generateGeminiFlash(
 
 	try {
 		const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
-		const baseUrl = await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any);
+		const gatewayBaseUrl = await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any);
+		const baseUrls = [gatewayBaseUrl, 'https://generativelanguage.googleapis.com/'];
 		let lastReason = 'gemini_gateway_request_failed';
-		for (const apiKey of apiKeys) {
-			const response = await (options.fetchFn ?? fetch)(`${baseUrl}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
-				method: 'POST',
-				signal: AbortSignal.timeout(30_000),
-				headers: {
-					Accept: 'application/json',
-					'Content-Type': 'application/json',
-					'cf-aig-authorization': `Bearer ${gatewayToken}`,
-					'x-goog-api-key': apiKey,
-					'User-Agent': 'dicebot-gemini-gateway',
-				},
-				body: JSON.stringify({
-					contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
-					generationConfig: {
-						temperature: options.temperature ?? 0.2,
-						maxOutputTokens: options.maxOutputTokens ?? 1024,
-					},
-				}),
-			});
-			if (!response.ok) {
-				lastReason = `gemini_gateway_http_${response.status}`;
-				continue;
+		for (const baseUrl of baseUrls) {
+			for (const apiKey of apiKeys) {
+				try {
+					const response = await (options.fetchFn ?? fetch)(`${baseUrl}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
+						method: 'POST',
+						signal: AbortSignal.timeout(30_000),
+						headers: {
+							Accept: 'application/json',
+							'Content-Type': 'application/json',
+							...(baseUrl === gatewayBaseUrl ? { 'cf-aig-authorization': `Bearer ${gatewayToken}` } : {}),
+							'x-goog-api-key': apiKey,
+							'User-Agent': 'dicebot-gemini-gateway',
+						},
+						body: JSON.stringify({
+							contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
+							generationConfig: {
+								temperature: options.temperature ?? 0.2,
+								maxOutputTokens: options.maxOutputTokens ?? 1024,
+							},
+						}),
+					});
+					if (!response.ok) {
+						lastReason = `gemini_gateway_http_${response.status}`;
+						continue;
+					}
+					const text = responseText(await response.json());
+					if (text) return { status: 'ok', text };
+					lastReason = 'gemini_gateway_missing_text';
+				} catch {
+					lastReason = 'gemini_gateway_request_failed';
+				}
 			}
-			const text = responseText(await response.json());
-			if (text) return { status: 'ok', text };
-			lastReason = 'gemini_gateway_missing_text';
 		}
 		return { status: 'error', reason: lastReason };
 	} catch {
