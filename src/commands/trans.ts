@@ -34,6 +34,9 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env): Promis
 	}
 
 	const result = await translateWithGemini(env, { targetLanguage, text });
+	console.log('[trans] Gemini translation result', result.status === 'ok'
+		? { status: result.status }
+		: { status: result.status, reason: result.reason });
 	const reply = result.status === 'ok'
 		? isReplyTranslation
 			? `骰娘刚刚听到： 「${escapeHtml(text)}」\n翻译一下就是： 「${escapeHtml(result.text)}」`
@@ -47,6 +50,7 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env): Promis
 		parse_mode: result.status === 'ok' ? 'HTML' : undefined,
 		message_thread_id: parsedMessage.threadId,
 	});
+	console.log('[trans] Translation reply sent');
 }
 
 export default handleTrans;
