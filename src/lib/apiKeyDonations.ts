@@ -551,7 +551,9 @@ export async function handleApiCredentialAdmin(request: Request, env: DonationEn
 	}
 	const migrateMatch = url.pathname.match(/^\/api\/donations\/api-keys\/([0-9a-f-]{36})\/migrate$/i);
 	const authorized = migrateMatch
-		? hasBearerToken(request, env.DONATION_ADMIN_KEY) || hasBearerToken(request, env.DONATION_INTAKE_KEY)
+		? hasBearerToken(request, env.DONATION_ADMIN_KEY)
+			|| hasBearerToken(request, env.DONATION_INTAKE_KEY)
+			|| hasBearerToken(request, env.AI_GATEWAY_MANAGEMENT_TOKEN)
 		: hasBearerToken(request, env.DONATION_ADMIN_KEY);
 	if (!authorized) return json({ error: 'Unauthorized' }, 401);
 	if (!env.DB) return json({ error: 'Credential management is not configured' }, 503);
