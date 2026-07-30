@@ -1,5 +1,5 @@
 import type { Env } from '../index';
-import { handleTrustedApiKeyDonation } from '../lib/apiKeyDonations';
+import { handleTrustedApiKeyDonation, pseudonymousTelegramDonorLabel } from '../lib/apiKeyDonations';
 import TgMessage, { type ParsedUpdate } from '../lib/telegram';
 import { escapeHtml } from '../lib/util';
 
@@ -43,19 +43,6 @@ function usageText(): string {
 • <code>shared_inference</code> — 明确允许机器人将其用于共享推理。
 
 含 Token 的原消息必须先被机器人删除，之后才会加密入库。请勿在群聊、Issue 或普通表单中发送 Token。`;
-}
-
-async function pseudonymousDonorLabel(userId: number, encryptionKey: string): Promise<string> {
-	const key = await crypto.subtle.importKey(
-		'raw',
-		new TextEncoder().encode(encryptionKey),
-		{ name: 'HMAC', hash: 'SHA-256' },
-		false,
-		['sign'],
-	);
-	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`telegram-donor\0${userId}`));
-	const fingerprint = Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
-	return `telegram:${fingerprint.slice(0, 16)}`;
 }
 
 async function sendText(parsed: ParsedUpdate, env: Env, text: string, replyMarkup?: unknown): Promise<void> {
@@ -117,7 +104,7 @@ export async function handleDonateToken(parsed: ParsedUpdate, env: Env): Promise
 	}
 
 	const [provider, usagePolicy, apiKey] = args;
-	const donorLabel = await pseudonymousDonorLabel(userId, env.DONATION_ENCRYPTION_KEY);
+	const donorLabel = await pseudonymousTelegramDonorLabel(userId, env.DONATION_ENCRYPTION_KEY);
 	try {
 		const recent = await env.DB.prepare(`
 			SELECT COUNT(*) AS count FROM api_key_donations

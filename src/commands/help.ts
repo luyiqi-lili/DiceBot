@@ -77,7 +77,8 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
  请勿把 Token 发到群聊、Issue 或普通表单。与机器人单独聊天并发送：
  <code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
  也兼容 <code>/donate_token</code>。机器人必须先删除含 Token 的原消息，才会加密入库；删除失败则拒绝保存。每位用户 24 小时最多捐赠 5 个 Token。
- 请求填写 <code>provider</code>、<code>apiKey</code>、<code>usagePolicy</code>，可选 <code>donorLabel</code>；<code>validation_only</code> 只允许验证，<code>shared_inference</code> 才授权机器人用于共享推理。
+ <code>/revoketoken</code> — 私聊查看自己的捐赠；撤销后密文不可恢复。
+ <code>validation_only</code> 仅验证；<code>shared_inference</code> 才授权共享推理。
  运维方仍可使用受保护的 <code>POST /api/donations/api-keys</code>。支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整说明</a>
 
 <b>💝 Stars / TON 捐赠</b>

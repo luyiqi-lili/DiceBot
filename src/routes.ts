@@ -120,6 +120,8 @@ export const COMMAND_ROUTES: Record<string, CommandRoute> = {
 
 	/* ── 私聊 API Token 捐赠（handler 负责立即删除含密钥的消息）── */
 	donatetoken: { module: './commands/donateToken', handler: 'handleDonateToken', deleteMsg: false },
+	revoketoken: { module: './commands/revokeToken', handler: 'handleRevokeToken', deleteMsg: false },
+	revoke:      { module: './commands/revokeToken', handler: 'handleRevokeToken', deleteMsg: false },
 	donate:      { module: './commands/donateMoney', handler: 'handleDonate', deleteMsg: false },
 	paysupport:  { module: './commands/paymentSupport', handler: 'handlePaySupport', deleteMsg: false },
 	terms:       { module: './commands/paymentSupport', handler: 'handleDonationTerms', deleteMsg: false },

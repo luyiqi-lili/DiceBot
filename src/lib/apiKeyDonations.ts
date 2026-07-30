@@ -84,6 +84,19 @@ async function sha256Hex(value: string): Promise<string> {
 	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export async function pseudonymousTelegramDonorLabel(userId: number, encryptionKey: string): Promise<string> {
+	const key = await crypto.subtle.importKey(
+		'raw',
+		new TextEncoder().encode(encryptionKey),
+		{ name: 'HMAC', hash: 'SHA-256' },
+		false,
+		['sign'],
+	);
+	const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`telegram-donor\0${userId}`));
+	const fingerprint = Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, '0')).join('');
+	return `telegram:${fingerprint.slice(0, 16)}`;
+}
+
 async function encryptApiKey(apiKey: string, masterKey: Uint8Array): Promise<{ ciphertext: string; iv: string }> {
 	const key = await crypto.subtle.importKey('raw', masterKey, { name: 'AES-GCM' }, false, ['encrypt']);
 	const iv = crypto.getRandomValues(new Uint8Array(12));

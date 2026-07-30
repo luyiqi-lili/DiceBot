@@ -35,6 +35,12 @@ describe('COMMAND_ROUTES', () => {
 			handler: 'handleDonateToken',
 			deleteMsg: false,
 		});
+		expect(COMMAND_ROUTES.revoketoken).toMatchObject({
+			module: './commands/revokeToken',
+			handler: 'handleRevokeToken',
+			deleteMsg: false,
+		});
+		expect(COMMAND_ROUTES.revoke?.handler).toBe('handleRevokeToken');
 		expect(COMMAND_ROUTES.donate).toMatchObject({
 			module: './commands/donateMoney',
 			handler: 'handleDonate',

@@ -45,6 +45,8 @@ describe('/help', () => {
 		expect(c.text).toContain('/trans [目标语言]');
 		expect(c.text).toContain('安全捐赠 AI Token');
 		expect(c.text).toContain('/donatetoken deepseek shared_inference YOUR_TOKEN');
+		expect(c.text).toContain('/revoketoken');
+		expect(c.text).toContain('撤销后密文不可恢复');
 		expect(c.text).toContain('POST /api/donations/api-keys');
 		expect(c.text).toContain('shared_inference');
 		expect(c.text).toContain('AES-GCM');

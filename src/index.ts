@@ -233,6 +233,7 @@ async function loadCommand(cmd: string): Promise<((parsed: any, env: any) => Pro
 		case 'rule':    { const { handleRule } = await import('./commands/rule'); return handleRule; }
 		case 'wish': case 'issue': { const { handleWish } = await import('./commands/wish'); return handleWish; }
 		case 'donatetoken': { const { handleDonateToken } = await import('./commands/donateToken'); return handleDonateToken; }
+		case 'revoketoken': case 'revoke': { const { handleRevokeToken } = await import('./commands/revokeToken'); return handleRevokeToken; }
 		case 'donate': { const { handleDonate } = await import('./commands/donateMoney'); return handleDonate; }
 		case 'paysupport': { const { handlePaySupport } = await import('./commands/paymentSupport'); return handlePaySupport; }
 		case 'terms': case 'donateterms': { const { handleDonationTerms } = await import('./commands/paymentSupport'); return handleDonationTerms; }
