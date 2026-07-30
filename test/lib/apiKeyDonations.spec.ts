@@ -116,6 +116,7 @@ describe('API key donations', () => {
 
 	it('creates the Ollama Cloud custom provider before storing its Gateway alias', async () => {
 		const urls: string[] = [];
+		const providerConfigBodies: any[] = [];
 		const env = gatewayEnv(makeDb());
 		vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
 			const url = String(input);
@@ -127,6 +128,7 @@ describe('API key donations', () => {
 				}), { status: 200 });
 			}
 			if (url.includes('/provider_configs')) {
+				providerConfigBodies.push(JSON.parse(String(init?.body)));
 				return new Response(JSON.stringify({ success: true, result: { secret_id: 'secret-id' } }), { status: 200 });
 			}
 			if (url.includes('/secrets_store/stores/store-id/secrets')) {
@@ -146,6 +148,10 @@ describe('API key donations', () => {
 		expect(response.status).toBe(201);
 		expect(result).toMatchObject({ provider: 'ollama-cloud', platform: 'Ollama Cloud', status: 'pending' });
 		expect(urls.some((url) => url.includes('POST https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/custom-providers'))).toBe(true);
+		expect(providerConfigBodies).toContainEqual(expect.objectContaining({
+			provider_slug: 'custom-ollama-cloud',
+			secret_id: 'secret-id',
+		}));
 	});
 
 	it('returns duplicate without inserting the same provider and fingerprint', async () => {
@@ -303,9 +309,11 @@ describe('API key donations', () => {
 				};
 			},
 		} as any;
-		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-			data: [{ id: 'gpt-oss:20b' }, { id: 'gpt-oss:120b' }],
-		}), { status: 200 }));
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(
+			String(input).endsWith('/v1/models')
+				? { data: [{ id: 'gpt-oss:20b' }, { id: 'gpt-oss:120b' }] }
+				: { choices: [{ message: { content: 'OK' } }] },
+		), { status: 200 }));
 		const getUrl = vi.fn().mockResolvedValue('https://gateway.example/custom-ollama-cloud');
 		const result = await validateCredentialDonation({
 			DB: db,
@@ -320,7 +328,53 @@ describe('API key donations', () => {
 		});
 		expect(fetchFn.mock.calls[0][0]).toBe('https://gateway.example/custom-ollama-cloud/v1/models');
 		expect(fetchFn.mock.calls[0][1].headers['cf-aig-byok-alias']).toBe('donation-ollama');
+		expect(fetchFn.mock.calls[1][0]).toBe('https://gateway.example/custom-ollama-cloud/v1/chat/completions');
+		expect(JSON.parse(String(fetchFn.mock.calls[1][1]?.body))).toMatchObject({
+			model: 'gpt-oss:20b',
+			max_tokens: 1,
+			stream: false,
+		});
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
+	});
+
+	it('does not activate an Ollama alias when its authenticated inference probe is rejected', async () => {
+		const calls: Array<{ sql: string; values: unknown[] }> = [];
+		const stored = {
+			id: 'gateway-ollama-invalid',
+			provider: 'ollama-cloud',
+			encrypted_key: '',
+			encryption_iv: '',
+			gateway_alias: 'donation-ollama-invalid',
+			status: 'pending',
+		};
+		const db = {
+			prepare(sql: string) {
+				return {
+					run: async () => ({ success: true }),
+					bind(...values: unknown[]) {
+						calls.push({ sql, values });
+						return {
+							run: async () => ({ success: true }),
+							first: async () => sql.includes('SELECT id, provider, encrypted_key') ? stored : null,
+						};
+					},
+				};
+			},
+		} as any;
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/v1/models')
+			? new Response(JSON.stringify({ data: [{ id: 'gpt-oss:20b' }] }), { status: 200 })
+			: new Response('{"error":"Unauthorized"}', { status: 401 }));
+		const result = await validateCredentialDonation({
+			DB: db,
+			AI: { gateway: vi.fn().mockReturnValue({ getUrl: vi.fn().mockResolvedValue('https://gateway.example/custom-ollama-cloud') }) },
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+		} as any, stored.id, { fetchFn });
+
+		expect(result).toEqual({ status: 'error', provider: 'ollama-cloud', reason: 'http_401' });
+		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations')
+			&& call.values[0] === 'invalid'
+			&& call.values[1] === 'http_401')).toBe(true);
+		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values[0] === 'active')).toBe(false);
 	});
 
 	it('keeps intake and administration credentials separate and cannot restore erased ciphertext', async () => {

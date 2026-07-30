@@ -48,11 +48,11 @@ The Gemini 2.5 models in `FREE_MODEL_SEEDS` power `/api/ai/route` recommendation
 2. The bot must delete the source Telegram message before doing any lookup or write; deletion failure rejects the donation.
 3. The key is written to Cloudflare AI Gateway Secrets Store and attached to a per-donation Provider Key alias.
 4. D1 records only an irreversible fingerprint, pseudonymous donor label, Gateway alias/Secret/Store ids, provider, cost class, consent, health, and cached model metadata.
-5. Intake immediately performs the supported read-only validation. `validation_only` remains excluded from shared inference even when healthy; only `shared_inference + healthy + active` can route.
+5. Intake immediately performs the supported validation. Ollama first reads `/v1/models`, then sends a fixed one-token probe through `/v1/chat/completions` so a public catalog cannot make an invalid key look healthy. `validation_only` remains excluded from shared inference even when healthy; only `shared_inference + healthy + active` can route.
 6. Multiple eligible aliases use separate D1-backed round-robin cursors for Gemini translation, Ollama translation, and Ollama Issue triage.
 7. `/revoketoken ... confirm` deletes the Gateway secret before marking D1 metadata revoked. Failure to delete fails closed.
 
-Supported donation names are `gemini`, `ollama`, `deepseek`, `openai`, `anthropic`, and `openrouter`. Google and Ollama validate by listing models through Gateway. A newly managed DeepSeek alias is marked with the supported premium model catalog because the bot cannot read the managed key back; only a legacy encrypted DeepSeek record can use the direct balance endpoint. Validation is not yet implemented for OpenAI, Anthropic, or OpenRouter.
+Supported donation names are `gemini`, `ollama`, `deepseek`, `openai`, `anthropic`, and `openrouter`. Google validates by listing models through Gateway. Ollama also performs a minimal authenticated inference probe after listing models. A newly managed DeepSeek alias is marked with the supported premium model catalog because the bot cannot read the managed key back; only a legacy encrypted DeepSeek record can use the direct balance endpoint. Validation is not yet implemented for OpenAI, Anthropic, or OpenRouter.
 
 `DONATION_ENCRYPTION_KEY` remains required even though new keys are not encrypted into D1: it produces the HMAC-based donor label and permits controlled migration of legacy ciphertext.
 
@@ -66,7 +66,7 @@ Ollama Cloud is registered as an account-level Cloudflare AI Gateway custom prov
 - Model discovery: `GET /v1/models`.
 - Inference: `POST /v1/chat/completions`.
 
-Provider credentials stay in AI Gateway. The Worker sends only the Provider Key alias and cannot retrieve the original donated key value.
+Provider credentials stay in Cloudflare Secrets Store. Production binds the activated Ollama secret from that store and adds the upstream bearer header only when its Secret ID matches the selected D1 row. This works around missing Authorization injection observed with custom-provider BYOK aliases; the Worker never stores the value locally or in D1, and the request still uses the AI Gateway URL.
 
 ## Commands And APIs
 

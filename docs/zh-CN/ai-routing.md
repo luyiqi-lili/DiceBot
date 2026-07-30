@@ -48,11 +48,11 @@ D1 凭据行把 Google 记为 `completely_free`，Ollama Cloud 记为 `free_limi
 2. 机器人必须先删除含密钥的 Telegram 原消息，之后才能查询或写入；删除失败会拒绝捐赠。
 3. 密钥写入 Cloudflare AI Gateway Secrets Store，并关联到该次捐赠专属的 Provider Key alias。
 4. D1 仅记录不可逆指纹、匿名 donor label、Gateway alias/Secret/Store id、平台、费用分类、授权、健康状态和缓存模型元数据。
-5. 接收后立即执行该平台支持的只读验证。即使健康，`validation_only` 也不会进入共享推理；只有 `shared_inference + healthy + active` 才可路由。
+5. 接收后立即执行该平台支持的验证。Ollama 先读取 `/v1/models`，再通过 `/v1/chat/completions` 发送固定的一 Token 探针，避免公开模型目录让无效密钥被误判为健康。即使健康，`validation_only` 也不会进入共享推理；只有 `shared_inference + healthy + active` 才可路由。
 6. 多把可用 alias 分别使用 D1 游标轮询 Gemini 翻译、Ollama 翻译和 Ollama Issue 门禁。
 7. `/revoketoken ... confirm` 先删除 Gateway secret，再把 D1 元数据标为 revoked；删除失败时默认拒绝继续。
 
-支持的捐赠名称是 `gemini`、`ollama`、`deepseek`、`openai`、`anthropic`、`openrouter`。Google 和 Ollama 通过 Gateway 列出模型验证。新托管的 DeepSeek alias 因无法读回密钥，只标记项目支持的高级模型目录；只有旧 D1 加密 DeepSeek 记录可调用直连余额接口。OpenAI、Anthropic、OpenRouter 尚未实现验证。
+支持的捐赠名称是 `gemini`、`ollama`、`deepseek`、`openai`、`anthropic`、`openrouter`。Google 通过 Gateway 列出模型验证；Ollama 列出模型后还会执行一次最小鉴权推理探针。新托管的 DeepSeek alias 因无法读回密钥，只标记项目支持的高级模型目录；只有旧 D1 加密 DeepSeek 记录可调用直连余额接口。OpenAI、Anthropic、OpenRouter 尚未实现验证。
 
 虽然新密钥不再加密写入 D1，`DONATION_ENCRYPTION_KEY` 仍然必需：它用于生成 HMAC 匿名 donor label，并支持受控迁移旧密文。
 
@@ -66,7 +66,7 @@ Ollama Cloud 注册为账户级 Cloudflare AI Gateway custom provider：
 - 模型发现：`GET /v1/models`。
 - 推理：`POST /v1/chat/completions`。
 
-提供商凭据保留在 AI Gateway。Worker 只发送 Provider Key alias，无法取回用户原始密钥值。
+提供商凭据保留在 Cloudflare Secrets Store。生产环境从该 Store 绑定已激活的 Ollama Secret，仅当其 Secret ID 与当前 D1 路由记录一致时才补充上游 bearer 头。这用于规避实际观察到的 Custom Provider BYOK alias 未注入 Authorization；Worker 不会把值保存到本地或 D1，请求仍然使用 AI Gateway URL。
 
 ## 命令与 API
 

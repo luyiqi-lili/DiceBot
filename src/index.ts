@@ -58,6 +58,10 @@ export type Env = {
 	/** AI Gateway/Secrets Store management credential used for donated-key lifecycle. */
 	AI_GATEWAY_MANAGEMENT_TOKEN?: string;
 	AI_GATEWAY_ACCOUNT_ID?: string;
+	/** Cloudflare Secrets Store binding for the currently activated Ollama donation. */
+	OLLAMA_DONATED_KEY?: { get(): Promise<string> };
+	/** Secrets Store id used to ensure the binding is only applied to its donation row. */
+	OLLAMA_DONATED_SECRET_ID?: string;
 	GEMINI_API_KEY?: string;
 	/** Legacy Google AI Studio secret retained by the production Worker. */
 	GOOGLE_API_KEY?: string;

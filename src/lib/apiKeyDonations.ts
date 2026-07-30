@@ -8,11 +8,12 @@ import {
 	type CredentialUsagePolicy,
 } from './aiProviderRegistry';
 import { DEEPSEEK_PREMIUM_MODELS, checkDeepSeekPaidBalance } from './deepseekPremium';
-import { routableOllamaModels } from './ollamaCloud';
+import { chooseOllamaTranslationModel, routableOllamaModels } from './ollamaCloud';
 import {
 	deleteGatewayCredential,
 	gatewayInferenceHeaders,
 	gatewayProviderSlug,
+	ollamaGatewayInferenceHeaders,
 	provisionGatewayCredential,
 } from './cloudflareAiGateway';
 
@@ -20,6 +21,7 @@ type DonationEnv = Pick<
 	Env,
 	'DB' | 'DONATION_INTAKE_KEY' | 'DONATION_ADMIN_KEY' | 'DONATION_ENCRYPTION_KEY'
 	| 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'AI_GATEWAY_MANAGEMENT_TOKEN' | 'AI_GATEWAY_ACCOUNT_ID'
+	| 'OLLAMA_DONATED_KEY' | 'OLLAMA_DONATED_SECRET_ID'
 >;
 
 type DonationRecord = {
@@ -28,6 +30,7 @@ type DonationRecord = {
 	encrypted_key: string;
 	encryption_iv: string;
 	gateway_alias?: string | null;
+	gateway_secret_id?: string | null;
 	status: 'pending' | 'active' | 'invalid' | 'disabled' | 'revoked';
 };
 
@@ -328,7 +331,7 @@ export async function validateCredentialDonation(
 	await ensureCredentialProfileTable(env.DB);
 	await ensureGatewayCredentialColumns(env.DB);
 	const record = await env.DB.prepare(`
-		SELECT id, provider, encrypted_key, encryption_iv, gateway_alias, status
+		SELECT id, provider, encrypted_key, encryption_iv, gateway_alias, gateway_secret_id, status
 		FROM api_key_donations WHERE id = ? LIMIT 1
 	`).bind(donationId).first<DonationRecord>();
 	if (!record) return { status: 'skipped', reason: 'Credential donation was not found' };
@@ -392,14 +395,17 @@ export async function validateCredentialDonation(
 			}
 			const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default')
 				.getUrl(gatewayProviderSlug(record.provider) as any);
-			const response = await (options.fetchFn ?? fetch)(`${base.replace(/\/+$/, '')}/v1/models`, {
+			const baseUrl = base.replace(/\/+$/, '');
+			const fetchFn = options.fetchFn ?? fetch;
+			const headers = {
+				Accept: 'application/json',
+				...await ollamaGatewayInferenceHeaders(env, gatewayAlias, record.gateway_secret_id),
+				'User-Agent': 'dicebot-ollama-cloud-validator',
+			};
+			const response = await fetchFn(`${baseUrl}/v1/models`, {
 				method: 'GET',
 				signal: AbortSignal.timeout(10_000),
-				headers: {
-					Accept: 'application/json',
-					...gatewayInferenceHeaders(env, gatewayAlias),
-					'User-Agent': 'dicebot-ollama-cloud-validator',
-				},
+				headers,
 			});
 			if (response.ok) {
 				const models = routableOllamaModels(await response.json());
@@ -410,6 +416,32 @@ export async function validateCredentialDonation(
 						errorCode: 'ollama_no_models',
 					});
 					return { status: 'error', provider: record.provider, reason: 'ollama_no_models' };
+				}
+				const probeModel = chooseOllamaTranslationModel(models) ?? models[0];
+				const probe = await fetchFn(`${baseUrl}/v1/chat/completions`, {
+					method: 'POST',
+					signal: AbortSignal.timeout(30_000),
+					headers: {
+						...headers,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({
+						model: probeModel,
+						messages: [{ role: 'user', content: 'Reply with one word.' }],
+						stream: false,
+						max_tokens: 1,
+						temperature: 0,
+					}),
+				});
+				if (!probe.ok) {
+					const errorCode = `http_${probe.status}`;
+					const invalid = [400, 401, 403].includes(probe.status);
+					await updateValidationResult(env.DB, record, {
+						status: invalid ? 'invalid' : record.status,
+						health: probe.status === 429 ? 'rate_limited' : 'error',
+						errorCode,
+					});
+					return { status: 'error', provider: record.provider, reason: errorCode };
 				}
 				await updateValidationResult(env.DB, record, { status: 'active', health: 'healthy', models });
 				console.log('[api-key-donations] validation complete', {

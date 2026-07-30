@@ -174,11 +174,12 @@ export async function provisionGatewayCredential(
 				alias,
 				default_config: false,
 				provider_slug: providerSlug,
+				secret_id: secretId,
 			}),
 		},
 		fetchFn,
 	);
-	if (!response.ok || typeof response.result?.secret_id !== 'string') {
+	if (!response.ok) {
 		try {
 			await deleteGatewayCredential(env, { secretId, storeId }, { fetchFn });
 		} catch { /* orphan is metadata-only and can be removed from the dashboard */ }
@@ -186,7 +187,7 @@ export async function provisionGatewayCredential(
 	}
 	return {
 		alias,
-		secretId: response.result.secret_id,
+		secretId,
 		storeId,
 		providerSlug,
 		costClass: providerCostClass(provider.id),
@@ -220,4 +221,32 @@ export function gatewayInferenceHeaders(
 		'cf-aig-collect-log-payload': 'false',
 		...(alias ? { 'cf-aig-byok-alias': alias } : {}),
 	};
+}
+
+/**
+ * Ollama custom-provider BYOK aliases currently do not inject the provider
+ * Authorization header reliably. Keep the credential in Cloudflare Secrets
+ * Store, read it through the Worker binding, and still send the request through
+ * AI Gateway. The secret-id match prevents one binding from authenticating a
+ * different donated credential.
+ */
+export async function ollamaGatewayInferenceHeaders(
+	env: Pick<Env, 'AI_GATEWAY_TOKEN' | 'OLLAMA_DONATED_KEY' | 'OLLAMA_DONATED_SECRET_ID'>,
+	alias: string,
+	secretId?: string | null,
+): Promise<Record<string, string>> {
+	const headers = gatewayInferenceHeaders(env, alias);
+	const configuredSecretId = configured(env.OLLAMA_DONATED_SECRET_ID);
+	if (!configuredSecretId || configuredSecretId !== configured(secretId) || !env.OLLAMA_DONATED_KEY) {
+		return headers;
+	}
+	try {
+		const providerKey = configured(await env.OLLAMA_DONATED_KEY.get());
+		if (providerKey) headers.Authorization = `Bearer ${providerKey}`;
+	} catch (error) {
+		console.error('[ai-gateway] Ollama Secrets Store binding unavailable', {
+			reason: error instanceof Error ? error.message.slice(0, 120) : 'unknown',
+		});
+	}
+	return headers;
 }

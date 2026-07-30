@@ -64,7 +64,7 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 - `POST /api/donations/api-keys/:id/validate`：经 AI Gateway alias 调用只读模型列表；Ollama 使用 OpenAI 兼容 `/v1/models`，Gemini 使用 `models.list`。
 - `POST /api/donations/api-keys/:id/status`：设置 `pending`、`disabled` 或 `revoked`；撤销会先删除 Secrets Store 中的密钥，删除失败则不改变 D1 状态。
 
-每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，Ollama Cloud 验证调用 OpenAI 兼容 `/v1/models`；成功后只记录可见模型名称。健康检查不会发送用户需求内容。
+每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`。Ollama Cloud 先调用 OpenAI 兼容 `/v1/models`，再执行固定的一 Token 鉴权探针；成功后只记录可见模型名称。由于实际观察到 Custom Provider BYOK alias 未注入上游 Authorization，生产环境仅通过匹配 Secret ID 的 Cloudflare Secrets Store Worker binding 读取已激活 Ollama 密钥，并把 bearer 头加入 AI Gateway 请求；密钥值不保存在本地或 D1。健康检查不会发送用户需求内容。
 
 捐赠者本人仍可在私聊使用 `/revoketoken`。撤销会先删除 Secrets Store 密钥，再把 D1 元数据标为 revoked；删除失败时默认拒绝修改。新托管的 DeepSeek alias 因无法读回密钥，只记录项目支持的高级模型目录；只有旧 D1 加密 DeepSeek 记录可调用直连余额接口。
 

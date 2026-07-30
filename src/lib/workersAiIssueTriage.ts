@@ -1,7 +1,7 @@
 import type { Env } from '../index';
 import { assessIssueForAutonomy } from './githubIssueMonitor';
 import { ensureGatewayCredentialColumns } from './apiKeyDonations';
-import { gatewayInferenceHeaders } from './cloudflareAiGateway';
+import { ollamaGatewayInferenceHeaders } from './cloudflareAiGateway';
 import {
 	OLLAMA_CLOUD_GATEWAY_SLUG,
 	chooseOllamaReviewModel,
@@ -15,6 +15,8 @@ type TriageEnv = Pick<
 	| 'AI'
 	| 'AI_GATEWAY_ID'
 	| 'AI_GATEWAY_TOKEN'
+	| 'OLLAMA_DONATED_KEY'
+	| 'OLLAMA_DONATED_SECRET_ID'
 	| 'DB'
 	| 'GITHUB_REPOSITORY'
 	| 'GITHUB_TOKEN'
@@ -141,6 +143,7 @@ function parseDecision(response: unknown): ModelDecision | null {
 type OllamaCredential = {
 	id: string;
 	gateway_alias: string;
+	gateway_secret_id: string | null;
 	available_models_json: string;
 };
 
@@ -148,7 +151,7 @@ async function ollamaCredentials(db: D1Database): Promise<OllamaCredential[]> {
 	try {
 		await ensureGatewayCredentialColumns(db);
 		const result = await db.prepare(`
-			SELECT d.id, d.gateway_alias, p.available_models_json
+			SELECT d.id, d.gateway_alias, d.gateway_secret_id, p.available_models_json
 			FROM api_key_donations d
 			JOIN api_credential_profiles p ON p.donation_id = d.id
 			WHERE d.provider = 'ollama-cloud' AND d.status = 'active'
@@ -204,7 +207,11 @@ async function decideWithOllama(
 			headers: {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
-				...gatewayInferenceHeaders(env, credential.gateway_alias),
+				...await ollamaGatewayInferenceHeaders(
+					env,
+					credential.gateway_alias,
+					credential.gateway_secret_id,
+				),
 				'User-Agent': 'dicebot-gateway-ollama-issue-triage',
 			},
 			body: JSON.stringify({

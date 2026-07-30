@@ -1,6 +1,6 @@
 import type { Env } from '../index';
 import { ensureGatewayCredentialColumns } from './apiKeyDonations';
-import { gatewayInferenceHeaders } from './cloudflareAiGateway';
+import { gatewayInferenceHeaders, ollamaGatewayInferenceHeaders } from './cloudflareAiGateway';
 import {
 	OLLAMA_CLOUD_GATEWAY_SLUG,
 	chooseOllamaTranslationModel,
@@ -11,11 +11,18 @@ export const GEMINI_FLASH_MODEL = 'gemini-3.5-flash-lite';
 export const DEEPSEEK_TRANSLATION_MODEL = 'deepseek-v4-flash';
 export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
-type TranslationEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'DB'>;
+type TranslationEnv = Pick<
+	Env,
+	'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'DB' | 'OLLAMA_DONATED_KEY' | 'OLLAMA_DONATED_SECRET_ID'
+>;
 type TranslationResponse =
 	| { status: 'ok'; text: string; provider: 'gateway-gemini-byok' | 'gateway-ollama-byok' | 'workers-ai-gateway' }
 	| { status: 'skipped' | 'error'; reason: string };
-type GatewayCredential = { gateway_alias: string; available_models_json: string };
+type GatewayCredential = {
+	gateway_alias: string;
+	gateway_secret_id: string | null;
+	available_models_json: string;
+};
 
 function responseText(payload: unknown): string | null {
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
@@ -44,7 +51,7 @@ async function gatewayCredentials(db: D1Database | undefined, provider: 'google-
 	try {
 		await ensureGatewayCredentialColumns(db);
 		const result = await db.prepare(`
-			SELECT d.gateway_alias, p.available_models_json
+			SELECT d.gateway_alias, d.gateway_secret_id, p.available_models_json
 			FROM api_key_donations d
 			JOIN api_credential_profiles p ON p.donation_id = d.id
 			WHERE d.provider = ? AND d.status = 'active'
@@ -167,7 +174,11 @@ export async function generateGeminiFlash(
 						headers: {
 							Accept: 'application/json',
 							'Content-Type': 'application/json',
-							...gatewayInferenceHeaders(env, credential.gateway_alias),
+							...await ollamaGatewayInferenceHeaders(
+								env,
+								credential.gateway_alias,
+								credential.gateway_secret_id,
+							),
 							'User-Agent': 'dicebot-gateway-ollama-translation',
 						},
 						body: JSON.stringify({

@@ -116,6 +116,13 @@
 			"ai": {
 				"binding": "AI"
 			},
+			"secrets_store_secrets": [
+				{
+					"binding": "OLLAMA_DONATED_KEY",
+					"store_id": "c40c1938cf5f4c9493681505d6434e8d",
+					"secret_name": "default_custom-ollama-cloud_donation-5cd8200c70394bceb458e821a3aa0d3c"
+				}
+			],
 			"triggers": {
 				"crons": [
 					"59 * * * *"
@@ -203,7 +210,8 @@
 				"GITHUB_AI_TRIAGE_ENABLED": "true",
 				"GITHUB_AI_TRIAGE_SCAN_LIMIT": "50",
 				"GITHUB_AI_TRIAGE_MIN_CONFIDENCE": "0.85",
-				"AI_GATEWAY_ID": "default"
+				"AI_GATEWAY_ID": "default",
+				"OLLAMA_DONATED_SECRET_ID": "28410b0b39bf4184b3021197f7d1f3d0"
 			}
 		}
 	}
