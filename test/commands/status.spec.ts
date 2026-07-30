@@ -13,8 +13,24 @@ describe('/status', () => {
 			prepare: vi.fn(() => ({
 				all: vi.fn().mockResolvedValue({
 					results: [
-						{ provider: 'google-gemini', available_models_json: JSON.stringify(['gemini-2.5-flash']) },
-						{ provider: 'deepseek', available_models_json: JSON.stringify(['deepseek-v4-flash']) },
+						{
+							provider: 'google-gemini',
+							total_count: 2,
+							shared_count: 2,
+							healthy_shared_count: 1,
+							pending_count: 1,
+							unavailable_count: 0,
+							translation_model_available: 1,
+						},
+						{
+							provider: 'deepseek',
+							total_count: 1,
+							shared_count: 1,
+							healthy_shared_count: 1,
+							pending_count: 0,
+							unavailable_count: 0,
+							translation_model_available: 1,
+						},
 					],
 				}),
 			})),
@@ -38,6 +54,10 @@ describe('/status', () => {
 		expect(reply.text).toContain('捐赠 Gemini 密钥：✅ 可用于共享推理');
 		expect(reply.text).toContain('捐赠 DeepSeek 密钥：✅ 可用于共享推理');
 		expect(reply.text).toContain('AI 翻译：✅ 已就绪（首选捐赠 Gemini）');
+		expect(reply.text).toContain('<b>捐赠 Token</b>');
+		expect(reply.text).toContain('Google Gemini：总计 2｜共享 2｜共享健康 1｜待验证 1｜异常/停用 0｜翻译模型 ✅');
+		expect(reply.text).toContain('DeepSeek：总计 1｜共享 1｜共享健康 1｜待验证 0｜异常/停用 0｜翻译模型 ✅');
+		expect(reply.text).toContain('合计：3 个｜共享授权 3 个｜共享健康 2 个');
 		expect(reply.text).toContain('外部 API 密钥：✅ 已配置');
 		expect(reply.text).toContain('不解密或显示密钥');
 		for (const secret of ['bot-secret', 'external-secret', 'gateway-secret', 'deepseek-secret', 'encryption-secret', 'github-secret']) {
@@ -50,6 +70,7 @@ describe('/status', () => {
 		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
 		expect(reply.text).toContain('AI 翻译：✅ 已就绪（首选捐赠 Gemini）');
 		expect(reply.text).toContain('AI Gateway：❌ 未配置');
+		expect(reply.text).toContain('捐赠凭据目录不可用');
 	});
 
 	it('does not treat the retired Google Worker secret as translation readiness', async () => {
