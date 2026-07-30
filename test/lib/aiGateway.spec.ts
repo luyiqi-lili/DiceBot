@@ -41,7 +41,7 @@ describe('AI Gateway translation routing', () => {
 
 		expect(result).toEqual({ status: 'ok', text: 'Hello', provider: 'gateway-gemini-byok' });
 		const [url, init] = fetchFn.mock.calls[0];
-		expect(url).toBe('https://gateway.example/google-ai-studio/v1beta/models/gemini-2.5-flash:generateContent');
+		expect(url).toBe('https://gateway.example/google-ai-studio/v1beta/models/gemini-3.5-flash-lite:generateContent');
 		expect(init.headers).toMatchObject({
 			'cf-aig-authorization': 'Bearer gateway-run-token',
 			'cf-aig-byok-alias': 'donation-one',

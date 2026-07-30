@@ -2,7 +2,7 @@ import type { Env } from '../index';
 import { ensureGatewayCredentialColumns } from './apiKeyDonations';
 import { gatewayInferenceHeaders } from './cloudflareAiGateway';
 
-export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+export const GEMINI_FLASH_MODEL = 'gemini-3.5-flash-lite';
 export const DEEPSEEK_TRANSLATION_MODEL = 'deepseek-v4-flash';
 export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
@@ -109,7 +109,6 @@ export async function generateGeminiFlash(
 						body: JSON.stringify({
 							contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
 							generationConfig: {
-								temperature: options.temperature ?? 0.2,
 								maxOutputTokens: options.maxOutputTokens ?? 1024,
 							},
 						}),
