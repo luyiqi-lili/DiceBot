@@ -34,7 +34,7 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env): Promis
 	}
 
 	const result = await translateWithGemini(env, { targetLanguage, text });
-	console.log('[trans] Gemini translation result', result.status === 'ok'
+	console.log('[trans] Translation result', result.status === 'ok'
 		? { status: result.status, provider: result.provider }
 		: { status: result.status, reason: result.reason });
 	const reply = result.status === 'ok'

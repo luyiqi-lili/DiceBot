@@ -9,20 +9,52 @@ function mark(ready: boolean): string {
 	return ready ? '✅ 已配置' : '❌ 未配置';
 }
 
+async function donatedAiReadiness(env: Env): Promise<{ gemini: boolean; deepSeek: boolean }> {
+	const unavailable = { gemini: false, deepSeek: false };
+	if (!env.DB || !configured(env.DONATION_ENCRYPTION_KEY)) return unavailable;
+	try {
+		const result = await env.DB.prepare(`
+			SELECT d.provider, p.available_models_json
+			FROM api_key_donations d
+			JOIN api_credential_profiles p ON p.donation_id = d.id
+			WHERE d.provider IN ('google-gemini', 'deepseek')
+				AND d.status = 'active'
+				AND p.usage_policy = 'shared_inference'
+				AND p.health_status = 'healthy'
+			ORDER BY CASE d.provider WHEN 'google-gemini' THEN 0 ELSE 1 END,
+				p.last_checked_at DESC, d.created_at ASC
+			LIMIT 10
+		`).all<{ provider: string; available_models_json: string }>();
+		let gemini = false;
+		let deepSeek = false;
+		for (const row of result.results ?? []) {
+			try {
+				const models = JSON.parse(row.available_models_json);
+				if (!Array.isArray(models)) continue;
+				if (row.provider === 'google-gemini' && models.includes('gemini-2.5-flash')) gemini = true;
+				if (row.provider === 'deepseek' && models.includes('deepseek-v4-flash')) deepSeek = true;
+			} catch {
+				// Ignore damaged metadata; another healthy donation may be usable.
+			}
+		}
+		return { gemini, deepSeek };
+	} catch {
+		return unavailable;
+	}
+}
+
 /**
  * Public, read-only runtime readiness summary.
  *
- * It deliberately reports only the presence of bindings and secrets. Running an
- * AI request for every group member would consume the shared AI quota and make
- * this diagnostic abusable; a successful configuration means the service is
- * ready to receive a normal /trans request, not that one was made here.
+ * It checks bindings plus non-secret donated-credential health metadata.
+ * It never decrypts a credential or performs inference.
  */
 export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void> {
 	const chatId = parsed.chatId ?? parsed.message?.chat?.id;
 	if (!chatId) return;
 
-	const geminiKeyReady = configured(env.GEMINI_API_KEY) || configured(env.GOOGLE_API_KEY) || configured(env.GOOGLE_API_KEYS);
-	const geminiReady = configured(env.AI) && geminiKeyReady && configured(env.AI_GATEWAY_TOKEN);
+	const donated = await donatedAiReadiness(env);
+	const translationReady = donated.gemini || donated.deepSeek || configured(env.DEEPSEEK_API_KEY) || Boolean(env.AI);
 	const text = [
 		'🩺 <b>骰娘运行状态</b>',
 		'',
@@ -35,13 +67,14 @@ export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void
 		'<b>AI</b>',
 		`☁️ Workers AI：${mark(Boolean(env.AI))}`,
 		`🚪 AI Gateway：${mark(configured(env.AI_GATEWAY_ID) && configured(env.AI_GATEWAY_TOKEN))}`,
-		`🔑 Gemini API key：${geminiKeyReady ? '✅ 已配置（兼容旧 Google key）' : '❌ 未配置'}`,
-		`🌐 Gemini 翻译：${geminiReady ? '✅ 已就绪' : '❌ 配置不完整'}`,
+		`🔑 捐赠 Gemini 密钥：${donated.gemini ? '✅ 可用于共享推理' : '❌ 无健康的共享凭据'}`,
+		`🔑 捐赠 DeepSeek 密钥：${donated.deepSeek ? '✅ 可用于共享推理' : '❌ 无健康的共享凭据'}`,
+		`🌐 AI 翻译：${translationReady ? '✅ 已就绪（首选捐赠 Gemini）' : '❌ 无可用提供方'}`,
 		`🧠 DeepSeek 审核密钥：${mark(configured(env.DEEPSEEK_API_KEY))}`,
 		'',
 		`🐙 GitHub 自动化：${mark(configured(env.GITHUB_REPOSITORY) && configured(env.GITHUB_TOKEN))}`,
 		'',
-		'<i>此命令仅检查运行时配置，不显示密钥内容，也不发起会消耗 AI 配额的请求。</i>',
+		'<i>此命令仅检查运行时配置和捐赠凭据健康元数据，不解密或显示密钥，也不发起 AI 请求。</i>',
 	].join('\n');
 
 	await TgMessage.sendText(env, {

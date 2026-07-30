@@ -1,14 +1,40 @@
 import type { Env } from '../index';
+import { decryptDonationCredentialForRuntime } from './apiKeyDonations';
 
 export const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEEPSEEK_TRANSLATION_MODEL = 'deepseek-v4-flash';
 export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/llama-3.2-3b-instruct';
 
-type GeminiGatewayEnv = Pick<Env, 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'DEEPSEEK_API_KEY' | 'GEMINI_API_KEY' | 'GOOGLE_API_KEY' | 'GOOGLE_API_KEYS'>;
+type GeminiGatewayEnv = Pick<
+	Env,
+	'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'DB' | 'DEEPSEEK_API_KEY' | 'DONATION_ENCRYPTION_KEY'
+>;
 
 type GeminiGatewayResponse =
-	| { status: 'ok'; text: string; provider: 'gemini-gateway' | 'gemini-direct' | 'deepseek' | 'workers-ai' }
+	| {
+		status: 'ok';
+		text: string;
+		provider:
+			| 'donated-gemini-gateway'
+			| 'donated-gemini-direct'
+			| 'donated-deepseek'
+			| 'deepseek-secret'
+			| 'workers-ai';
+	}
 	| { status: 'skipped' | 'error'; reason: string };
+
+type StoredCredential = {
+	id: string;
+	provider: 'google-gemini' | 'deepseek';
+	encrypted_key: string;
+	encryption_iv: string;
+	available_models_json: string;
+};
+
+type RuntimeCredential = {
+	provider: 'google-gemini' | 'deepseek';
+	apiKey: string;
+};
 
 function responseText(payload: unknown): string | null {
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
@@ -45,61 +71,163 @@ function chatCompletionText(payload: unknown): string | null {
 	return null;
 }
 
-function geminiApiKeys(env: GeminiGatewayEnv): string[] {
-	const keys = [configuredKey(env.GEMINI_API_KEY), configuredKey(env.GOOGLE_API_KEY)].filter((key): key is string => Boolean(key));
-	const legacyPool = configuredKey(env.GOOGLE_API_KEYS);
-	if (legacyPool) {
-		try {
-			const parsed = JSON.parse(legacyPool);
-			if (Array.isArray(parsed)) {
-				for (const key of parsed) {
-					const value = configuredKey(key);
-					if (value) keys.push(value);
-				}
-			}
-		} catch {
-			// Legacy pools are expected to be JSON. Ignore malformed values safely.
-		}
+function supportsTranslationModel(record: StoredCredential): boolean {
+	if (record.provider !== 'google-gemini') return true;
+	try {
+		const models = JSON.parse(record.available_models_json);
+		return Array.isArray(models) && models.includes(GEMINI_FLASH_MODEL);
+	} catch {
+		return false;
 	}
-	return [...new Set(keys)];
+}
+
+async function donatedRuntimeCredentials(env: GeminiGatewayEnv): Promise<RuntimeCredential[]> {
+	if (!env.DB || !configuredKey(env.DONATION_ENCRYPTION_KEY)) return [];
+	try {
+		const result = await env.DB.prepare(`
+			SELECT d.id, d.provider, d.encrypted_key, d.encryption_iv, p.available_models_json
+			FROM api_key_donations d
+			JOIN api_credential_profiles p ON p.donation_id = d.id
+			WHERE d.provider IN ('google-gemini', 'deepseek')
+				AND d.status = 'active'
+				AND p.usage_policy = 'shared_inference'
+				AND p.health_status = 'healthy'
+			ORDER BY CASE d.provider WHEN 'google-gemini' THEN 0 ELSE 1 END,
+				p.last_checked_at DESC, d.created_at ASC
+			LIMIT 6
+		`).all<StoredCredential>();
+		const credentials: RuntimeCredential[] = [];
+		for (const record of result.results ?? []) {
+			if (!supportsTranslationModel(record)) continue;
+			try {
+				const apiKey = configuredKey(await decryptDonationCredentialForRuntime(env, record));
+				if (apiKey) credentials.push({ provider: record.provider, apiKey });
+			} catch {
+				console.error('[trans] Donated credential decrypt failed', {
+					donationId: record.id,
+					provider: record.provider,
+				});
+			}
+		}
+		return credentials;
+	} catch (error) {
+		console.error('[trans] Donated credential lookup failed', {
+			reason: error instanceof Error ? error.message.slice(0, 160) : 'unknown',
+		});
+		return [];
+	}
+}
+
+function donatedKeys(credentials: RuntimeCredential[], provider: RuntimeCredential['provider']): string[] {
+	const keys: string[] = [];
+	for (const credential of credentials) {
+		if (credential.provider === provider && !keys.includes(credential.apiKey)) keys.push(credential.apiKey);
+	}
+	return keys;
+}
+
+async function deepSeekTranslation(
+	apiKey: string,
+	prompt: string,
+	options: { fetchFn: typeof fetch; maxOutputTokens?: number; temperature?: number },
+): Promise<{ status: 'ok'; text: string } | { status: 'error'; reason: string }> {
+	try {
+		const response = await options.fetchFn('https://api.deepseek.com/chat/completions', {
+			method: 'POST',
+			signal: AbortSignal.timeout(20_000),
+			headers: {
+				Accept: 'application/json',
+				Authorization: `Bearer ${apiKey}`,
+				'Content-Type': 'application/json',
+				'User-Agent': 'dicebot-translation-fallback',
+			},
+			body: JSON.stringify({
+				model: DEEPSEEK_TRANSLATION_MODEL,
+				messages: [{ role: 'user', content: prompt.slice(0, 20_000) }],
+				thinking: { type: 'disabled' },
+				max_tokens: options.maxOutputTokens ?? 1024,
+				temperature: options.temperature ?? 0.2,
+			}),
+		});
+		if (!response.ok) return { status: 'error', reason: `deepseek_http_${response.status}` };
+		const text = chatCompletionText(await response.json());
+		return text
+			? { status: 'ok', text }
+			: { status: 'error', reason: 'deepseek_missing_text' };
+	} catch {
+		return { status: 'error', reason: 'deepseek_request_failed' };
+	}
+}
+
+function uniqueBaseUrls(
+	gatewayBaseUrl: string | null,
+): Array<{ url: string; provider: 'donated-gemini-gateway' | 'donated-gemini-direct' }> {
+	const urls: Array<{ url: string; provider: 'donated-gemini-gateway' | 'donated-gemini-direct' }> = [];
+	if (gatewayBaseUrl) {
+		urls.push({ url: gatewayBaseUrl, provider: 'donated-gemini-gateway' });
+	}
+	urls.push({ url: 'https://generativelanguage.googleapis.com/', provider: 'donated-gemini-direct' });
+	return urls;
+}
+
+async function gatewayUrl(env: GeminiGatewayEnv): Promise<string | null> {
+	const gatewayToken = configuredKey(env.AI_GATEWAY_TOKEN);
+	if (!env.AI || !gatewayToken) return null;
+	try {
+		const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
+		return await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any);
+	} catch {
+		return null;
+	}
+}
+
+function gatewayHeaders(
+	provider: 'donated-gemini-gateway' | 'donated-gemini-direct',
+	gatewayToken: string | null,
+): Record<string, string> {
+	if (provider !== 'donated-gemini-gateway' || !gatewayToken) return {};
+	return { 'cf-aig-authorization': `Bearer ${gatewayToken}` };
+}
+
+function sanitizeProviderReason(provider: string, suffix: string): string {
+	return `${provider.replaceAll('-', '_')}_${suffix}`;
+}
+
+function configuredFallbackKeys(env: GeminiGatewayEnv): string[] {
+	const key = configuredKey(env.DEEPSEEK_API_KEY);
+	return key ? [key] : [];
+}
+
+function splitDonatedCredentials(credentials: RuntimeCredential[]): {
+	googleKeys: string[];
+	deepSeekKeys: string[];
+} {
+	return {
+		googleKeys: donatedKeys(credentials, 'google-gemini'),
+		deepSeekKeys: donatedKeys(credentials, 'deepseek'),
+	};
 }
 
 /**
- * Calls a Google AI Studio key through the Worker-bound AI Gateway. This keeps
- * Gemini's own free-tier accounting while centralizing logs and controls in
- * Cloudflare; it deliberately does not use Unified Billing.
+ * Routes translation through active shared-inference donations first. Retired
+ * Worker Google secrets are intentionally outside this runtime credential set.
  */
 export async function generateGeminiFlash(
 	env: GeminiGatewayEnv,
 	prompt: string,
 	options: { fetchFn?: typeof fetch; maxOutputTokens?: number; temperature?: number } = {},
 ): Promise<GeminiGatewayResponse> {
-	// Production predates the GEMINI_API_KEY name. Prefer the explicit new name,
-	// while retaining the existing Google AI Studio secret without exposing it.
-	const apiKeys = geminiApiKeys(env);
+	const donated = splitDonatedCredentials(await donatedRuntimeCredentials(env));
 	const gatewayToken = configuredKey(env.AI_GATEWAY_TOKEN);
-	const deepSeekKey = configuredKey(env.DEEPSEEK_API_KEY);
 	const fetchFn = options.fetchFn ?? fetch;
 	let lastReason = 'translation-provider-not-configured';
 	let providerConfigured = false;
 
-	if (apiKeys.length) {
+	if (donated.googleKeys.length) {
 		providerConfigured = true;
-		const baseUrls: Array<{ url: string; provider: 'gemini-gateway' | 'gemini-direct' }> = [];
-		if (env.AI && gatewayToken) {
-			try {
-				const gatewayId = env.AI_GATEWAY_ID?.trim() || 'default';
-				baseUrls.push({
-					url: await env.AI.gateway(gatewayId).getUrl('google-ai-studio' as any),
-					provider: 'gemini-gateway',
-				});
-			} catch {
-				lastReason = 'gemini_gateway_url_failed';
-			}
-		}
-		baseUrls.push({ url: 'https://generativelanguage.googleapis.com/', provider: 'gemini-direct' });
+		const baseUrls = uniqueBaseUrls(await gatewayUrl(env));
 		for (const baseUrl of baseUrls) {
-			for (const apiKey of apiKeys) {
+			for (const apiKey of donated.googleKeys) {
 				try {
 					const response = await fetchFn(`${baseUrl.url}v1beta/models/${GEMINI_FLASH_MODEL}:generateContent`, {
 						method: 'POST',
@@ -107,9 +235,9 @@ export async function generateGeminiFlash(
 						headers: {
 							Accept: 'application/json',
 							'Content-Type': 'application/json',
-							...(baseUrl.provider === 'gemini-gateway' ? { 'cf-aig-authorization': `Bearer ${gatewayToken}` } : {}),
+							...gatewayHeaders(baseUrl.provider, gatewayToken),
 							'x-goog-api-key': apiKey,
-							'User-Agent': 'dicebot-gemini-gateway',
+							'User-Agent': 'dicebot-donated-gemini-translation',
 						},
 						body: JSON.stringify({
 							contents: [{ role: 'user', parts: [{ text: prompt.slice(0, 20_000) }] }],
@@ -120,49 +248,31 @@ export async function generateGeminiFlash(
 						}),
 					});
 					if (!response.ok) {
-						lastReason = `${baseUrl.provider.replace('-', '_')}_http_${response.status}`;
+						lastReason = sanitizeProviderReason(baseUrl.provider, `http_${response.status}`);
 						continue;
 					}
 					const text = responseText(await response.json());
 					if (text) return { status: 'ok', text, provider: baseUrl.provider };
-					lastReason = `${baseUrl.provider.replace('-', '_')}_missing_text`;
+					lastReason = sanitizeProviderReason(baseUrl.provider, 'missing_text');
 				} catch {
-					lastReason = `${baseUrl.provider.replace('-', '_')}_request_failed`;
+					lastReason = sanitizeProviderReason(baseUrl.provider, 'request_failed');
 				}
 			}
 		}
 	}
 
-	if (deepSeekKey) {
+	for (const apiKey of donated.deepSeekKeys) {
 		providerConfigured = true;
-		try {
-			const response = await fetchFn('https://api.deepseek.com/chat/completions', {
-				method: 'POST',
-				signal: AbortSignal.timeout(20_000),
-				headers: {
-					Accept: 'application/json',
-					Authorization: `Bearer ${deepSeekKey}`,
-					'Content-Type': 'application/json',
-					'User-Agent': 'dicebot-translation-fallback',
-				},
-				body: JSON.stringify({
-					model: DEEPSEEK_TRANSLATION_MODEL,
-					messages: [{ role: 'user', content: prompt.slice(0, 20_000) }],
-					thinking: { type: 'disabled' },
-					max_tokens: options.maxOutputTokens ?? 1024,
-					temperature: options.temperature ?? 0.2,
-				}),
-			});
-			if (response.ok) {
-				const text = chatCompletionText(await response.json());
-				if (text) return { status: 'ok', text, provider: 'deepseek' };
-				lastReason = 'deepseek_missing_text';
-			} else {
-				lastReason = `deepseek_http_${response.status}`;
-			}
-		} catch {
-			lastReason = 'deepseek_request_failed';
-		}
+		const result = await deepSeekTranslation(apiKey, prompt, { ...options, fetchFn });
+		if (result.status === 'ok') return { ...result, provider: 'donated-deepseek' };
+		lastReason = `donated_${result.reason}`;
+	}
+
+	for (const apiKey of configuredFallbackKeys(env)) {
+		providerConfigured = true;
+		const result = await deepSeekTranslation(apiKey, prompt, { ...options, fetchFn });
+		if (result.status === 'ok') return { ...result, provider: 'deepseek-secret' };
+		lastReason = result.reason;
 	}
 
 	if (env.AI) {

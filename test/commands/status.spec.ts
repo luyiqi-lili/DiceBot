@@ -8,11 +8,25 @@ import { handleStatus } from '../../src/commands/status';
 describe('/status', () => {
 	beforeEach(() => vi.clearAllMocks());
 
+	function healthyDonatedGeminiDb() {
+		return {
+			prepare: vi.fn(() => ({
+				all: vi.fn().mockResolvedValue({
+					results: [
+						{ provider: 'google-gemini', available_models_json: JSON.stringify(['gemini-2.5-flash']) },
+						{ provider: 'deepseek', available_models_json: JSON.stringify(['deepseek-v4-flash']) },
+					],
+				}),
+			})),
+		};
+	}
+
 	it('shows readiness without exposing any secret values', async () => {
 		const env = {
-			TOKEN: 'bot-secret', EXTERNAL_API_KEY: 'external-secret', GEMINI_API_KEY: 'gemini-secret',
+			TOKEN: 'bot-secret', EXTERNAL_API_KEY: 'external-secret',
 			AI_GATEWAY_ID: 'default', AI_GATEWAY_TOKEN: 'gateway-secret', DEEPSEEK_API_KEY: 'deepseek-secret',
-			GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'github-secret', AI: {}, DB: {},
+			DONATION_ENCRYPTION_KEY: 'encryption-secret',
+			GITHUB_REPOSITORY: 'owner/repo', GITHUB_TOKEN: 'github-secret', AI: {}, DB: healthyDonatedGeminiDb(),
 			TGBOTCOUNT: {}, NEWS_STORE: {}, TOPIC_KV: {}, BOOK_STORE: {}, FISHING_RECORD_KV: {}, FISH_KV: {}, AFFECTION_KV: {}, ITEM_STORE: {}, COIN_KV: {},
 			COIN_DO: {}, LOTTERY_DO: {},
 		};
@@ -21,32 +35,28 @@ describe('/status', () => {
 
 		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
 		expect(reply).toMatchObject({ chat_id: -100, message_thread_id: 42, parse_mode: 'HTML' });
-		expect(reply.text).toContain('Gemini 翻译：✅ 已就绪');
+		expect(reply.text).toContain('捐赠 Gemini 密钥：✅ 可用于共享推理');
+		expect(reply.text).toContain('捐赠 DeepSeek 密钥：✅ 可用于共享推理');
+		expect(reply.text).toContain('AI 翻译：✅ 已就绪（首选捐赠 Gemini）');
 		expect(reply.text).toContain('外部 API 密钥：✅ 已配置');
-		expect(reply.text).toContain('不显示密钥内容');
-		for (const secret of ['bot-secret', 'external-secret', 'gemini-secret', 'gateway-secret', 'deepseek-secret', 'github-secret']) {
+		expect(reply.text).toContain('不解密或显示密钥');
+		for (const secret of ['bot-secret', 'external-secret', 'gateway-secret', 'deepseek-secret', 'encryption-secret', 'github-secret']) {
 			expect(reply.text).not.toContain(secret);
 		}
 	});
 
 	it('identifies incomplete AI configuration', async () => {
-		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {}, GEMINI_API_KEY: 'gemini' } as any);
+		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {} } as any);
 		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
-		expect(reply.text).toContain('Gemini 翻译：❌ 配置不完整');
+		expect(reply.text).toContain('AI 翻译：✅ 已就绪（首选捐赠 Gemini）');
 		expect(reply.text).toContain('AI Gateway：❌ 未配置');
 	});
 
-	it('recognizes the legacy Google key without exposing it', async () => {
+	it('does not treat the retired Google Worker secret as translation readiness', async () => {
 		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {}, GOOGLE_API_KEY: 'legacy-key' } as any);
 		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
-		expect(reply.text).toContain('Gemini API key：✅ 已配置（兼容旧 Google key）');
-		expect(reply.text).not.toContain('legacy-key');
-	});
-
-	it('recognizes the legacy Google key pool without exposing it', async () => {
-		await handleStatus({ chatId: 1 } as any, { TOKEN: 'bot', AI: {}, GOOGLE_API_KEYS: '["legacy-key"]' } as any);
-		const reply = vi.mocked(TgMessage.sendText).mock.calls[0][1];
-		expect(reply.text).toContain('Gemini API key：✅ 已配置（兼容旧 Google key）');
+		expect(reply.text).toContain('捐赠 Gemini 密钥：❌ 无健康的共享凭据');
+		expect(reply.text).toContain('AI 翻译：✅ 已就绪（首选捐赠 Gemini）');
 		expect(reply.text).not.toContain('legacy-key');
 	});
 });
