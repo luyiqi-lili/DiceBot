@@ -26,6 +26,27 @@ function makeDb(existing = false) {
 
 const encryptionKey = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
 
+function gatewayEnv(db: any, extra: Record<string, unknown> = {}) {
+	vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+		if (String(input).includes('/provider_configs')) {
+			return new Response(JSON.stringify({ success: true, result: { secret_id: 'secret-id' } }), { status: 200 });
+		}
+		return new Response(JSON.stringify({
+			success: true,
+			result: [{ id: 'store-id', name: 'default_secrets_store' }],
+		}), { status: 200 });
+	}));
+	return {
+		DB: db,
+		DONATION_INTAKE_KEY: 'intake-secret',
+		DONATION_ENCRYPTION_KEY: encryptionKey,
+		AI_GATEWAY_MANAGEMENT_TOKEN: 'management-token',
+		AI_GATEWAY_ACCOUNT_ID: 'account-id',
+		AI_GATEWAY_ID: 'default',
+		...extra,
+	} as any;
+}
+
 function request(body: unknown, token = 'intake-secret') {
 	return new Request('https://example.com/api/donations/api-keys', {
 		method: 'POST',
@@ -53,27 +74,20 @@ describe('API key donations', () => {
 			provider: 'deepseek',
 			apiKey: 'sk-trusted-telegram-token',
 			usagePolicy: 'shared_inference',
-		}, {
-			DB: makeDb(),
-			DONATION_ENCRYPTION_KEY: encryptionKey,
-		});
+		}, gatewayEnv(makeDb(), { DONATION_INTAKE_KEY: undefined }));
 
 		expect(response.status).toBe(201);
 		expect(await response.json<any>()).toMatchObject({ provider: 'deepseek', status: 'pending' });
 	});
 
-	it('encrypts the key and returns only non-secret metadata', async () => {
+	it('stores the key only in AI Gateway and returns non-secret metadata', async () => {
 		const db = makeDb();
 		const response = await handleApiKeyDonation(request({
 			provider: 'OpenAI',
 			apiKey: 'sk-test-value',
 			donorLabel: 'alice',
 			usagePolicy: 'shared_inference',
-		}), {
-			DB: db,
-			DONATION_INTAKE_KEY: 'intake-secret',
-			DONATION_ENCRYPTION_KEY: encryptionKey,
-		});
+		}), gatewayEnv(db));
 		const result = await response.json<any>();
 
 		expect(response.status).toBe(201);
@@ -88,11 +102,10 @@ describe('API key donations', () => {
 	});
 
 	it('normalizes Gemini aliases to the canonical platform id', async () => {
-		const response = await handleApiKeyDonation(request({ provider: 'Gemini', apiKey: 'AIza-test-value' }), {
-			DB: makeDb(),
-			DONATION_INTAKE_KEY: 'intake-secret',
-			DONATION_ENCRYPTION_KEY: encryptionKey,
-		});
+		const response = await handleApiKeyDonation(
+			request({ provider: 'Gemini', apiKey: 'AIza-test-value' }),
+			gatewayEnv(makeDb()),
+		);
 		const result = await response.json<any>();
 
 		expect(result).toMatchObject({ provider: 'google-gemini', platform: 'Google Gemini', usagePolicy: 'validation_only' });
@@ -100,11 +113,10 @@ describe('API key donations', () => {
 
 	it('returns duplicate without inserting the same provider and fingerprint', async () => {
 		const db = makeDb(true);
-		const response = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'sk-test-value' }), {
-			DB: db,
-			DONATION_INTAKE_KEY: 'intake-secret',
-			DONATION_ENCRYPTION_KEY: encryptionKey,
-		});
+		const response = await handleApiKeyDonation(
+			request({ provider: 'openai', apiKey: 'sk-test-value' }),
+			gatewayEnv(db),
+		);
 		const result = await response.json<any>();
 
 		expect(response.status).toBe(200);
@@ -113,7 +125,7 @@ describe('API key donations', () => {
 	});
 
 	it('rejects invalid provider and short keys', async () => {
-		const env = { DB: makeDb(), DONATION_INTAKE_KEY: 'intake-secret', DONATION_ENCRYPTION_KEY: encryptionKey };
+		const env = gatewayEnv(makeDb());
 		const badProvider = await handleApiKeyDonation(request({ provider: '../openai', apiKey: 'sk-test-value' }), env);
 		const shortKey = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'short' }), env);
 		const badPolicy = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'sk-test-value', usagePolicy: 'anything' }), env);
@@ -123,19 +135,19 @@ describe('API key donations', () => {
 		expect(badPolicy.status).toBe(400);
 	});
 
-	it('fails closed when D1 or the encryption key is unavailable', async () => {
+	it('fails closed when D1 or Gateway management is unavailable', async () => {
 		const withoutDb = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'sk-test-value' }), {
 			DONATION_INTAKE_KEY: 'intake-secret',
 			DONATION_ENCRYPTION_KEY: encryptionKey,
 		});
-		const invalidEncryption = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'sk-test-value' }), {
+		const missingManagement = await handleApiKeyDonation(request({ provider: 'openai', apiKey: 'sk-test-value' }), {
 			DB: makeDb(),
 			DONATION_INTAKE_KEY: 'intake-secret',
-			DONATION_ENCRYPTION_KEY: 'not-a-32-byte-key',
+			DONATION_ENCRYPTION_KEY: encryptionKey,
 		});
 
 		expect(withoutDb.status).toBe(503);
-		expect(invalidEncryption.status).toBe(503);
+		expect(missingManagement.status).toBe(503);
 	});
 
 	it('requires HTTPS and JSON content type', async () => {
@@ -155,18 +167,22 @@ describe('API key donations', () => {
 		expect((await handleApiKeyDonation(wrongType, env)).status).toBe(415);
 	});
 
-	it('decrypts a Gemini credential only inside the validator and records visible models', async () => {
+	it('validates a Gemini credential through its Gateway alias and records visible models', async () => {
 		const calls: Array<{ sql: string; values: unknown[] }> = [];
-		let stored: any = null;
+		const stored = {
+			id: 'gateway-donation',
+			provider: 'google-gemini',
+			encrypted_key: '',
+			encryption_iv: '',
+			gateway_alias: 'donation-gateway',
+			status: 'pending',
+		};
 		const db = {
 			prepare(sql: string) {
 				return {
 					run: async () => ({ success: true }),
 					bind(...values: unknown[]) {
 						calls.push({ sql, values });
-						if (sql.includes('INSERT INTO api_key_donations')) {
-							stored = { id: values[0], provider: values[1], encrypted_key: values[3], encryption_iv: values[4], status: 'pending' };
-						}
 						return {
 							run: async () => ({ success: true }),
 							first: async () => sql.includes('SELECT id, provider, encrypted_key') ? stored : null,
@@ -175,33 +191,39 @@ describe('API key donations', () => {
 				};
 			},
 		} as any;
-		const donation = await handleApiKeyDonation(request({
-			provider: 'gemini', apiKey: 'AIza-donated-secret', usagePolicy: 'shared_inference',
-		}), { DB: db, DONATION_INTAKE_KEY: 'intake-secret', DONATION_ENCRYPTION_KEY: encryptionKey });
-		const { id } = await donation.json<any>();
 		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ models: [{
 			name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'],
 		}] }), { status: 200 }));
-		const result = await validateCredentialDonation({ DB: db, DONATION_ENCRYPTION_KEY: encryptionKey }, id, { fetchFn });
+		const getUrl = vi.fn().mockResolvedValue('https://gateway.example/google-ai-studio');
+		const result = await validateCredentialDonation({
+			DB: db,
+			AI: { gateway: vi.fn().mockReturnValue({ getUrl }) },
+			AI_GATEWAY_ID: 'default',
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+		} as any, stored.id, { fetchFn });
 
 		expect(result).toEqual({ status: 'ok', provider: 'google-gemini', models: ['gemini-2.5-flash'] });
-		expect(fetchFn.mock.calls[0][1].headers['x-goog-api-key']).toBe('AIza-donated-secret');
-		expect(JSON.stringify(result)).not.toContain('AIza-donated-secret');
+		expect(fetchFn.mock.calls[0][1].headers['cf-aig-byok-alias']).toBe('donation-gateway');
+		expect(fetchFn.mock.calls[0][1].headers).not.toHaveProperty('x-goog-api-key');
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});
 
-	it('validates a donated DeepSeek credential with the official paid-balance signal', async () => {
+	it('marks an already managed DeepSeek credential without reading a local key', async () => {
 		const calls: Array<{ sql: string; values: unknown[] }> = [];
-		let stored: any = null;
+		const stored = {
+			id: 'gateway-deepseek',
+			provider: 'deepseek',
+			encrypted_key: '',
+			encryption_iv: '',
+			gateway_alias: 'donation-deepseek',
+			status: 'pending',
+		};
 		const db = {
 			prepare(sql: string) {
 				return {
 					run: async () => ({ success: true }),
 					bind(...values: unknown[]) {
 						calls.push({ sql, values });
-						if (sql.includes('INSERT INTO api_key_donations')) {
-							stored = { id: values[0], provider: values[1], encrypted_key: values[3], encryption_iv: values[4], status: 'pending' };
-						}
 						return {
 							run: async () => ({ success: true }),
 							first: async () => sql.includes('SELECT id, provider, encrypted_key') ? stored : null,
@@ -210,24 +232,13 @@ describe('API key donations', () => {
 				};
 			},
 		} as any;
-		const donation = await handleApiKeyDonation(request({
-			provider: 'deepseek', apiKey: 'sk-deepseek-donated-secret', usagePolicy: 'shared_inference',
-		}), { DB: db, DONATION_INTAKE_KEY: 'intake-secret', DONATION_ENCRYPTION_KEY: encryptionKey });
-		const { id } = await donation.json<any>();
-		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-			is_available: true,
-			balance_infos: [{ currency: 'USD', total_balance: '3', granted_balance: '0', topped_up_balance: '3' }],
-		}), { status: 200 }));
-		const result = await validateCredentialDonation({ DB: db, DONATION_ENCRYPTION_KEY: encryptionKey }, id, { fetchFn });
+		const result = await validateCredentialDonation({ DB: db } as any, stored.id, { fetchFn: vi.fn() });
 
 		expect(result).toEqual({
 			status: 'ok',
 			provider: 'deepseek',
 			models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
-			paidBalanceAvailable: true,
 		});
-		expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe('Bearer sk-deepseek-donated-secret');
-		expect(JSON.stringify(result)).not.toContain('sk-deepseek-donated-secret');
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});
 

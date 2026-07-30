@@ -1,6 +1,7 @@
 import type { Env } from '../index';
 import { normalizeProvider, providerById } from '../lib/aiProviderRegistry';
 import { pseudonymousTelegramDonorLabel } from '../lib/apiKeyDonations';
+import { deleteGatewayCredential } from '../lib/cloudflareAiGateway';
 import TgMessage, { type ParsedUpdate } from '../lib/telegram';
 import { escapeHtml } from '../lib/util';
 
@@ -10,6 +11,8 @@ type OwnedDonation = {
 	status: string;
 	usage_policy: string | null;
 	health_status: string | null;
+	gateway_secret_id: string | null;
+	gateway_store_id: string | null;
 };
 
 function normalizedArgs(parsed: ParsedUpdate): string[] {
@@ -98,7 +101,8 @@ export async function handleRevokeToken(parsed: ParsedUpdate, env: Env): Promise
 	let rows: OwnedDonation[];
 	try {
 		const result = await env.DB.prepare(`
-			SELECT d.id, d.provider, d.status, p.usage_policy, p.health_status
+			SELECT d.id, d.provider, d.status, d.gateway_secret_id, d.gateway_store_id,
+				p.usage_policy, p.health_status
 			FROM api_key_donations d
 			LEFT JOIN api_credential_profiles p ON p.donation_id = d.id
 			WHERE d.donor_label = ? AND d.status <> 'revoked'
@@ -142,6 +146,14 @@ export async function handleRevokeToken(parsed: ParsedUpdate, env: Env): Promise
 
 	const filter = mutationFilter(selection);
 	try {
+		for (const row of selection.rows) {
+			if (row.gateway_secret_id && row.gateway_store_id) {
+				await deleteGatewayCredential(env, {
+					secretId: row.gateway_secret_id,
+					storeId: row.gateway_store_id,
+				});
+			}
+		}
 		const donationUpdate = env.DB.prepare(`
 			UPDATE api_key_donations
 			SET status = 'revoked', encrypted_key = '', encryption_iv = '',

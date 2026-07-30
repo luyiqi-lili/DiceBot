@@ -55,6 +55,9 @@ export type Env = {
 	AI?: Ai;
 	AI_GATEWAY_ID?: string;
 	AI_GATEWAY_TOKEN?: string;
+	/** Narrow token: AI Gateway/Secrets Store write, used only for donated-key lifecycle. */
+	AI_GATEWAY_MANAGEMENT_TOKEN?: string;
+	AI_GATEWAY_ACCOUNT_ID?: string;
 	GEMINI_API_KEY?: string;
 	/** Legacy Google AI Studio secret retained by the production Worker. */
 	GOOGLE_API_KEY?: string;

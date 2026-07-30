@@ -98,7 +98,7 @@ export async function handleDonateToken(parsed: ParsedUpdate, env: Env): Promise
 		return;
 	}
 
-	if (!env.DB || !env.DONATION_ENCRYPTION_KEY) {
+	if (!env.DB || !env.DONATION_ENCRYPTION_KEY || !env.AI_GATEWAY_MANAGEMENT_TOKEN || !env.AI_GATEWAY_ACCOUNT_ID) {
 		await sendText(parsed, env, '⚠️ Token 捐赠入口当前未配置，原消息已删除且未保存，请稍后再试。');
 		return;
 	}
@@ -131,12 +131,12 @@ export async function handleDonateToken(parsed: ParsedUpdate, env: Env): Promise
 			? '不支持的平台名称'
 			: result.error === 'Invalid API key length'
 				? 'Token 长度无效'
-				: '加密存储暂时不可用';
+				: 'Cloudflare AI Gateway 托管暂时不可用';
 		await sendText(parsed, env, `⚠️ ${reason}，原消息已删除且未保存。请检查后重试。`);
 		return;
 	}
 
-	const statusText = result.status === 'duplicate' ? '已存在（未重复保存）' : '待安全验证';
+	const statusText = result.status === 'duplicate' ? '已存在（未重复保存）' : '已托管到 Cloudflare AI Gateway，待验证';
 	await sendText(parsed, env, `✅ <b>Token 已安全接收</b>
 
 平台：<b>${escapeHtml(result.platform ?? result.provider ?? provider)}</b>
@@ -145,7 +145,7 @@ export async function handleDonateToken(parsed: ParsedUpdate, env: Env): Promise
 凭证编号：<code>${escapeHtml(result.id ?? 'unknown')}</code>
 指纹：<code>${escapeHtml(result.fingerprint ?? 'unknown')}</code>
 
-原消息已删除；回复中不会回显 Token。共享推理凭证会由定时任务验证，只有健康且明确授权的凭证才会进入模型路由。`);
+原消息已删除；回复中不会回显 Token，Worker 与 D1 也不会保存密钥值。密钥由 Cloudflare AI Gateway Provider Keys 托管；共享推理凭证验证通过后进入轮询池。`);
 }
 
 export default handleDonateToken;

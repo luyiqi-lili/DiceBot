@@ -3,6 +3,16 @@ import TgMessage, { type ParsedUpdate } from '../lib/telegram';
 import { translateWithGemini } from '../lib/aiGateway';
 import { escapeHtml } from '../lib/util';
 
+function escapedWithin(value: string, budget: number): string {
+	let output = '';
+	for (const character of value) {
+		const escaped = escapeHtml(character);
+		if (output.length + escaped.length > budget - 1) return `${output}…`;
+		output += escaped;
+	}
+	return output;
+}
+
 export async function handleTrans(parsedMessage: ParsedUpdate, env: Env): Promise<void> {
 	const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
 	if (!chatId) return;
@@ -39,8 +49,8 @@ export async function handleTrans(parsedMessage: ParsedUpdate, env: Env): Promis
 		: { status: result.status, reason: result.reason });
 	const reply = result.status === 'ok'
 		? isReplyTranslation
-			? `骰娘刚刚听到： 「${escapeHtml(text)}」\n翻译一下就是： 「${escapeHtml(result.text)}」`
-			: `🌐 <b>${escapeHtml(targetLanguage)}</b>：\n${escapeHtml(result.text)}`
+			? `骰娘刚刚听到： 「${escapedWithin(text, 1400)}」\n翻译一下就是： 「${escapedWithin(result.text, 2300)}」`
+			: `🌐 <b>${escapeHtml(targetLanguage)}</b>：\n${escapedWithin(result.text, 3900)}`
 		: result.status === 'skipped'
 			? '⚠️ 翻译服务尚未配置。'
 			: '⚠️ 翻译服务暂时不可用，请稍后再试。';

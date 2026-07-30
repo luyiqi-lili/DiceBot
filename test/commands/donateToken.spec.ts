@@ -59,6 +59,9 @@ function makeEnv(db = makeDb(), includeIntakeKey = true) {
 		DB: db,
 		...(includeIntakeKey ? { DONATION_INTAKE_KEY: 'donation-intake-secret' } : {}),
 		DONATION_ENCRYPTION_KEY: ENCRYPTION_KEY,
+		AI_GATEWAY_MANAGEMENT_TOKEN: 'gateway-management-token',
+		AI_GATEWAY_ACCOUNT_ID: 'account-id',
+		AI_GATEWAY_ID: 'default',
 	} as any;
 }
 
@@ -67,9 +70,19 @@ describe('/donatetoken', () => {
 		vi.clearAllMocks();
 		vi.mocked(TgMessage.deleteMessage).mockResolvedValue({ ok: true } as any);
 		vi.mocked(TgMessage.sendText).mockResolvedValue({ ok: true } as any);
+		vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (url.includes('/provider_configs')) {
+				return new Response(JSON.stringify({ success: true, result: { secret_id: 'secret-id' } }), { status: 200 });
+			}
+			return new Response(JSON.stringify({
+				success: true,
+				result: [{ id: 'store-id', name: 'default_secrets_store' }],
+			}), { status: 200 });
+		}));
 	});
 
-	it('deletes the private source first, encrypts the token, and never echoes secret or raw Telegram id', async () => {
+	it('deletes the private source first, stores it in Gateway, and never echoes secret or raw Telegram id', async () => {
 		const db = makeDb();
 		const parsed = makeParsed({
 			command: 'donate',
@@ -83,9 +96,10 @@ describe('/donatetoken', () => {
 			.toBeLessThan(vi.mocked(TgMessage.sendText).mock.invocationCallOrder[0]);
 		const insert = db.calls.find((call: any) => call.sql.includes('INSERT INTO api_key_donations'));
 		expect(insert).toBeTruthy();
-		expect(String(insert?.values[5])).toMatch(/^telegram:[a-f0-9]{16}$/);
-		expect(String(insert?.values[5])).not.toContain('123456');
+		expect(String(insert?.values[3])).toMatch(/^telegram:[a-f0-9]{16}$/);
+		expect(String(insert?.values[3])).not.toContain('123456');
 		expect(JSON.stringify(db.calls)).not.toContain(API_KEY);
+		expect(JSON.stringify(insert?.values)).toContain('donation-');
 		const reply = vi.mocked(TgMessage.sendText).mock.calls.at(-1)?.[1]?.text ?? '';
 		expect(reply).toContain('Token 已安全接收');
 		expect(reply).toContain('DeepSeek');

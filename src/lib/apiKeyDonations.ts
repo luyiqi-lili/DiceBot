@@ -8,10 +8,16 @@ import {
 	type CredentialUsagePolicy,
 } from './aiProviderRegistry';
 import { DEEPSEEK_PREMIUM_MODELS, checkDeepSeekPaidBalance } from './deepseekPremium';
+import {
+	gatewayInferenceHeaders,
+	gatewayProviderSlug,
+	provisionGatewayCredential,
+} from './cloudflareAiGateway';
 
 type DonationEnv = Pick<
 	Env,
 	'DB' | 'DONATION_INTAKE_KEY' | 'DONATION_ADMIN_KEY' | 'DONATION_ENCRYPTION_KEY'
+	| 'AI' | 'AI_GATEWAY_ID' | 'AI_GATEWAY_TOKEN' | 'AI_GATEWAY_MANAGEMENT_TOKEN' | 'AI_GATEWAY_ACCOUNT_ID'
 >;
 
 type DonationRecord = {
@@ -19,6 +25,7 @@ type DonationRecord = {
 	provider: string;
 	encrypted_key: string;
 	encryption_iv: string;
+	gateway_alias?: string | null;
 	status: 'pending' | 'active' | 'invalid' | 'disabled' | 'revoked';
 };
 
@@ -145,6 +152,17 @@ export async function ensureCredentialProfileTable(db: D1Database): Promise<void
 	`).run();
 }
 
+export async function ensureGatewayCredentialColumns(db: D1Database): Promise<void> {
+	for (const sql of [
+		'ALTER TABLE api_key_donations ADD COLUMN gateway_alias TEXT',
+		'ALTER TABLE api_key_donations ADD COLUMN gateway_secret_id TEXT',
+		'ALTER TABLE api_key_donations ADD COLUMN gateway_store_id TEXT',
+		"ALTER TABLE api_key_donations ADD COLUMN cost_class TEXT NOT NULL DEFAULT 'paid'",
+	]) {
+		try { await db.prepare(sql).run(); } catch { /* already present */ }
+	}
+}
+
 async function ensureProfile(
 	db: D1Database,
 	donationId: string,
@@ -193,11 +211,11 @@ export async function handleApiKeyDonation(request: Request, env: DonationEnv): 
  */
 export async function storeApiKeyDonation(
 	payload: ApiKeyDonationPayload,
-	env: Pick<Env, 'DB' | 'DONATION_ENCRYPTION_KEY'>,
+	env: DonationEnv,
 ): Promise<Response> {
-	if (!env.DB || !env.DONATION_ENCRYPTION_KEY) return json({ error: 'Donation intake is not configured' }, 503);
-	const masterKey = masterKeyFromEnv(env);
-	if (!masterKey) return json({ error: 'Donation encryption is not configured correctly' }, 503);
+	if (!env.DB || !env.DONATION_ENCRYPTION_KEY || !env.AI_GATEWAY_MANAGEMENT_TOKEN || !env.AI_GATEWAY_ACCOUNT_ID) {
+		return json({ error: 'Donation intake is not configured' }, 503);
+	}
 
 	const provider = normalizeProvider(payload.provider);
 	const apiKey = typeof payload.apiKey === 'string' ? payload.apiKey.trim() : '';
@@ -217,6 +235,7 @@ export async function storeApiKeyDonation(
 	const fullFingerprint = await sha256Hex(`${provider.id}\0${apiKey}`);
 	const publicFingerprint = fullFingerprint.slice(0, 16);
 	try {
+		await ensureGatewayCredentialColumns(env.DB);
 		const existing = await env.DB.prepare(
 			'SELECT id FROM api_key_donations WHERE provider = ? AND key_fingerprint = ? LIMIT 1',
 		).bind(provider.id, fullFingerprint).first<{ id: string }>();
@@ -235,14 +254,19 @@ export async function storeApiKeyDonation(
 			});
 		}
 
-		const encrypted = await encryptApiKey(apiKey, masterKey);
 		const id = crypto.randomUUID();
+		const gateway = await provisionGatewayCredential(env, { donationId: id, provider: provider.id, apiKey });
 		await env.DB.prepare(
 			`INSERT INTO api_key_donations
-			(id, provider, key_fingerprint, encrypted_key, encryption_iv, donor_label, status)
-			VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
-		).bind(id, provider.id, fullFingerprint, encrypted.ciphertext, encrypted.iv, donorLabel).run();
+			(id, provider, key_fingerprint, encrypted_key, encryption_iv, donor_label, status,
+			 gateway_alias, gateway_secret_id, gateway_store_id, cost_class)
+			VALUES (?, ?, ?, '', '', ?, 'pending', ?, ?, ?, ?)`,
+		).bind(
+			id, provider.id, fullFingerprint, donorLabel,
+			gateway.alias, gateway.secretId, gateway.storeId, gateway.costClass,
+		).run();
 		await ensureProfile(env.DB, id, provider.id, usagePolicy);
+		const validation = await validateCredentialDonation(env, id);
 
 		return json({
 			id,
@@ -250,7 +274,7 @@ export async function storeApiKeyDonation(
 			platform: provider.displayName,
 			fingerprint: publicFingerprint,
 			usagePolicy,
-			status: 'pending',
+			status: validation.status === 'ok' ? 'active' : 'pending',
 		}, 201);
 	} catch (error) {
 		console.error('[api-key-donations] storage failed', {
@@ -299,11 +323,10 @@ export async function validateCredentialDonation(
 	reason?: string;
 }> {
 	if (!env.DB) return { status: 'skipped', reason: 'D1 is not configured' };
-	const masterKey = masterKeyFromEnv(env);
-	if (!masterKey) return { status: 'skipped', reason: 'Donation encryption is not configured correctly' };
 	await ensureCredentialProfileTable(env.DB);
+	await ensureGatewayCredentialColumns(env.DB);
 	const record = await env.DB.prepare(`
-		SELECT id, provider, encrypted_key, encryption_iv, status
+		SELECT id, provider, encrypted_key, encryption_iv, gateway_alias, status
 		FROM api_key_donations WHERE id = ? LIMIT 1
 	`).bind(donationId).first<DonationRecord>();
 	if (!record) return { status: 'skipped', reason: 'Credential donation was not found' };
@@ -316,16 +339,28 @@ export async function validateCredentialDonation(
 	}
 
 	try {
-		const apiKey = await decryptApiKey(record, masterKey);
 		if (provider.validation === 'google-models') {
+			const gatewayAlias = record.gateway_alias?.trim();
+			let url = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000';
+			let headers: Record<string, string>;
+			if (gatewayAlias) {
+				if (!env.AI || !env.AI_GATEWAY_TOKEN) return { status: 'skipped', provider: record.provider, reason: 'AI Gateway is not configured' };
+				const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default').getUrl(gatewayProviderSlug(record.provider) as any);
+				url = `${base.replace(/\/+$/, '')}/v1beta/models?pageSize=1000`;
+				headers = gatewayInferenceHeaders(env, gatewayAlias);
+			} else {
+				const masterKey = masterKeyFromEnv(env);
+				if (!masterKey) return { status: 'skipped', reason: 'Legacy donation decryption is unavailable' };
+				headers = { 'x-goog-api-key': await decryptApiKey(record, masterKey) };
+			}
 			const response = await (options.fetchFn ?? fetch)(
-				'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+				url,
 				{
 					method: 'GET',
 					signal: AbortSignal.timeout(10_000),
 					headers: {
 						Accept: 'application/json',
-						'x-goog-api-key': apiKey,
+						...headers,
 						'User-Agent': 'dicebot-credential-validator',
 					},
 				},
@@ -348,7 +383,17 @@ export async function validateCredentialDonation(
 			return { status: 'error', provider: record.provider, reason: errorCode };
 		}
 
-		const balance = await checkDeepSeekPaidBalance(apiKey, options);
+		if (record.gateway_alias) {
+			await updateValidationResult(env.DB, record, {
+				status: 'active',
+				health: 'healthy',
+				models: [...DEEPSEEK_PREMIUM_MODELS],
+			});
+			return { status: 'ok', provider: record.provider, models: [...DEEPSEEK_PREMIUM_MODELS] };
+		}
+		const masterKey = masterKeyFromEnv(env);
+		if (!masterKey) return { status: 'skipped', reason: 'Legacy donation decryption is unavailable' };
+		const balance = await checkDeepSeekPaidBalance(await decryptApiKey(record, masterKey), options);
 		if (balance.status === 'error') {
 			const invalid = balance.reason === 'balance_http_401' || balance.reason === 'balance_http_403';
 			await updateValidationResult(env.DB, record, {
@@ -411,10 +456,12 @@ export async function refreshOneSharedCredential(
 }
 
 async function listCredentialMetadata(db: D1Database): Promise<Response> {
+	await ensureGatewayCredentialColumns(db);
 	await ensureCredentialProfileTable(db);
 	const result = await db.prepare(`
 		SELECT d.id, d.provider, substr(d.key_fingerprint, 1, 16) AS fingerprint,
 			d.donor_label, d.status, d.created_at, d.updated_at, d.last_validated_at,
+			d.gateway_alias, d.cost_class,
 			p.credential_type, p.usage_policy, p.available_models_json, p.health_status,
 			p.last_checked_at, p.last_error_code
 		FROM api_key_donations d
@@ -422,6 +469,41 @@ async function listCredentialMetadata(db: D1Database): Promise<Response> {
 		ORDER BY d.created_at DESC LIMIT 100
 	`).all<Record<string, unknown>>();
 	return json({ credentials: result.results ?? [], providers: publicProviderCatalog() });
+}
+
+async function migrateLegacyCredential(env: DonationEnv, donationId: string): Promise<Response> {
+	if (!env.DB) return json({ error: 'Credential management is not configured' }, 503);
+	const masterKey = masterKeyFromEnv(env);
+	if (!masterKey) return json({ error: 'Legacy donation decryption is unavailable' }, 503);
+	await ensureGatewayCredentialColumns(env.DB);
+	const record = await env.DB.prepare(`
+		SELECT id, provider, encrypted_key, encryption_iv, gateway_alias, status
+		FROM api_key_donations WHERE id = ? LIMIT 1
+	`).bind(donationId).first<DonationRecord>();
+	if (!record) return json({ error: 'Credential donation was not found' }, 404);
+	if (record.gateway_alias) return json({ id: record.id, status: 'already_migrated', alias: record.gateway_alias });
+	if (!record.encrypted_key || record.status === 'revoked') return json({ error: 'Credential cannot be migrated' }, 409);
+	try {
+		const apiKey = await decryptApiKey(record, masterKey);
+		const gateway = await provisionGatewayCredential(env, {
+			donationId: record.id,
+			provider: record.provider,
+			apiKey,
+		});
+		await env.DB.prepare(`
+			UPDATE api_key_donations
+			SET encrypted_key = '', encryption_iv = '', gateway_alias = ?, gateway_secret_id = ?,
+				gateway_store_id = ?, cost_class = ?, updated_at = datetime('now')
+			WHERE id = ?
+		`).bind(gateway.alias, gateway.secretId, gateway.storeId, gateway.costClass, record.id).run();
+		return json({ id: record.id, status: 'migrated', alias: gateway.alias });
+	} catch (error) {
+		console.error('[api-key-donations] gateway migration failed', {
+			id: record.id,
+			reason: error instanceof Error ? error.message : 'unknown',
+		});
+		return json({ error: 'Gateway migration failed' }, 502);
+	}
 }
 
 async function updateCredentialStatus(request: Request, db: D1Database, donationId: string): Promise<Response> {
@@ -467,9 +549,14 @@ export async function handleApiCredentialAdmin(request: Request, env: DonationEn
 	if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
 		return json({ error: 'HTTPS Required' }, 400);
 	}
-	if (!hasBearerToken(request, env.DONATION_ADMIN_KEY)) return json({ error: 'Unauthorized' }, 401);
+	const migrateMatch = url.pathname.match(/^\/api\/donations\/api-keys\/([0-9a-f-]{36})\/migrate$/i);
+	const authorized = migrateMatch
+		? hasBearerToken(request, env.DONATION_ADMIN_KEY) || hasBearerToken(request, env.DONATION_INTAKE_KEY)
+		: hasBearerToken(request, env.DONATION_ADMIN_KEY);
+	if (!authorized) return json({ error: 'Unauthorized' }, 401);
 	if (!env.DB) return json({ error: 'Credential management is not configured' }, 503);
 	const path = url.pathname;
+	if (migrateMatch && request.method === 'POST') return migrateLegacyCredential(env, migrateMatch[1]);
 	if (path === '/api/donations/api-keys' && request.method === 'GET') return listCredentialMetadata(env.DB);
 
 	const validateMatch = path.match(/^\/api\/donations\/api-keys\/([0-9a-f-]{36})\/validate$/i);

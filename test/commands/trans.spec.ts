@@ -43,4 +43,12 @@ describe('/trans', () => {
 
 		expect(translateWithGemini).toHaveBeenCalledWith(expect.anything(), { targetLanguage: 'English', text: '你好' });
 	});
+
+	it('keeps an escaped translation within Telegram message limits', async () => {
+		vi.mocked(translateWithGemini).mockResolvedValue({ status: 'ok', text: '&'.repeat(5_000) });
+		await handleTrans({ chatId: 123, args: ['English', 'test'] } as any, {} as any);
+		const reply = vi.mocked(TgMessage.sendText).mock.calls.at(-1)?.[1]?.text ?? '';
+		expect(reply.length).toBeLessThan(4096);
+		expect(reply).toContain('…');
+	});
 });

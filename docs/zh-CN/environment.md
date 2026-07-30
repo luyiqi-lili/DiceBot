@@ -66,10 +66,12 @@ dev 和 prod 分别定义 Durable Object migrations。
 - `EXTERNAL_API_KEY`：`/api/*` 可选 API key。
 - `DONATION_INTAKE_KEY`：仅用于 `/api/donations/api-keys` 的 bearer token，不授予其他管理 API 权限。
 - `DONATION_ADMIN_KEY`：查看、验证、禁用和撤销捐赠凭据的独立 bearer token。
-- `DONATION_ENCRYPTION_KEY`：32 字节随机 AES 主密钥的 base64 表示。
+- `DONATION_ENCRYPTION_KEY`：32 字节随机密钥的 base64 表示，仅用于捐赠者匿名标识和旧 D1 凭据迁移；新 Provider Key 不写入 D1。
 - `TON_DONATION_ADDRESS`：`/donate ton` 展示的主网 TON 公共收款地址；缺失或格式无效时安全关闭 TON 捐赠。
 - `GEMINI_API_KEY`：`/trans` 使用的 Google AI Studio key；通过 AI Gateway 的 Google 原生通道转发，仍使用该 Google key 自己的免费额度/计费层。
-- `AI_GATEWAY_TOKEN`：仅有 AI Gateway **Run** 权限的窄权限 token，用于 Gemini 原生提供商调用；不得复用 Cloudflare 部署 token。
+- `AI_GATEWAY_TOKEN`：仅有 AI Gateway **Run** 权限的窄权限 token，所有 AI 推理都经它进入 Gateway。
+- `AI_GATEWAY_MANAGEMENT_TOKEN`：仅有 AI Gateway/Secrets Store 读写权限的窄权限 token，用于添加或撤销捐赠的 Provider Keys。
+- `AI_GATEWAY_ACCOUNT_ID`：AI Gateway 与 Secrets Store 所在的 Cloudflare 账户。
 - `GITHUB_TOKEN`：用于鉴权扫描的 GitHub API token；开启 intake 且没有专用 token 时也用于创建 Issue，因此该回退方式要求仓库 Issues 写权限。
 - `GITHUB_ISSUE_TOKEN`：可选、仅供 `/wish`、`/issue` 创建 Issue 的仓库级 Issues 写 token。未配置时，显式开启的入口复用 `GITHUB_TOKEN`，避免把同一高权限凭据复制成第二份 Worker secret。
 
