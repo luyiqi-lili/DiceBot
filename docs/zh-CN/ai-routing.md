@@ -26,7 +26,7 @@ Issue 门禁当前请求：
 - Ollama Cloud：依次选择账号可见的 `qwen3.5:397b`、`qwen3.5`、`gpt-oss:120b`、`nemotron-3-super:120b`、`mistral-large-3`、`deepseek-v4-flash`；都没有时，选择发现到的最大不小于 70B 模型。
 - Workers AI：`@cf/meta/llama-3.3-70b-instruct-fp8-fast`。
 
-Ollama 选择来自每把凭据最近一次成功 `/api/tags` 验证。偏好列表中有某个模型，不代表每个捐赠账号都能访问它。
+Ollama 选择来自每把凭据最近一次成功的 OpenAI 兼容 `/v1/models` 验证。偏好列表中有某个模型，不代表每个捐赠账号都能访问它。
 
 ## 项目费用分级
 
@@ -63,8 +63,8 @@ Ollama Cloud 注册为账户级 Cloudflare AI Gateway custom provider：
 - Worker binding 使用的 Gateway slug：`custom-ollama-cloud`。
 - 账户 custom-provider slug：`ollama-cloud`。
 - Base URL：`https://ollama.com`。
-- 模型发现：`GET /api/tags`。
-- 推理：`POST /api/chat`。
+- 模型发现：`GET /v1/models`。
+- 推理：`POST /v1/chat/completions`。
 
 提供商凭据保留在 AI Gateway。Worker 只发送 Provider Key alias，无法取回用户原始密钥值。
 
@@ -96,4 +96,3 @@ Ollama Cloud 注册为账户级 Cloudflare AI Gateway custom provider：
 - 收费提供商不会成为自动回退。
 - 捐赠密钥调用关闭 Gateway 请求 payload 日志。
 - 当前无法显示 Ollama 精确剩余额度，只能以健康状态和账号可见模型为信号。
-

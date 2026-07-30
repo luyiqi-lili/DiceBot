@@ -161,7 +161,7 @@ export async function generateGeminiFlash(
 				const model = chooseOllamaTranslationModel(models);
 				if (!model) continue;
 				try {
-					const response = await fetchFn(`${base.replace(/\/+$/, '')}/api/chat`, {
+					const response = await fetchFn(`${base.replace(/\/+$/, '')}/v1/chat/completions`, {
 						method: 'POST',
 						signal: AbortSignal.timeout(30_000),
 						headers: {
@@ -174,10 +174,8 @@ export async function generateGeminiFlash(
 							model,
 							messages: [{ role: 'user', content: prompt.slice(0, 20_000) }],
 							stream: false,
-							options: {
-								num_predict: options.maxOutputTokens ?? 1024,
-								temperature: options.temperature ?? 0.2,
-							},
+							max_tokens: options.maxOutputTokens ?? 1024,
+							temperature: options.temperature ?? 0.2,
 						}),
 					});
 					if (!response.ok) {

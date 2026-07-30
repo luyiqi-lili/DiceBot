@@ -41,12 +41,19 @@ function choosePreferred(availableModels: readonly string[], preferences: readon
 
 export function routableOllamaModels(payload: unknown): string[] {
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return [];
-	const models = (payload as { models?: unknown }).models;
+	const object = payload as { models?: unknown; data?: unknown };
+	const models = Array.isArray(object.data) ? object.data : object.models;
 	if (!Array.isArray(models)) return [];
 	const names = models.flatMap((entry) => {
 		if (!entry || typeof entry !== 'object') return [];
-		const item = entry as { name?: unknown; model?: unknown };
-		const name = typeof item.model === 'string' ? item.model : typeof item.name === 'string' ? item.name : '';
+		const item = entry as { id?: unknown; name?: unknown; model?: unknown };
+		const name = typeof item.id === 'string'
+			? item.id
+			: typeof item.model === 'string'
+				? item.model
+				: typeof item.name === 'string'
+					? item.name
+					: '';
 		return name.trim() ? [name.trim().slice(0, 160)] : [];
 	});
 	return Array.from(new Set(names)).sort();
@@ -74,6 +81,16 @@ export function chooseOllamaReviewModel(availableModels: readonly string[]): str
 
 export function ollamaChatText(payload: unknown): string | null {
 	if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-	const content = (payload as { message?: { content?: unknown } }).message?.content;
-	return typeof content === 'string' && content.trim() ? content.trim() : null;
+	const object = payload as {
+		message?: { content?: unknown };
+		choices?: Array<{ message?: { content?: unknown } }>;
+	};
+	const candidates = [
+		object.message?.content,
+		...(Array.isArray(object.choices) ? object.choices.map((choice) => choice?.message?.content) : []),
+	];
+	for (const content of candidates) {
+		if (typeof content === 'string' && content.trim()) return content.trim();
+	}
+	return null;
 }

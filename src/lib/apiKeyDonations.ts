@@ -392,7 +392,7 @@ export async function validateCredentialDonation(
 			}
 			const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default')
 				.getUrl(gatewayProviderSlug(record.provider) as any);
-			const response = await (options.fetchFn ?? fetch)(`${base.replace(/\/+$/, '')}/api/tags`, {
+			const response = await (options.fetchFn ?? fetch)(`${base.replace(/\/+$/, '')}/v1/models`, {
 				method: 'GET',
 				signal: AbortSignal.timeout(10_000),
 				headers: {

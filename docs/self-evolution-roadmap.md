@@ -28,7 +28,7 @@ Gemini 2.5 Flash-Lite, Flash, and Pro are seeded from Google's official [model l
 
 The hourly Cron statically filters unready Issues, excludes assigned, locked, PR-linked, underspecified, blocked, and protected work, and reviews at most one eligible Issue. The only automatic GitHub mutation is adding `bot:ready`.
 
-The decision first round-robins donated Ollama Cloud aliases and selects a large model from each validated `/api/tags` catalog. It falls back to Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. Both paths use AI Gateway and must return `risk=low` with confidence at or above `GITHUB_AI_TRIAGE_MIN_CONFIDENCE` (production: `0.85`). Translation uses the completely-free small-model pool: donated Gemini first, then Ollama Cloud small models, then Workers AI `@cf/meta/llama-3.2-3b-instruct`.
+The decision first round-robins donated Ollama Cloud aliases and selects a large model from each validated OpenAI-compatible `/v1/models` catalog. It falls back to Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. Both paths use AI Gateway and must return `risk=low` with confidence at or above `GITHUB_AI_TRIAGE_MIN_CONFIDENCE` (production: `0.85`). Translation uses the completely-free small-model pool: donated Gemini first, then Ollama Cloud small models, then Workers AI `@cf/meta/llama-3.2-3b-instruct`.
 
 Every outcome is recorded in `ai_issue_triage_runs` without storing a prompt or credential. An unchanged rejected Issue is not repeatedly reviewed; editing it makes it eligible for a later review. `GET /api/evolution/candidate` includes the latest non-secret triage audit.
 

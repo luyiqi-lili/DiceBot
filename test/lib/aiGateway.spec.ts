@@ -97,7 +97,7 @@ describe('AI Gateway translation routing', () => {
 
 	it('uses a donated Ollama Cloud small model before Workers AI', async () => {
 		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-			message: { role: 'assistant', content: 'Hello' },
+			choices: [{ message: { role: 'assistant', content: 'Hello' } }],
 		}), { status: 200 }));
 		const AI = aiBinding();
 		const result = await translateWithGemini({
@@ -108,8 +108,13 @@ describe('AI Gateway translation routing', () => {
 
 		expect(result).toEqual({ status: 'ok', text: 'Hello', provider: 'gateway-ollama-byok' });
 		const [url, init] = fetchFn.mock.calls[0];
-		expect(url).toBe('https://gateway.example/google-ai-studio/api/chat');
-		expect(JSON.parse(init.body)).toMatchObject({ model: 'gpt-oss:20b', stream: false });
+		expect(url).toBe('https://gateway.example/google-ai-studio/v1/chat/completions');
+		expect(JSON.parse(init.body)).toMatchObject({
+			model: 'gpt-oss:20b',
+			stream: false,
+			max_tokens: 2048,
+			temperature: 0.1,
+		});
 		expect(init.headers['cf-aig-byok-alias']).toBe('ollama-one');
 		expect(init.headers).not.toHaveProperty('Authorization');
 	});

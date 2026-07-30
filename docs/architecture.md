@@ -59,7 +59,7 @@ Issue gate
   -> Workers AI 70B
 ```
 
-All arrows are AI Gateway requests. Multiple healthy `shared_inference` aliases rotate through D1-backed cursors. Ollama Cloud is registered as an account-level custom provider and its model catalog is discovered through `/api/tags`.
+All arrows are AI Gateway requests. Multiple healthy `shared_inference` aliases rotate through D1-backed cursors. Ollama Cloud is registered as an account-level custom provider and uses its OpenAI-compatible `/v1/models` and `/v1/chat/completions` endpoints through the Gateway.
 
 New donated key values live only in Cloudflare AI Gateway Secrets Store. D1 retains the fingerprint, Gateway alias and secret/store ids, consent policy, health, cost class, and cached model catalog. `validation_only` credentials never enter shared routing. Paid credentials may be catalogued but are not automatically selected. See [AI routing and donated credentials](ai-routing.md).
 

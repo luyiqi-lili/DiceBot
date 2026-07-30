@@ -21,10 +21,10 @@ describe('AI provider registry', () => {
 	});
 
 	it('selects small Ollama models for translation and large models for review', () => {
-		const models = routableOllamaModels({ models: [
-			{ name: 'gpt-oss:20b' },
-			{ model: 'gpt-oss:120b' },
-			{ model: 'qwen3.5:397b-cloud' },
+		const models = routableOllamaModels({ data: [
+			{ id: 'gpt-oss:20b' },
+			{ id: 'gpt-oss:120b' },
+			{ id: 'qwen3.5:397b-cloud' },
 		] });
 		expect(chooseOllamaTranslationModel(models)).toBe('gpt-oss:20b');
 		expect(chooseOllamaReviewModel(models)).toBe('qwen3.5:397b-cloud');

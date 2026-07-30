@@ -198,7 +198,7 @@ async function decideWithOllama(
 	try {
 		const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default')
 			.getUrl(OLLAMA_CLOUD_GATEWAY_SLUG as any);
-		const response = await fetchFn(`${base.replace(/\/+$/, '')}/api/chat`, {
+		const response = await fetchFn(`${base.replace(/\/+$/, '')}/v1/chat/completions`, {
 			method: 'POST',
 			signal: AbortSignal.timeout(45_000),
 			headers: {
@@ -211,8 +211,9 @@ async function decideWithOllama(
 				model,
 				messages: [{ role: 'user', content: prompt }],
 				stream: false,
-				format: 'json',
-				options: { num_predict: 320, temperature: 0 },
+				response_format: { type: 'json_object' },
+				max_tokens: 320,
+				temperature: 0,
 			}),
 		});
 		if (!response.ok) {

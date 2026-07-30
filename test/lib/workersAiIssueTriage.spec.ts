@@ -67,9 +67,11 @@ describe('Workers AI Issue triage', () => {
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input);
 			if (url.includes('/issues?')) return new Response(JSON.stringify([issue]), { status: 200 });
-			if (url.endsWith('/api/chat')) {
+			if (url.endsWith('/v1/chat/completions')) {
 				return new Response(JSON.stringify({
-					message: { content: JSON.stringify({ approve: true, confidence: 0.96, risk: 'low', reason: 'Safe.' }) },
+					choices: [{
+						message: { content: JSON.stringify({ approve: true, confidence: 0.96, risk: 'low', reason: 'Safe.' }) },
+					}],
 				}), { status: 200 });
 			}
 			if (url.endsWith('/issues/42')) return new Response(JSON.stringify(issue), { status: 200 });

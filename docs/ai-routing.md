@@ -26,7 +26,7 @@ Issue triage currently requests:
 - Ollama Cloud: first available preferred model in `qwen3.5:397b`, `qwen3.5`, `gpt-oss:120b`, `nemotron-3-super:120b`, `mistral-large-3`, `deepseek-v4-flash`; otherwise the largest discovered model at or above 70B.
 - Workers AI: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
 
-Ollama choices come from each credential's last successful `/api/tags` validation. A model name in this preference list is not a guarantee that every donor account can access it.
+Ollama choices come from each credential's last successful OpenAI-compatible `/v1/models` validation. A model name in this preference list is not a guarantee that every donor account can access it.
 
 ## Project Cost Classes
 
@@ -63,8 +63,8 @@ Ollama Cloud is registered as an account-level Cloudflare AI Gateway custom prov
 - Gateway slug used by Worker bindings: `custom-ollama-cloud`.
 - Account custom-provider slug: `ollama-cloud`.
 - Base URL: `https://ollama.com`.
-- Model discovery: `GET /api/tags`.
-- Inference: `POST /api/chat`.
+- Model discovery: `GET /v1/models`.
+- Inference: `POST /v1/chat/completions`.
 
 Provider credentials stay in AI Gateway. The Worker sends only the Provider Key alias and cannot retrieve the original donated key value.
 
@@ -96,4 +96,3 @@ Only secret names are documented. Values must never be printed, logged, committe
 - Paid providers are not an automatic fallback.
 - Gateway request payload logging is disabled for donated-key calls.
 - Exact Ollama remaining quota is not exposed by this implementation; health and accessible models are the available signal.
-

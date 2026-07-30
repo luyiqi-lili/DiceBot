@@ -57,7 +57,7 @@ Issue 门禁
   -> Workers AI 70B
 ```
 
-每一跳都经过 AI Gateway。多个健康的 `shared_inference` alias 使用 D1 游标轮询。Ollama Cloud 注册为账户级 custom provider，模型目录通过 `/api/tags` 发现。
+每一跳都经过 AI Gateway。多个健康的 `shared_inference` alias 使用 D1 游标轮询。Ollama Cloud 注册为账户级 custom provider，并通过 Gateway 使用 OpenAI 兼容接口 `/v1/models` 和 `/v1/chat/completions`。
 
 新捐赠密钥值只保存在 Cloudflare AI Gateway Secrets Store。D1 仅保存指纹、Gateway alias、secret/store id、授权范围、健康状态、费用分类和缓存模型目录。`validation_only` 凭据不会进入共享路由；收费凭据可以进入目录，但默认不自动选择。详见 [AI 路由与凭据捐赠](ai-routing.md)。
 

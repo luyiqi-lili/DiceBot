@@ -279,7 +279,7 @@ describe('API key donations', () => {
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});
 
-	it('validates an Ollama Cloud alias through /api/tags', async () => {
+	it('validates an Ollama Cloud alias through the OpenAI-compatible model endpoint', async () => {
 		const calls: Array<{ sql: string; values: unknown[] }> = [];
 		const stored = {
 			id: 'gateway-ollama',
@@ -304,7 +304,7 @@ describe('API key donations', () => {
 			},
 		} as any;
 		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-			models: [{ name: 'gpt-oss:20b' }, { model: 'gpt-oss:120b' }],
+			data: [{ id: 'gpt-oss:20b' }, { id: 'gpt-oss:120b' }],
 		}), { status: 200 }));
 		const getUrl = vi.fn().mockResolvedValue('https://gateway.example/custom-ollama-cloud');
 		const result = await validateCredentialDonation({
@@ -318,7 +318,7 @@ describe('API key donations', () => {
 			provider: 'ollama-cloud',
 			models: ['gpt-oss:120b', 'gpt-oss:20b'],
 		});
-		expect(fetchFn.mock.calls[0][0]).toBe('https://gateway.example/custom-ollama-cloud/api/tags');
+		expect(fetchFn.mock.calls[0][0]).toBe('https://gateway.example/custom-ollama-cloud/v1/models');
 		expect(fetchFn.mock.calls[0][1].headers['cf-aig-byok-alias']).toBe('donation-ollama');
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});

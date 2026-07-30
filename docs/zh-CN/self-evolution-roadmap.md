@@ -61,10 +61,10 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 `DONATION_ADMIN_KEY` 保护以下管理接口；生产当前未配置该 secret，因此这些管理接口关闭：
 
 - `GET /api/donations/api-keys`：只返回平台、指纹、状态、授权用途和模型目录等非敏感字段。
-- `POST /api/donations/api-keys/:id/validate`：经 AI Gateway alias 调用只读模型列表；Ollama 使用 `/api/tags`，Gemini 使用 `models.list`。
+- `POST /api/donations/api-keys/:id/validate`：经 AI Gateway alias 调用只读模型列表；Ollama 使用 OpenAI 兼容 `/v1/models`，Gemini 使用 `models.list`。
 - `POST /api/donations/api-keys/:id/status`：设置 `pending`、`disabled` 或 `revoked`；撤销会先删除 Secrets Store 中的密钥，删除失败则不改变 D1 状态。
 
-每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，Ollama Cloud 验证调用 `/api/tags`；成功后只记录可见模型名称。健康检查不会发送用户需求内容。
+每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，Ollama Cloud 验证调用 OpenAI 兼容 `/v1/models`；成功后只记录可见模型名称。健康检查不会发送用户需求内容。
 
 捐赠者本人仍可在私聊使用 `/revoketoken`。撤销会先删除 Secrets Store 密钥，再把 D1 元数据标为 revoked；删除失败时默认拒绝修改。新托管的 DeepSeek alias 因无法读回密钥，只记录项目支持的高级模型目录；只有旧 D1 加密 DeepSeek 记录可调用直连余额接口。
 
