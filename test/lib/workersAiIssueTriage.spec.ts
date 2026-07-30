@@ -38,4 +38,63 @@ describe('Workers AI Issue triage', () => {
 		expect(JSON.parse(String(labelCall?.[1]?.body))).toEqual({ labels: ['bot:ready'] });
 		expect(db.calls.some((call) => call.sql.includes('INSERT INTO ai_issue_triage_runs') && call.values.includes('approved'))).toBe(true);
 	});
+
+	it('prefers a donated Ollama Cloud large model and does not spend Workers AI quota', async () => {
+		const calls: Array<{ sql: string; values: unknown[] }> = [];
+		const db = {
+			calls,
+			prepare(sql: string) {
+				const all = async () => ({
+					results: sql.includes("d.provider = 'ollama-cloud'")
+						? [{
+							id: 'ollama-donation',
+							gateway_alias: 'ollama-alias',
+							available_models_json: JSON.stringify(['gpt-oss:20b', 'gpt-oss:120b']),
+						}]
+						: [],
+				});
+				return {
+					all,
+					run: async () => ({ success: true }),
+					bind(...values: unknown[]) {
+						calls.push({ sql, values });
+						return { all, run: async () => ({ success: true }) };
+					},
+				};
+			},
+		} as any;
+		const run = vi.fn();
+		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (url.includes('/issues?')) return new Response(JSON.stringify([issue]), { status: 200 });
+			if (url.endsWith('/api/chat')) {
+				return new Response(JSON.stringify({
+					message: { content: JSON.stringify({ approve: true, confidence: 0.96, risk: 'low', reason: 'Safe.' }) },
+				}), { status: 200 });
+			}
+			if (url.endsWith('/issues/42')) return new Response(JSON.stringify(issue), { status: 200 });
+			if (url.endsWith('/issues/42/labels')) return new Response('[]', { status: 200 });
+			throw new Error(`Unexpected request ${url}`);
+		});
+		const result = await runWorkersAiIssueTriage({
+			DB: db,
+			AI: {
+				run,
+				gateway: vi.fn().mockReturnValue({ getUrl: vi.fn().mockResolvedValue('https://gateway.example/custom-ollama-cloud') }),
+			},
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+			GITHUB_REPOSITORY: 'owner/repo',
+			GITHUB_TOKEN: 'github-write-token',
+			GITHUB_AI_TRIAGE_ENABLED: 'true',
+		} as any, {}, { fetchFn: fetchFn as typeof fetch });
+
+		expect(result).toMatchObject({
+			status: 'approved',
+			provider: 'ollama-cloud',
+			model: 'gpt-oss:120b',
+			credentialSource: 'donated-gateway',
+			donationId: 'ollama-donation',
+		});
+		expect(run).not.toHaveBeenCalled();
+	});
 });

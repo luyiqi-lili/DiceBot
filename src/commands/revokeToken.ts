@@ -175,7 +175,7 @@ export async function handleRevokeToken(parsed: ParsedUpdate, env: Env): Promise
 			await reply(parsed, env, '没有找到仍可撤销的匹配捐赠，未做任何修改。');
 			return;
 		}
-		await reply(parsed, env, `✅ 已撤销 ${revoked} 个 Token 捐赠。加密密文已永久清空，该凭据不会再用于验证或共享推理。`);
+		await reply(parsed, env, `✅ 已撤销 ${revoked} 个 Token 捐赠。Cloudflare AI Gateway 中的密钥已删除，该凭据不会再用于验证或共享推理。`);
 	} catch {
 		await reply(parsed, env, '⚠️ 撤销失败，未确认完成任何修改。请稍后重新查询状态。');
 	}

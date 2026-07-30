@@ -1,5 +1,6 @@
 import type { Env } from '../index';
 import { normalizeProvider } from './aiProviderRegistry';
+import { OLLAMA_CLOUD_GATEWAY_SLUG } from './ollamaCloud';
 
 export type AiCostClass = 'completely_free' | 'free_limited' | 'paid';
 
@@ -18,6 +19,7 @@ type GatewayManagementEnv = Pick<
 
 const PROVIDER_SLUGS: Record<string, string> = {
 	'google-gemini': 'google-ai-studio',
+	'ollama-cloud': OLLAMA_CLOUD_GATEWAY_SLUG,
 	deepseek: 'deepseek',
 	openai: 'openai',
 	anthropic: 'anthropic',
@@ -25,10 +27,12 @@ const PROVIDER_SLUGS: Record<string, string> = {
 };
 
 export function providerCostClass(provider: string): AiCostClass {
-	// DiceBot treats donated Gemini keys used only with the Gemini 2.5 free-tier
-	// translation models as completely free. Workers AI is classified separately
-	// as free_limited because its account-wide monthly allocation is finite.
-	return provider === 'google-gemini' ? 'completely_free' : 'paid';
+	// Gemini free-tier translation keys are completely free. Ollama accounts are
+	// quota-limited at the credential level; routing classifies their small and
+	// large models separately. Workers AI is classified at each call site.
+	if (provider === 'google-gemini') return 'completely_free';
+	if (provider === 'ollama-cloud') return 'free_limited';
+	return 'paid';
 }
 
 export function gatewayProviderSlug(provider: string): string | null {
@@ -88,6 +92,46 @@ async function defaultSecretStore(
 	return store.id;
 }
 
+async function ensureOllamaCustomProvider(
+	config: NonNullable<ReturnType<typeof managementConfig>>,
+	fetchFn: typeof fetch,
+): Promise<void> {
+	const list = await cloudflareJson(
+		`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai-gateway/custom-providers?per_page=100`,
+		config.token,
+		{},
+		fetchFn,
+	);
+	if (!list.ok) throw new Error(`gateway_custom_provider_list_http_${list.status}`);
+	const providers = Array.isArray(list.result) ? list.result : [];
+	const existing = providers.find((item) => item?.slug === 'ollama-cloud' && typeof item?.id === 'string');
+	if (existing?.enable !== false && String(existing?.base_url).replace(/\/+$/, '') === 'https://ollama.com') return;
+	const response = existing
+		? await cloudflareJson(
+			`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai-gateway/custom-providers/${existing.id}`,
+			config.token,
+			{ method: 'PATCH', body: JSON.stringify({ enable: true, base_url: 'https://ollama.com' }) },
+			fetchFn,
+		)
+		: await cloudflareJson(
+			`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai-gateway/custom-providers`,
+			config.token,
+			{
+				method: 'POST',
+				body: JSON.stringify({
+					name: 'Ollama Cloud',
+					slug: 'ollama-cloud',
+					base_url: 'https://ollama.com',
+					description: 'Ollama Cloud donated API keys for DiceBot',
+					link: 'https://docs.ollama.com/cloud',
+					enable: true,
+				}),
+			},
+			fetchFn,
+		);
+	if (!response.ok) throw new Error(`gateway_custom_provider_create_http_${response.status}`);
+}
+
 export async function provisionGatewayCredential(
 	env: GatewayManagementEnv,
 	input: { donationId: string; provider: string; apiKey: string },
@@ -100,6 +144,7 @@ export async function provisionGatewayCredential(
 	if (!provider || !providerSlug) throw new Error('gateway_provider_unsupported');
 	const alias = `donation-${input.donationId.replaceAll('-', '')}`;
 	const fetchFn = options.fetchFn ?? fetch;
+	if (provider.id === 'ollama-cloud') await ensureOllamaCustomProvider(config, fetchFn);
 	const storeId = await defaultSecretStore(config, fetchFn);
 	const secretName = `${config.gatewayId}_${providerSlug}_${alias}`;
 	const secretResponse = await cloudflareJson(

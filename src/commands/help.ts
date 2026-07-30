@@ -64,22 +64,23 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
 
 <b>🧬 源码共创与 AI 审核</b>
  <code>/wish 具体需求</code> / <code>/issue 具体需求</code> — 创建公开源码 Issue
- 请写清使用场景、期望结果和限制条件（8–2000 字）。Cloudflare 每小时审核尚未标记的 Issue。
- 静态检查通过后，Workers AI 会经 AI Gateway 用免费额度复核。AI 判定 <code>risk=low</code> 且置信度 ≥ 85%，并确认 Issue 未被修改后，才自动添加 <code>bot:ready</code>。
+ 请写清场景、结果和限制（8–2000 字）。Cloudflare 每小时审核未标记的 Issue。
+ 静态检查后，Ollama Cloud 大模型优先、Workers AI 70B 兜底，均经 AI Gateway。只有 <code>risk=low</code>、置信度 ≥ 85% 且 Issue 未变化才添加 <code>bot:ready</code>。
  密钥、资金、权限、部署、工作流、数据库迁移和安全类需求不会自动批准；维护者仍可手动添加 <code>bot:ready</code>。机器人不会自动改源码、创建 PR 或合并。
  <a href="https://github.com/luyiqi-lili/DiceBot/issues">查看公开 Issues 与处理进度</a>
 
 <b>🌐 翻译</b>
- 回复一条文字后发送 <code>/trans [目标语言]</code> — 通过 AI Gateway 调用 Gemini Flash 翻译，默认译为简体中文；也支持 <code>/trans English 你好，世界</code>
+ 回复文字后发送 <code>/trans [目标语言]</code> — 经 AI Gateway 使用免费小模型翻译，默认简体中文；也支持 <code>/trans English 你好，世界</code>
  <code>/quota</code> — 仅私聊：查询自己捐赠 API 的余额或可用性
 
 <b>🔑 安全捐赠 AI Token</b>
  请勿把 Token 发到群聊、Issue 或普通表单。与机器人单独聊天并发送：
  <code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
- 也兼容 <code>/donate_token</code>。机器人必须先删除含 Token 的原消息，才会加密入库；删除失败则拒绝保存。每位用户 24 小时最多捐赠 5 个 Token。
- <code>/revoketoken</code> — 私聊查看自己的捐赠；撤销后密文不可恢复。
+ Ollama Cloud 示例：<code>/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY</code>
+ 也兼容 <code>/donate_token</code>。机器人必须先删除含 Token 的原消息，才会托管到 Cloudflare AI Gateway；删除失败则拒绝保存。每位用户 24 小时最多捐赠 5 个 Token。
+ <code>/revoketoken</code> — 私聊查看自己的捐赠；撤销后 Gateway 密钥不可恢复。
  <code>validation_only</code> 仅验证；<code>shared_inference</code> 才授权共享推理。
- 运维方仍可使用受保护的 <code>POST /api/donations/api-keys</code>。支持 Gemini、DeepSeek、OpenAI、Anthropic、OpenRouter；平台名称会标准化，Token 经 AES-GCM 加密且不会通过 API 读回。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">查看完整说明</a>
+ 运维入口：<code>POST /api/donations/api-keys</code>。支持 Gemini、Ollama Cloud、DeepSeek、OpenAI、Anthropic、OpenRouter；Token 只托管到 AI Gateway。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">完整说明</a>
 
 <b>💝 Stars / TON 捐赠</b>
  与机器人私聊发送 <code>/donate</code> 打开捐赠菜单；也可使用 <code>/donate stars 25</code> 或 <code>/donate ton 0.5</code>。

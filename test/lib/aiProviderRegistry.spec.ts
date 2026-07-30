@@ -5,13 +5,29 @@ import {
 	normalizeProvider,
 	routableGeminiModels,
 } from '../../src/lib/aiProviderRegistry';
+import {
+	chooseOllamaReviewModel,
+	chooseOllamaTranslationModel,
+	routableOllamaModels,
+} from '../../src/lib/ollamaCloud';
 
 describe('AI provider registry', () => {
 	it('normalizes platform aliases without guessing from secret formats', () => {
 		expect(normalizeProvider('Gemini')?.id).toBe('google-gemini');
 		expect(normalizeProvider('google-ai-studio')?.id).toBe('google-gemini');
 		expect(normalizeProvider('Claude')?.id).toBe('anthropic');
+		expect(normalizeProvider('ollama')?.id).toBe('ollama-cloud');
 		expect(normalizeProvider('unknown-provider')).toBeNull();
+	});
+
+	it('selects small Ollama models for translation and large models for review', () => {
+		const models = routableOllamaModels({ models: [
+			{ name: 'gpt-oss:20b' },
+			{ model: 'gpt-oss:120b' },
+			{ model: 'qwen3.5:397b-cloud' },
+		] });
+		expect(chooseOllamaTranslationModel(models)).toBe('gpt-oss:20b');
+		expect(chooseOllamaReviewModel(models)).toBe('qwen3.5:397b-cloud');
 	});
 
 	it('keeps documented Gemini 2.5 free-tier seeds and routes by complexity', () => {

@@ -7,7 +7,7 @@ Autonomy is opened in explicit permission stages. Stages 1 and 2 are now impleme
 ## Implemented: Stage 1 Foundation
 
 - The hourly Worker cron reads open pull requests and stores deterministic risk snapshots in D1.
-- `POST /api/donations/api-keys` is operator mediated, uses a dedicated bearer token, encrypts with AES-GCM, and deduplicates by SHA-256 fingerprint.
+- `POST /api/donations/api-keys` uses a dedicated bearer token, deduplicates by SHA-256 fingerprint, and stores new keys only in Cloudflare AI Gateway Secrets Store; D1 retains non-secret routing metadata.
 - Optional subsystem failures safely skip without interrupting Telegram service.
 
 ## Implemented: Stage 2A Issues and Candidate Selection
@@ -18,17 +18,17 @@ The hourly review gives suitable low-risk community PRs priority. Only when the 
 
 ## Implemented: Stage 2B Credential Platform and Free Models
 
-Provider aliases are canonicalized, so Gemini/Google donations are stored as `google-gemini`. Each donation declares `validation_only` (default) or explicit `shared_inference` consent. Only the latter can enter routing after validation.
+Provider aliases are canonicalized, so Gemini/Google donations are stored as `google-gemini` and Ollama donations as `ollama-cloud`. Each donation declares `validation_only` (default) or explicit `shared_inference` consent. Only the latter can enter routing after validation. Ollama Cloud uses an account-level AI Gateway Custom Provider pointing at `https://ollama.com`; keys remain in Secrets Store and are selected by alias.
 
 `DONATION_ADMIN_KEY` protects metadata listing, validation, disable, and revoke operations. Revocation clears ciphertext. Gemini validation calls the official read-only models list and records visible `generateContent` models; DeepSeek validation calls the official balance endpoint and records only availability, not an exact balance. One shared credential can be health-checked per hourly run.
 
 Gemini 2.5 Flash-Lite, Flash, and Pro are seeded from Google's official [model list](https://ai.google.dev/gemini-api/docs/models) and [pricing](https://ai.google.dev/gemini-api/docs/pricing), verified 2026-07-20. Free availability remains account, region, and rate-limit dependent. `/api/ai/models` lists seeds; `/api/ai/route` returns a recommendation and clearly distinguishes a validated credential from an unverified catalog seed.
 
-## Implemented: Stage 2C Workers AI Issue Approval
+## Implemented: Stage 2C Free-Limited Large-Model Issue Approval
 
 The hourly Cron statically filters unready Issues, excludes assigned, locked, PR-linked, underspecified, blocked, and protected work, and reviews at most one eligible Issue. The only automatic GitHub mutation is adding `bot:ready`.
 
-The decision uses Workers AI model `@cf/meta/llama-3.2-3b-instruct` and sends the run through AI Gateway. It must return `risk=low` with confidence at or above `GITHUB_AI_TRIAGE_MIN_CONFIDENCE` (production: `0.85`). Any missing binding, malformed response, model error, or GitHub error fails closed without a label. This consumes the Workers AI free allocation where available.
+The decision first round-robins donated Ollama Cloud aliases and selects a large model from each validated `/api/tags` catalog. It falls back to Workers AI `@cf/meta/llama-3.3-70b-instruct-fp8-fast`. Both paths use AI Gateway and must return `risk=low` with confidence at or above `GITHUB_AI_TRIAGE_MIN_CONFIDENCE` (production: `0.85`). Translation uses the completely-free small-model pool: donated Gemini first, then Ollama Cloud small models, then Workers AI `@cf/meta/llama-3.2-3b-instruct`.
 
 Every outcome is recorded in `ai_issue_triage_runs` without storing a prompt or credential. An unchanged rejected Issue is not repeatedly reviewed; editing it makes it eligible for a later review. `GET /api/evolution/candidate` includes the latest non-secret triage audit.
 

@@ -114,6 +114,40 @@ describe('API key donations', () => {
 		expect(result).toMatchObject({ provider: 'google-gemini', platform: 'Google Gemini', usagePolicy: 'validation_only' });
 	});
 
+	it('creates the Ollama Cloud custom provider before storing its Gateway alias', async () => {
+		const urls: string[] = [];
+		const env = gatewayEnv(makeDb());
+		vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = String(input);
+			urls.push(`${init?.method ?? 'GET'} ${url}`);
+			if (url.includes('/custom-providers')) {
+				return new Response(JSON.stringify({
+					success: true,
+					result: init?.method === 'POST' ? { id: 'ollama-provider', slug: 'ollama-cloud', enable: true } : [],
+				}), { status: 200 });
+			}
+			if (url.includes('/provider_configs')) {
+				return new Response(JSON.stringify({ success: true, result: { secret_id: 'secret-id' } }), { status: 200 });
+			}
+			if (url.includes('/secrets_store/stores/store-id/secrets')) {
+				return new Response(JSON.stringify({ success: true, result: [{ id: 'secret-id' }] }), { status: 200 });
+			}
+			return new Response(JSON.stringify({
+				success: true,
+				result: [{ id: 'store-id', name: 'default_secrets_store' }],
+			}), { status: 200 });
+		}));
+		const response = await handleApiKeyDonation(
+			request({ provider: 'ollama', apiKey: 'ollama-donated-key', usagePolicy: 'shared_inference' }),
+			env,
+		);
+		const result = await response.json<any>();
+
+		expect(response.status).toBe(201);
+		expect(result).toMatchObject({ provider: 'ollama-cloud', platform: 'Ollama Cloud', status: 'pending' });
+		expect(urls.some((url) => url.includes('POST https://api.cloudflare.com/client/v4/accounts/account-id/ai-gateway/custom-providers'))).toBe(true);
+	});
+
 	it('returns duplicate without inserting the same provider and fingerprint', async () => {
 		const db = makeDb(true);
 		const response = await handleApiKeyDonation(
@@ -242,6 +276,50 @@ describe('API key donations', () => {
 			provider: 'deepseek',
 			models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
 		});
+		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
+	});
+
+	it('validates an Ollama Cloud alias through /api/tags', async () => {
+		const calls: Array<{ sql: string; values: unknown[] }> = [];
+		const stored = {
+			id: 'gateway-ollama',
+			provider: 'ollama-cloud',
+			encrypted_key: '',
+			encryption_iv: '',
+			gateway_alias: 'donation-ollama',
+			status: 'pending',
+		};
+		const db = {
+			prepare(sql: string) {
+				return {
+					run: async () => ({ success: true }),
+					bind(...values: unknown[]) {
+						calls.push({ sql, values });
+						return {
+							run: async () => ({ success: true }),
+							first: async () => sql.includes('SELECT id, provider, encrypted_key') ? stored : null,
+						};
+					},
+				};
+			},
+		} as any;
+		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			models: [{ name: 'gpt-oss:20b' }, { model: 'gpt-oss:120b' }],
+		}), { status: 200 }));
+		const getUrl = vi.fn().mockResolvedValue('https://gateway.example/custom-ollama-cloud');
+		const result = await validateCredentialDonation({
+			DB: db,
+			AI: { gateway: vi.fn().mockReturnValue({ getUrl }) },
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+		} as any, stored.id, { fetchFn });
+
+		expect(result).toEqual({
+			status: 'ok',
+			provider: 'ollama-cloud',
+			models: ['gpt-oss:120b', 'gpt-oss:20b'],
+		});
+		expect(fetchFn.mock.calls[0][0]).toBe('https://gateway.example/custom-ollama-cloud/api/tags');
+		expect(fetchFn.mock.calls[0][1].headers['cf-aig-byok-alias']).toBe('donation-ollama');
 		expect(calls.some((call) => call.sql.includes('UPDATE api_key_donations') && call.values.includes('active'))).toBe(true);
 	});
 

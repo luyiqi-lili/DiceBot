@@ -37,8 +37,10 @@ describe('/status', () => {
 		expect(reply.text).toContain('<b>免费但有限额</b>');
 		expect(reply.text).toContain('<b>收费</b>');
 		expect(reply.text).toContain('DeepSeek：1 把 Gateway 密钥（轮询）');
-		expect(reply.text).toContain('翻译：✅ 免费优先；无完全免费时使用免费限额池');
-		expect(reply.text).toContain('PR 审核：✅ 免费限额池（Workers AI）');
+		expect(reply.text).toContain('翻译：✅ 完全免费小模型池（Gemini / Ollama / Workers AI）');
+		expect(reply.text).toContain('PR 审核：✅ 免费限额大模型池（Ollama → Workers AI）');
+		expect(reply.text).toContain('Workers AI 小模型：✅ Llama 3.2 3B');
+		expect(reply.text).toContain('Workers AI 大模型：✅ Llama 3.3 70B');
 		for (const secret of ['bot-secret', 'external-secret', 'gateway-secret', 'management-secret']) {
 			expect(reply.text).not.toContain(secret);
 		}

@@ -51,9 +51,9 @@ prod 和 dev 都有名为 `DB` 的 D1 绑定，分别指向 `dicebot-db` 与 `di
 - 好感度：`affections`、`rose_sends`。
 - 使用与备份：调用统计、用户活跃、消息历史、活动和汇报相关表。
 - 规则：`src/commands/rule.ts` 使用的群规则表。
-- 自进化：`api_key_donations` 保存 AES-GCM 密文和不可逆指纹；`api_credential_profiles` 保存规范化平台、用途授权、健康状态和非敏感模型 ID。PR/Issue 快照、Telegram 到 Issue 的私有映射、候选运行与付费高级模型标签审计分别使用 `pull_request_snapshots`、`pr_monitor_runs`、`github_issue_submissions`、`github_issue_snapshots`、`evolution_selection_runs`、`ai_issue_triage_runs`。
+- 自进化：`api_key_donations` 保存不可逆指纹、AI Gateway alias/Secret ID 与生命周期元数据；新捐赠密钥值只保存在 Cloudflare Secrets Store。`api_credential_profiles` 保存规范化平台、用途授权、健康状态和非敏感模型 ID。PR/Issue 快照、Telegram 到 Issue 的私有映射、候选运行与免费额度模型标签审计分别使用 `pull_request_snapshots`、`pr_monitor_runs`、`github_issue_submissions`、`github_issue_snapshots`、`evolution_selection_runs`、`ai_issue_triage_runs`。
 
-`api_key_donations.encrypted_key` 不能通过 HTTP API 读回。路由只能考虑 `active` 且 profile 为 `shared_inference + healthy` 的记录；接收时默认 `validation_only`。
+历史 `api_key_donations.encrypted_key` 不能通过 HTTP API 读回；新捐赠不再把密钥值写入 D1。路由只能考虑 `active` 且 profile 为 `shared_inference + healthy` 的记录；接收时默认 `validation_only`。
 
 `financial_donations` 保存 Stars 发票意向、Telegram 成功支付编号，以及带唯一备注的 TON 转账意向；不保存钱包私钥。
 

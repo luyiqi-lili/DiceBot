@@ -36,7 +36,7 @@ function usageText(): string {
 只在与机器人单独聊天时发送：
 <code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
 
-也兼容 <code>/donate_token</code>。支持平台：<code>gemini</code>、<code>deepseek</code>、<code>openai</code>、<code>anthropic</code>、<code>openrouter</code>。
+也兼容 <code>/donate_token</code>。支持平台：<code>gemini</code>、<code>ollama</code>、<code>deepseek</code>、<code>openai</code>、<code>anthropic</code>、<code>openrouter</code>。
 
 授权范围：
 • <code>validation_only</code> — 只允许验证 Token 和模型可用性；

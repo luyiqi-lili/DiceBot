@@ -34,7 +34,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 |------|---------|
 | `/api/coin/*` | Forwarded to `CoinDO` after stripping `/api/coin` |
 | `/api/lottery/*` | Forwarded to `LotteryDO` after stripping `/api/lottery` |
-| `/api/donations/api-keys` | Accepts encrypted API-key donations using a dedicated bearer token |
+| `/api/donations/api-keys` | Accepts API-key donations with a dedicated bearer token and stores keys in Cloudflare AI Gateway Secrets Store |
 | `/api/donations/api-keys/:id/validate`, `.../status` | Separate donation-admin bearer token; validates or changes lifecycle without returning secrets |
 | `/api/ai/models`, `/api/ai/route` | Protected non-secret catalog and routing recommendation |
 | `/api/evolution/candidate` | Protected read-only latest issue candidate |

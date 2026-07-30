@@ -1,4 +1,4 @@
-export type AiProviderId = 'google-gemini' | 'openai' | 'anthropic' | 'deepseek' | 'openrouter';
+export type AiProviderId = 'google-gemini' | 'ollama-cloud' | 'openai' | 'anthropic' | 'deepseek' | 'openrouter';
 
 export type CredentialUsagePolicy = 'validation_only' | 'shared_inference';
 
@@ -7,7 +7,7 @@ export interface AiProviderDefinition {
 	displayName: string;
 	aliases: readonly string[];
 	credentialType: 'api_key';
-	validation: 'google-models' | 'deepseek-balance' | 'not-implemented';
+	validation: 'google-models' | 'ollama-models' | 'deepseek-balance' | 'not-implemented';
 }
 
 export interface FreeModelSeed {
@@ -27,6 +27,13 @@ export const AI_PROVIDERS: readonly AiProviderDefinition[] = [
 		aliases: ['google-gemini', 'google', 'gemini', 'google-ai', 'google-ai-studio'],
 		credentialType: 'api_key',
 		validation: 'google-models',
+	},
+	{
+		id: 'ollama-cloud',
+		displayName: 'Ollama Cloud',
+		aliases: ['ollama-cloud', 'ollama', 'ollama.com'],
+		credentialType: 'api_key',
+		validation: 'ollama-models',
 	},
 	{
 		id: 'openai',

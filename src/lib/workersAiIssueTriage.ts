@@ -1,12 +1,20 @@
 import type { Env } from '../index';
 import { assessIssueForAutonomy } from './githubIssueMonitor';
+import { ensureGatewayCredentialColumns } from './apiKeyDonations';
+import { gatewayInferenceHeaders } from './cloudflareAiGateway';
+import {
+	OLLAMA_CLOUD_GATEWAY_SLUG,
+	chooseOllamaReviewModel,
+	ollamaChatText,
+} from './ollamaCloud';
 
-export const WORKERS_AI_TRIAGE_MODEL = '@cf/meta/llama-3.2-3b-instruct';
+export const WORKERS_AI_TRIAGE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 type TriageEnv = Pick<
 	Env,
 	| 'AI'
 	| 'AI_GATEWAY_ID'
+	| 'AI_GATEWAY_TOKEN'
 	| 'DB'
 	| 'GITHUB_REPOSITORY'
 	| 'GITHUB_TOKEN'
@@ -35,9 +43,10 @@ type GitHubIssue = {
 export type WorkersAiIssueTriageResult = {
 	status: 'approved' | 'rejected' | 'skipped' | 'error';
 	issueNumber?: number;
-	provider?: 'workers-ai';
+	provider?: 'ollama-cloud' | 'workers-ai';
 	model?: string;
-	credentialSource?: 'workers-ai';
+	credentialSource?: 'donated-gateway' | 'workers-ai';
+	donationId?: string;
 	/** Retained in D1/API response for backward compatibility; Workers AI has no paid-balance gate. */
 	paidBalanceVerified?: false;
 	confidence?: number;
@@ -83,10 +92,11 @@ async function recordRun(db: D1Database, repository: string, result: WorkersAiIs
 		INSERT INTO ai_issue_triage_runs
 		(id, repository, status, issue_number, issue_updated_at, provider, model, credential_source,
 		 donation_id, paid_balance_verified, confidence, decision_reason, error_summary, checked_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, ?, ?, datetime('now'))
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, datetime('now'))
 	`).bind(
 		crypto.randomUUID(), repository, result.status, result.issueNumber ?? null, input.issueUpdatedAt ?? null,
 		result.provider ?? null, result.model ?? null, result.credentialSource ?? null,
+		result.donationId ?? null,
 		result.confidence ?? null, result.reason.slice(0, 500), input.errorSummary?.slice(0, 500) ?? null,
 	).run();
 }
@@ -123,6 +133,94 @@ function parseDecision(response: unknown): ModelDecision | null {
 			|| !Number.isFinite(parsed.confidence) || !['low', 'medium', 'high'].includes(String(parsed.risk))
 			|| typeof parsed.reason !== 'string') return null;
 		return { approve: parsed.approve, confidence: Math.min(1, Math.max(0, parsed.confidence)), risk: parsed.risk as ModelDecision['risk'], reason: parsed.reason.slice(0, 500) };
+	} catch {
+		return null;
+	}
+}
+
+type OllamaCredential = {
+	id: string;
+	gateway_alias: string;
+	available_models_json: string;
+};
+
+async function ollamaCredentials(db: D1Database): Promise<OllamaCredential[]> {
+	try {
+		await ensureGatewayCredentialColumns(db);
+		const result = await db.prepare(`
+			SELECT d.id, d.gateway_alias, p.available_models_json
+			FROM api_key_donations d
+			JOIN api_credential_profiles p ON p.donation_id = d.id
+			WHERE d.provider = 'ollama-cloud' AND d.status = 'active'
+				AND d.gateway_alias IS NOT NULL AND d.gateway_alias <> ''
+				AND p.usage_policy = 'shared_inference' AND p.health_status = 'healthy'
+			ORDER BY d.created_at ASC
+		`).all<OllamaCredential>();
+		const credentials = result.results ?? [];
+		if (credentials.length < 2) return credentials;
+		await db.prepare(`
+			CREATE TABLE IF NOT EXISTS ai_gateway_rotation_state (
+				pool TEXT PRIMARY KEY, cursor INTEGER NOT NULL DEFAULT 0,
+				updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+			)
+		`).run();
+		await db.prepare(`INSERT OR IGNORE INTO ai_gateway_rotation_state (pool, cursor) VALUES ('issue-triage-ollama', 0)`).run();
+		const row = await db.prepare(`
+			UPDATE ai_gateway_rotation_state SET cursor = cursor + 1, updated_at = datetime('now')
+			WHERE pool = 'issue-triage-ollama' RETURNING cursor
+		`).first<{ cursor: number }>();
+		const start = Math.max(0, Number(row?.cursor ?? 1) - 1) % credentials.length;
+		return [...credentials.slice(start), ...credentials.slice(0, start)];
+	} catch (error) {
+		console.error('[workers-ai-issue-triage] Ollama credential lookup failed', {
+			reason: error instanceof Error ? error.message.slice(0, 160) : 'unknown',
+		});
+		return [];
+	}
+}
+
+async function decideWithOllama(
+	env: TriageEnv,
+	credential: OllamaCredential,
+	prompt: string,
+	fetchFn: typeof fetch,
+): Promise<{ decision: ModelDecision; model: string } | null> {
+	if (!env.AI || !env.AI_GATEWAY_TOKEN) return null;
+	let models: string[] = [];
+	try {
+		const parsed = JSON.parse(credential.available_models_json);
+		if (Array.isArray(parsed)) models = parsed.filter((model): model is string => typeof model === 'string');
+	} catch {
+		return null;
+	}
+	const model = chooseOllamaReviewModel(models);
+	if (!model) return null;
+	try {
+		const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default')
+			.getUrl(OLLAMA_CLOUD_GATEWAY_SLUG as any);
+		const response = await fetchFn(`${base.replace(/\/+$/, '')}/api/chat`, {
+			method: 'POST',
+			signal: AbortSignal.timeout(45_000),
+			headers: {
+				Accept: 'application/json',
+				'Content-Type': 'application/json',
+				...gatewayInferenceHeaders(env, credential.gateway_alias),
+				'User-Agent': 'dicebot-gateway-ollama-issue-triage',
+			},
+			body: JSON.stringify({
+				model,
+				messages: [{ role: 'user', content: prompt }],
+				stream: false,
+				format: 'json',
+				options: { num_predict: 320, temperature: 0 },
+			}),
+		});
+		if (!response.ok) {
+			console.warn('[workers-ai-issue-triage] Ollama alias failed', { status: response.status });
+			return null;
+		}
+		const decision = parseDecision(ollamaChatText(await response.json()));
+		return decision ? { decision, model } : null;
 	} catch {
 		return null;
 	}
@@ -184,17 +282,61 @@ export async function runWorkersAiIssueTriage(env: TriageEnv, input: { linkedIss
 			await recordRun(env.DB, repository, result);
 			return result;
 		}
-		const output = await env.AI.run(WORKERS_AI_TRIAGE_MODEL, { prompt: promptFor(selected), max_tokens: 320, temperature: 0 }, {
-			gateway: { id: env.AI_GATEWAY_ID?.trim() || 'default', skipCache: true, collectLog: true, metadata: { feature: 'issue-triage', issue: String(selected.number) } },
-		});
-		const decision = parseDecision((output as { response?: unknown }).response);
+		const prompt = promptFor(selected);
+		let decision: ModelDecision | null = null;
+		let provider: WorkersAiIssueTriageResult['provider'] = 'workers-ai';
+		let model = WORKERS_AI_TRIAGE_MODEL;
+		let credentialSource: WorkersAiIssueTriageResult['credentialSource'] = 'workers-ai';
+		let donationId: string | undefined;
+		for (const credential of await ollamaCredentials(env.DB)) {
+			const result = await decideWithOllama(env, credential, prompt, fetchFn);
+			if (!result) continue;
+			decision = result.decision;
+			provider = 'ollama-cloud';
+			model = result.model;
+			credentialSource = 'donated-gateway';
+			donationId = credential.id;
+			break;
+		}
 		if (!decision) {
-			const result: WorkersAiIssueTriageResult = { status: 'error', issueNumber: selected.number, provider: 'workers-ai', model: WORKERS_AI_TRIAGE_MODEL, credentialSource: 'workers-ai', reason: 'workers-ai-invalid-response' };
+			const output = await env.AI.run(WORKERS_AI_TRIAGE_MODEL, { prompt, max_tokens: 320, temperature: 0 }, {
+				gateway: {
+					id: env.AI_GATEWAY_ID?.trim() || 'default',
+					skipCache: true,
+					collectLog: true,
+					metadata: { feature: 'issue-triage', issue: String(selected.number), costClass: 'free_limited', modelSize: 'large' },
+				},
+			});
+			decision = parseDecision((output as { response?: unknown }).response);
+			provider = 'workers-ai';
+			model = WORKERS_AI_TRIAGE_MODEL;
+			credentialSource = 'workers-ai';
+		}
+		if (!decision) {
+			const result: WorkersAiIssueTriageResult = {
+				status: 'error',
+				issueNumber: selected.number,
+				provider,
+				model,
+				credentialSource,
+				donationId,
+				reason: 'free-limited-model-invalid-response',
+			};
 			await recordRun(env.DB, repository, result, { issueUpdatedAt: selected.updated_at, errorSummary: result.reason });
 			return result;
 		}
 		const approved = decision.approve && decision.risk === 'low' && decision.confidence >= minimumConfidence(env.GITHUB_AI_TRIAGE_MIN_CONFIDENCE);
-		const result: WorkersAiIssueTriageResult = { status: approved ? 'approved' : 'rejected', issueNumber: selected.number, provider: 'workers-ai', model: WORKERS_AI_TRIAGE_MODEL, credentialSource: 'workers-ai', paidBalanceVerified: false, confidence: decision.confidence, reason: decision.reason };
+		const result: WorkersAiIssueTriageResult = {
+			status: approved ? 'approved' : 'rejected',
+			issueNumber: selected.number,
+			provider,
+			model,
+			credentialSource,
+			donationId,
+			paidBalanceVerified: false,
+			confidence: decision.confidence,
+			reason: decision.reason,
+		};
 		if (approved) {
 			const guard = await revalidateIssue(fetchFn, repository, selected, readyLabel, headers, linked);
 			if (guard.reason) {

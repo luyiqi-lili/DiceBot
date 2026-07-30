@@ -60,10 +60,10 @@ Major D1 table families:
 - Affection: `affections`, `rose_sends`.
 - Usage and backup: usage count, user activity, message history, and activity/report tables as used by `src/lib/backup.ts`, `src/commands/act.ts`, and `src/commands/report.ts`.
 - Rules: group rule tables used by `src/commands/rule.ts`.
-- Self-evolution: `api_key_donations` stores AES-GCM ciphertext and irreversible fingerprints; `api_credential_profiles` stores canonical provider, consent policy, health, and non-secret model ids. PR/Issue snapshots, private Telegram-to-Issue intake mappings, selection runs, and Workers AI label audits use `pull_request_snapshots`, `pr_monitor_runs`, `github_issue_submissions`, `github_issue_snapshots`, `evolution_selection_runs`, and `ai_issue_triage_runs`.
+- Self-evolution: `api_key_donations` stores irreversible fingerprints, AI Gateway aliases/Secret IDs, and lifecycle metadata; new key values exist only in Cloudflare Secrets Store. `api_credential_profiles` stores canonical provider, consent policy, health, and non-secret model ids. PR/Issue snapshots, private Telegram-to-Issue intake mappings, selection runs, and free-limited model label audits use `pull_request_snapshots`, `pr_monitor_runs`, `github_issue_submissions`, `github_issue_snapshots`, `evolution_selection_runs`, and `ai_issue_triage_runs`.
 - Financial donations: `financial_donations` records Stars invoice intents, successful Telegram charge identifiers, and TON transfer intents with unique memos. It never stores a wallet private key.
 
-No HTTP API may return `api_key_donations.encrypted_key`. Routing may only consider `active` credentials whose profile is `shared_inference + healthy`; `validation_only` is the intake default.
+No HTTP API may return legacy `api_key_donations.encrypted_key`, and new donations never write key values to D1. Routing may only consider `active` credentials whose profile is `shared_inference + healthy`; `validation_only` is the intake default.
 
 `ai_issue_triage_runs` stores only the provider/model, credential source, paid-balance boolean, confidence, decision reason, and Issue version. It never stores the API key or exact provider balance.
 

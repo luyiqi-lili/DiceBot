@@ -294,6 +294,11 @@ CREATE TABLE IF NOT EXISTS api_key_donations (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_validated_at TEXT,
   validation_error TEXT,
+  gateway_alias TEXT,
+  gateway_secret_id TEXT,
+  gateway_store_id TEXT,
+  cost_class TEXT NOT NULL DEFAULT 'paid'
+    CHECK (cost_class IN ('completely_free', 'free_limited', 'paid')),
   UNIQUE(provider, key_fingerprint)
 );
 

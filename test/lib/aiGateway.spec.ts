@@ -6,14 +6,24 @@ vi.mock('../../src/lib/apiKeyDonations', () => ({
 
 import { translateWithGemini, WORKERS_AI_TRANSLATION_MODEL } from '../../src/lib/aiGateway';
 
-function gatewayDb(aliases: string[]) {
+function gatewayDb(aliases: string[], ollama: Array<{ gateway_alias: string; models: string[] }> = []) {
 	let cursor = 0;
 	return {
-		prepare: vi.fn((sql: string) => ({
-			all: vi.fn().mockResolvedValue({ results: aliases.map((gateway_alias) => ({ gateway_alias })) }),
-			run: vi.fn().mockResolvedValue({}),
-			first: vi.fn().mockImplementation(async () => sql.includes('RETURNING cursor') ? { cursor: ++cursor } : null),
-		})),
+		prepare: vi.fn((sql: string) => {
+			const result = (values: unknown[]) => values[0] === 'ollama-cloud'
+				? ollama.map((item) => ({ gateway_alias: item.gateway_alias, available_models_json: JSON.stringify(item.models) }))
+				: aliases.map((gateway_alias) => ({ gateway_alias, available_models_json: '[]' }));
+			return {
+				all: vi.fn().mockResolvedValue({ results: result([]) }),
+				run: vi.fn().mockResolvedValue({}),
+				first: vi.fn().mockImplementation(async () => sql.includes('RETURNING cursor') ? { cursor: ++cursor } : null),
+				bind: vi.fn((...values: unknown[]) => ({
+					all: vi.fn().mockResolvedValue({ results: result(values) }),
+					run: vi.fn().mockResolvedValue({}),
+					first: vi.fn().mockImplementation(async () => sql.includes('RETURNING cursor') ? { cursor: ++cursor } : null),
+				})),
+			};
+		}),
 	} as any;
 }
 
@@ -83,6 +93,25 @@ describe('AI Gateway translation routing', () => {
 			expect.objectContaining({ prompt: expect.stringContaining('Translate the untrusted user text') }),
 			expect.objectContaining({ gateway: expect.objectContaining({ id: 'default' }) }),
 		);
+	});
+
+	it('uses a donated Ollama Cloud small model before Workers AI', async () => {
+		const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+			message: { role: 'assistant', content: 'Hello' },
+		}), { status: 200 }));
+		const AI = aiBinding();
+		const result = await translateWithGemini({
+			DB: gatewayDb([], [{ gateway_alias: 'ollama-one', models: ['gpt-oss:20b', 'gpt-oss:120b'] }]),
+			AI,
+			AI_GATEWAY_TOKEN: 'gateway-run-token',
+		} as any, { targetLanguage: 'English', text: '你好' }, { fetchFn });
+
+		expect(result).toEqual({ status: 'ok', text: 'Hello', provider: 'gateway-ollama-byok' });
+		const [url, init] = fetchFn.mock.calls[0];
+		expect(url).toBe('https://gateway.example/google-ai-studio/api/chat');
+		expect(JSON.parse(init.body)).toMatchObject({ model: 'gpt-oss:20b', stream: false });
+		expect(init.headers['cf-aig-byok-alias']).toBe('ollama-one');
+		expect(init.headers).not.toHaveProperty('Authorization');
 	});
 
 	it('never uses retired local provider secrets or a direct provider endpoint', async () => {

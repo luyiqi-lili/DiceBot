@@ -15,6 +15,8 @@ type CredentialRow = {
 	health_status?: string | null;
 	last_checked_at?: string | null;
 	last_error_code?: string | null;
+	gateway_alias?: string | null;
+	available_models_json?: string | null;
 };
 
 export type PersonalApiQuota = {
@@ -56,6 +58,30 @@ async function checkCredential(row: CredentialRow, env: QuotaEnv, fetchFn: typeo
 	const base = { provider: row.provider, displayName: definition?.displayName ?? row.provider, fingerprint: row.fingerprint, lastCheckedAt: row.last_checked_at };
 	if (row.status === 'disabled' || row.status === 'revoked') return { ...base, status: 'disabled', detail: '凭据已停用或撤销，未发起联网检查' };
 	if (!definition) return { ...base, status: 'unsupported', detail: '未知供应商，无法安全检查' };
+	if (row.gateway_alias) {
+		let models: string[] = [];
+		try {
+			const parsed = JSON.parse(row.available_models_json ?? '[]');
+			if (Array.isArray(parsed)) {
+				models = parsed.filter((model): model is string => typeof model === 'string').slice(0, 30);
+			}
+		} catch { /* health metadata below still remains useful */ }
+		const status = row.health_status === 'healthy'
+			? 'available'
+			: row.health_status === 'rate_limited'
+				? 'rate_limited'
+				: 'unavailable';
+		return {
+			...base,
+			status,
+			detail: status === 'available'
+				? `Cloudflare AI Gateway 托管正常（${models.length} 个已验证模型）；供应商未提供可用的精确剩余额度接口`
+				: status === 'rate_limited'
+					? 'Cloudflare AI Gateway 最近检查时被供应商限流'
+					: `Cloudflare AI Gateway 最近检查状态：${row.health_status ?? 'unchecked'}`,
+			models,
+		};
+	}
 
 	try {
 		const apiKey = await decryptDonationCredentialForRuntime(env, row);
@@ -108,8 +134,9 @@ export async function inspectPersonalApiQuotas(env: QuotaEnv, userId: number, op
 	const donorLabel = await telegramDonorLabel(userId, env.DONATION_ENCRYPTION_KEY);
 	const result = await env.DB.prepare(`
 		SELECT d.id, d.provider, d.encrypted_key, d.encryption_iv, d.status,
+			d.gateway_alias,
 			substr(d.key_fingerprint, 1, 16) AS fingerprint,
-			p.health_status, p.last_checked_at, p.last_error_code
+			p.health_status, p.last_checked_at, p.last_error_code, p.available_models_json
 		FROM api_key_donations d LEFT JOIN api_credential_profiles p ON p.donation_id = d.id
 		WHERE d.donor_label = ? ORDER BY d.created_at DESC LIMIT 10
 	`).bind(donorLabel).all<CredentialRow>();

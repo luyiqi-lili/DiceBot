@@ -32,7 +32,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 |------|------|
 | `/api/coin/*` | 去掉 `/api/coin` 后转发给 `CoinDO` |
 | `/api/lottery/*` | 去掉 `/api/lottery` 后转发给 `LotteryDO` |
-| `/api/donations/api-keys` | 使用独立 bearer token 接收并加密保存捐赠 API Key |
+| `/api/donations/api-keys` | 使用独立 bearer token 接收 API Key，并托管到 Cloudflare AI Gateway Secrets Store |
 | `/api/donations/api-keys/:id/validate`、`.../status` | 使用独立管理 token 验证或变更生命周期，不返回秘密 |
 | `/api/ai/models`、`/api/ai/route` | 受保护的非敏感目录与模型路由建议 |
 | `/api/evolution/candidate` | 受保护地读取最新 Issue 候选 |
@@ -97,4 +97,4 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。只有 Workers AI 给出达到配置置信度的低风险结论时才允许该写入；请求通过 AI Gateway 记录。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复审核。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。审核优先轮询捐赠的 Ollama Cloud 大模型，不可用时回退 Workers AI 70B；两条路径都通过 AI Gateway。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复审核。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。

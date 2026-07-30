@@ -8,7 +8,9 @@ import {
 	type CredentialUsagePolicy,
 } from './aiProviderRegistry';
 import { DEEPSEEK_PREMIUM_MODELS, checkDeepSeekPaidBalance } from './deepseekPremium';
+import { routableOllamaModels } from './ollamaCloud';
 import {
+	deleteGatewayCredential,
 	gatewayInferenceHeaders,
 	gatewayProviderSlug,
 	provisionGatewayCredential,
@@ -383,6 +385,50 @@ export async function validateCredentialDonation(
 			return { status: 'error', provider: record.provider, reason: errorCode };
 		}
 
+		if (provider.validation === 'ollama-models') {
+			const gatewayAlias = record.gateway_alias?.trim();
+			if (!gatewayAlias || !env.AI || !env.AI_GATEWAY_TOKEN) {
+				return { status: 'skipped', provider: record.provider, reason: 'AI Gateway is not configured' };
+			}
+			const base = await env.AI.gateway(env.AI_GATEWAY_ID?.trim() || 'default')
+				.getUrl(gatewayProviderSlug(record.provider) as any);
+			const response = await (options.fetchFn ?? fetch)(`${base.replace(/\/+$/, '')}/api/tags`, {
+				method: 'GET',
+				signal: AbortSignal.timeout(10_000),
+				headers: {
+					Accept: 'application/json',
+					...gatewayInferenceHeaders(env, gatewayAlias),
+					'User-Agent': 'dicebot-ollama-cloud-validator',
+				},
+			});
+			if (response.ok) {
+				const models = routableOllamaModels(await response.json());
+				if (!models.length) {
+					await updateValidationResult(env.DB, record, {
+						status: record.status,
+						health: 'error',
+						errorCode: 'ollama_no_models',
+					});
+					return { status: 'error', provider: record.provider, reason: 'ollama_no_models' };
+				}
+				await updateValidationResult(env.DB, record, { status: 'active', health: 'healthy', models });
+				console.log('[api-key-donations] validation complete', {
+					id: record.id,
+					provider: record.provider,
+					models: models.length,
+				});
+				return { status: 'ok', provider: record.provider, models };
+			}
+			const errorCode = `http_${response.status}`;
+			const invalid = [400, 401, 403].includes(response.status);
+			await updateValidationResult(env.DB, record, {
+				status: invalid ? 'invalid' : record.status,
+				health: response.status === 429 ? 'rate_limited' : 'error',
+				errorCode,
+			});
+			return { status: 'error', provider: record.provider, reason: errorCode };
+		}
+
 		if (record.gateway_alias) {
 			await updateValidationResult(env.DB, record, {
 				status: 'active',
@@ -506,7 +552,7 @@ async function migrateLegacyCredential(env: DonationEnv, donationId: string): Pr
 	}
 }
 
-async function updateCredentialStatus(request: Request, db: D1Database, donationId: string): Promise<Response> {
+async function updateCredentialStatus(request: Request, env: DonationEnv, donationId: string): Promise<Response> {
 	let payload: { status?: unknown };
 	try {
 		const decoded = await request.json();
@@ -518,15 +564,33 @@ async function updateCredentialStatus(request: Request, db: D1Database, donation
 	if (payload.status !== 'disabled' && payload.status !== 'revoked' && payload.status !== 'pending') {
 		return json({ error: 'status must be disabled, revoked, or pending' }, 400);
 	}
+	const db = env.DB!;
 	await ensureCredentialProfileTable(db);
+	await ensureGatewayCredentialColumns(db);
 	const existing = await db.prepare(`
-		SELECT status, encrypted_key FROM api_key_donations WHERE id = ? LIMIT 1
-	`).bind(donationId).first<{ status: DonationRecord['status']; encrypted_key: string }>();
+		SELECT status, encrypted_key, gateway_secret_id, gateway_store_id
+		FROM api_key_donations WHERE id = ? LIMIT 1
+	`).bind(donationId).first<{
+		status: DonationRecord['status'];
+		encrypted_key: string;
+		gateway_secret_id: string | null;
+		gateway_store_id: string | null;
+	}>();
 	if (!existing) return json({ error: 'Credential donation was not found' }, 404);
 	if (existing.status === 'revoked' && payload.status !== 'revoked') {
 		return json({ error: 'A revoked credential cannot be restored because its ciphertext was erased' }, 409);
 	}
 	if (payload.status === 'revoked') {
+		if (existing.gateway_secret_id && existing.gateway_store_id) {
+			try {
+				await deleteGatewayCredential(env, {
+					secretId: existing.gateway_secret_id,
+					storeId: existing.gateway_store_id,
+				});
+			} catch {
+				return json({ error: 'Gateway credential deletion failed; donation was not revoked' }, 502);
+			}
+		}
 		await db.prepare(`
 			UPDATE api_key_donations SET status = 'revoked', encrypted_key = '', encryption_iv = '',
 				validation_error = NULL, updated_at = datetime('now') WHERE id = ?
@@ -568,6 +632,6 @@ export async function handleApiCredentialAdmin(request: Request, env: DonationEn
 		return json(result, status);
 	}
 	const statusMatch = path.match(/^\/api\/donations\/api-keys\/([0-9a-f-]{36})\/status$/i);
-	if (statusMatch && request.method === 'POST') return updateCredentialStatus(request, env.DB, statusMatch[1]);
+	if (statusMatch && request.method === 'POST') return updateCredentialStatus(request, env, statusMatch[1]);
 	return json({ error: 'Not Found' }, 404);
 }

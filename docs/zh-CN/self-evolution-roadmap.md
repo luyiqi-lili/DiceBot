@@ -7,7 +7,7 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 ## 已实现：阶段 1 可审计底座
 
 - 生产 Cron 每小时只读扫描开放 PR，保存提交 SHA、文件统计和静态风险信号。
-- `POST /api/donations/api-keys` 使用独立 intake bearer token 接收密钥，以 AES-GCM 加密、SHA-256 指纹去重，HTTP API 永不返回密文或明文。
+- `POST /api/donations/api-keys` 使用独立 intake bearer token 接收密钥，以 SHA-256 指纹去重，并立即托管到 Cloudflare AI Gateway Secrets Store；D1 只保存 alias、Secret ID 与非敏感元数据，HTTP API 永不返回密钥。
 - Telegram 私聊支持 <code>/donatetoken 平台 授权范围 Token</code>（兼容 <code>/donate_token</code>）。含参数消息必须先删除成功才会调用同一受保护 intake；删除失败、非私聊、配置缺失或超过每用户每天 5 个的限制时均拒绝保存。Telegram 用户 ID 只用于生成不可逆 HMAC 标签，不以明文写入捐赠表。
 - 缺少 D1、GitHub 或加密配置时安全跳过，不影响 Telegram 基础功能。
 
@@ -40,13 +40,13 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 ## 已实现：阶段 2B Token 平台与免费模型目录
 
-捐赠请求必须明确平台，别名会归一化，例如 `gemini`、`google`、`google-ai-studio` 均保存为 `google-gemini`。支持的平台目录还包括 `openai`、`anthropic`、`deepseek` 与 `openrouter`；已实现 Google Gemini 模型列表验证和 DeepSeek 官方余额验证。
+捐赠请求必须明确平台，别名会归一化，例如 `gemini`、`google`、`google-ai-studio` 均保存为 `google-gemini`，`ollama` 保存为 `ollama-cloud`。支持的平台目录还包括 `openai`、`anthropic`、`deepseek` 与 `openrouter`；已实现 Google Gemini 与 Ollama Cloud 模型列表验证，以及 DeepSeek 官方余额验证。Ollama 首次捐赠会在账户级 AI Gateway 中按需创建指向 `https://ollama.com` 的 Custom Provider。
 
 请求示例：
 
 ```json
 {
-  "provider": "gemini",
+  "provider": "ollama",
   "apiKey": "donated-secret",
   "donorLabel": "community-member",
   "usagePolicy": "shared_inference"
@@ -61,10 +61,10 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 `DONATION_ADMIN_KEY` 保护以下管理接口：
 
 - `GET /api/donations/api-keys`：只返回平台、指纹、状态、授权用途和模型目录等非敏感字段。
-- `POST /api/donations/api-keys/:id/validate`：解密仅存在于请求内存中；Gemini 调用只读模型列表，DeepSeek 调用官方余额接口且不返回精确余额。
-- `POST /api/donations/api-keys/:id/status`：设置 `pending`、`disabled` 或 `revoked`；撤销会清空已保存密文。
+- `POST /api/donations/api-keys/:id/validate`：经 AI Gateway alias 调用只读模型列表；Ollama 使用 `/api/tags`，Gemini 使用 `models.list`。
+- `POST /api/donations/api-keys/:id/status`：设置 `pending`、`disabled` 或 `revoked`；撤销会先删除 Secrets Store 中的密钥，删除失败则不改变 D1 状态。
 
-每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，成功后记录该项目实际可见且支持 `generateContent` 的模型；DeepSeek 验证调用官方余额接口并记录模型目录及非敏感付费可用状态。健康检查不会发送用户需求内容。
+每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，Ollama Cloud 验证调用 `/api/tags`；成功后只记录可见模型名称。健康检查不会发送用户需求内容。
 
 当前免费候选种子为 `gemini-2.5-flash-lite`、`gemini-2.5-flash` 与 `gemini-2.5-pro`，核对日期为 2026-07-20，来源为 Google 官方[模型列表](https://ai.google.dev/gemini-api/docs/models)与[价格页](https://ai.google.dev/gemini-api/docs/pricing)。免费层受地区、账号和速率限制影响，种子不等于永久可用承诺。
 
@@ -73,11 +73,11 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 - `GET /api/ai/models`：查看 provider 与免费模型种子。
 - `GET /api/ai/route?complexity=standard&budget=depleted`：得到路由建议。只有 `active + shared_inference + healthy` 的凭据能把结果标记为已验证可用；否则只返回不可执行的目录建议。
 
-## 已实现：阶段 2C 付费高级模型自动批准
+## 已实现：阶段 2C 免费额度大模型自动批准
 
 每小时 Cron 会先静态过滤尚未 ready 的 Issue，排除已指派、锁定、已有 PR 关联、描述不足、被阻止以及鉴权、资金、权限、部署、迁移、安全等受保护主题；每轮最多审核一个合格 Issue。唯一允许的 GitHub 自动写入是添加现有的 `bot:ready` 标签。
 
-当前审核使用 Workers AI 的 `@cf/meta/llama-3.2-3b-instruct`，并通过 AI Gateway 记录请求。必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。缺少 binding、响应格式错误、模型失败或 GitHub 写入失败时全部默认拒绝。可用时该调用消耗 Workers AI 免费额度。
+当前审核优先轮询捐赠的 Ollama Cloud alias，并从该账号实际可见模型中选择大模型；不可用时回退 Workers AI 的 `@cf/meta/llama-3.3-70b-instruct-fp8-fast`。两者都经 AI Gateway。必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。翻译继续优先 Gemini 免费层，再使用 Ollama Cloud 小模型与 Workers AI `@cf/meta/llama-3.2-3b-instruct`。
 
 所有结果写入 `ai_issue_triage_runs`，不保存提示词或密钥；未修改的已拒绝 Issue 不会重复消耗模型，Issue 更新后可再次审核。`GET /api/evolution/candidate` 会返回最新非敏感审核记录。
 
