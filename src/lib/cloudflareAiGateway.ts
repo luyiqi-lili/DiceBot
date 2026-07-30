@@ -100,6 +100,26 @@ export async function provisionGatewayCredential(
 	if (!provider || !providerSlug) throw new Error('gateway_provider_unsupported');
 	const alias = `donation-${input.donationId.replaceAll('-', '')}`;
 	const fetchFn = options.fetchFn ?? fetch;
+	const storeId = await defaultSecretStore(config, fetchFn);
+	const secretName = `${config.gatewayId}_${providerSlug}_${alias}`;
+	const secretResponse = await cloudflareJson(
+		`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/secrets_store/stores/${storeId}/secrets`,
+		config.token,
+		{
+			method: 'POST',
+			body: JSON.stringify([{
+				name: secretName,
+				value: input.apiKey,
+				scopes: ['ai_gateway'],
+				comment: `DiceBot donated ${provider.id} credential`,
+			}]),
+		},
+		fetchFn,
+	);
+	const secretId = Array.isArray(secretResponse.result) ? secretResponse.result[0]?.id : null;
+	if (!secretResponse.ok || typeof secretId !== 'string') {
+		throw new Error(`gateway_secret_create_http_${secretResponse.status}`);
+	}
 	const response = await cloudflareJson(
 		`https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai-gateway/gateways/${encodeURIComponent(config.gatewayId)}/provider_configs`,
 		config.token,
@@ -109,18 +129,20 @@ export async function provisionGatewayCredential(
 				alias,
 				default_config: false,
 				provider_slug: providerSlug,
-				secret: input.apiKey,
 			}),
 		},
 		fetchFn,
 	);
 	if (!response.ok || typeof response.result?.secret_id !== 'string') {
+		try {
+			await deleteGatewayCredential(env, { secretId, storeId }, { fetchFn });
+		} catch { /* orphan is metadata-only and can be removed from the dashboard */ }
 		throw new Error(`gateway_provider_config_http_${response.status}`);
 	}
 	return {
 		alias,
 		secretId: response.result.secret_id,
-		storeId: await defaultSecretStore(config, fetchFn),
+		storeId,
 		providerSlug,
 		costClass: providerCostClass(provider.id),
 	};

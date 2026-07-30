@@ -31,6 +31,9 @@ function gatewayEnv(db: any, extra: Record<string, unknown> = {}) {
 		if (String(input).includes('/provider_configs')) {
 			return new Response(JSON.stringify({ success: true, result: { secret_id: 'secret-id' } }), { status: 200 });
 		}
+		if (String(input).includes('/secrets_store/stores/store-id/secrets')) {
+			return new Response(JSON.stringify({ success: true, result: [{ id: 'secret-id' }] }), { status: 200 });
+		}
 		return new Response(JSON.stringify({
 			success: true,
 			result: [{ id: 'store-id', name: 'default_secrets_store' }],
