@@ -137,7 +137,7 @@ export async function handleRevokeToken(parsed: ParsedUpdate, env: Env): Promise
 	if (args.length === 1) {
 		await reply(parsed, env, `⚠️ <b>撤销后不可恢复</b>
 
-将撤销 ${selection.rows.length} 个 Token，永久清空加密密文，并立即停止验证和共享推理。
+将撤销 ${selection.rows.length} 个 Token，永久删除 Cloudflare AI Gateway 中的密钥，并立即停止验证和共享推理。
 
 确认执行请发送：
 <code>/revoketoken ${escapeHtml(args[0])} confirm</code>`);

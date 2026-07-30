@@ -34,7 +34,7 @@ function usageText(): string {
 	return `🔐 <b>私聊捐赠 AI Token</b>
 
 只在与机器人单独聊天时发送：
-<code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
+<code>/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY</code>
 
 也兼容 <code>/donate_token</code>。支持平台：<code>gemini</code>、<code>ollama</code>、<code>deepseek</code>、<code>openai</code>、<code>anthropic</code>、<code>openrouter</code>。
 
@@ -42,7 +42,7 @@ function usageText(): string {
 • <code>validation_only</code> — 只允许验证 Token 和模型可用性；
 • <code>shared_inference</code> — 明确允许机器人将其用于共享推理。
 
-含 Token 的原消息必须先被机器人删除，之后才会加密入库。请勿在群聊、Issue 或普通表单中发送 Token。`;
+含 Token 的原消息必须先被机器人删除，之后密钥才会托管到 Cloudflare AI Gateway；D1 只保存非敏感元数据。请勿在群聊、Issue 或普通表单中发送 Token。`;
 }
 
 async function sendText(parsed: ParsedUpdate, env: Env, text: string, replyMarkup?: unknown): Promise<void> {

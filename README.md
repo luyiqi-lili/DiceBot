@@ -2,7 +2,7 @@
 
 Chinese translation: [README.zh-CN.md](README.zh-CN.md)
 
-DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, and the Telegram Bot API. Chat features have no external AI dependency; the controlled self-evolution foundation accesses GitHub and can validate donated model credentials.
+DiceBot is a Cloudflare Workers Telegram bot for group utility, games, lightweight DND play, and small web games. The runtime is TypeScript on Cloudflare Workers with KV, Durable Objects, D1, and the Telegram Bot API. AI inference is limited to `/trans` and the controlled GitHub Issue gate; both use Cloudflare AI Gateway and prefer donated provider credentials before Workers AI fallback models.
 
 This README is the entry point. Detailed manuals live in `docs/`.
 
@@ -12,15 +12,16 @@ This README is the entry point. Detailed manuals live in `docs/`.
 - Main entry: `src/index.ts`.
 - Command dispatch: static `import()` switch in `src/index.ts`.
 - Route metadata: `src/routes.ts`, mainly for `deleteMsg`.
-- Unit tests: `npm test -- --run`.
+- Local unit tests: `npm run test:unit -- --run`.
 - Type check: `npx tsc --noEmit`.
 - Dependency audit: `npm audit --audit-level=low`.
 
 Known operational risks:
 
-- `/api/*` authentication only runs when `EXTERNAL_API_KEY` is configured. If the secret is absent, API routes are not blocked by key comparison.
+- Regular `/api/*` routes fail closed when `EXTERNAL_API_KEY` is missing or incorrect. Donation routes use separate intake/admin credentials.
 - `src/web/score.ts` logs `env.TOKEN` in inline score submission. Remove or redact before treating logs as safe.
 - `routes.ts` does not list every command/callback that `src/index.ts` can dispatch. Runtime behavior follows `src/index.ts`.
+- As of 2026-07-30, `npm audit --audit-level=low` reports 5 high-severity findings in the Wrangler/Miniflare development toolchain (`postcss` and `sharp`). The complete suggested fix includes a breaking Cloudflare Vitest-pool upgrade and must be handled as an intentional dependency update.
 
 ## Request Flow
 
@@ -31,6 +32,7 @@ HTTP request
   |
   +-- /api/*  -> handleExternalAPI()
   |              /api/coin/* -> CoinDO HTTP facade
+  |              /api/donations/*, /api/ai/*, /api/evolution/*
   |              /api/health
   |
   +-- non-POST -> "I am alive"
@@ -52,7 +54,8 @@ Main command groups:
 
 - Dice and party games: `/roll`, `/r`, `/rd`, `/rh`, `/groll`, `/21`, `/duel`.
 - Economy: `/coin`, `/lottery`, `/congrats`, `/恭喜发财`.
-- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/wish`, `/issue`.
+- Utility: `/help`, `/whoami`, `/book`, `/news`, `/rule`, `/echo`, `/em`, `/me`, `/emote`, `/like`, `/act`, `/trans`, `/wish`, `/issue`, `/status`.
+- Credential donation: private-chat `/donatetoken`, `/quota`, and `/revoketoken`.
 - Access control: the bot responds in any group it is added to (no chat allowlist; data isolated per `chat_id`). Group owners implicitly hold every admin permission and can grant/revoke per-user permissions with `/perm` (stored in D1 `permission_grants`). See [docs/commands.md](docs/commands.md#access-control-and-permissions).
 - Fish: `/f`, `/f check`, `/f add`, `/f list`, `/f remove`.
 - Affection: `/rose`, `/rose send`, `/rose check`.
@@ -63,9 +66,10 @@ Full command reference: [docs/commands.md](docs/commands.md).
 
 ## Self-Evolution Foundation
 
-Stages 1–2 provide a controlled foundation: the hourly cron evaluates open PRs and, only when no suitable community PR exists, selects a low-risk maintainer-labelled `bot:ready` issue. Fail-closed `/wish` and `/issue` commands can create public requests. Credential intake canonicalizes the provider and consent policy before AES-GCM encryption; Gemini credentials can be checked through the read-only model list. The Worker does not edit source, comment, approve, merge, pay bills, or change Cloudflare plans.
+Stages 1–2 provide a controlled foundation: the hourly cron evaluates open PRs and, only when no suitable community PR exists, selects a low-risk `bot:ready` issue. Before selection, at most one unready issue may be approved by a donated Ollama Cloud large model or a Workers AI 70B fallback. `/wish` and `/issue` can create public requests when explicitly enabled. New donated keys are held by Cloudflare AI Gateway Secrets Store; D1 stores only non-secret routing metadata, fingerprints, health, and cached model information. The Worker does not edit source, comment, approve, merge, pay bills, or change Cloudflare plans.
 
 See the [self-evolution roadmap](docs/self-evolution-roadmap.md) for scope and later stages.
+See [AI routing and donated credentials](docs/ai-routing.md) for the active model order, cost classes, and credential lifecycle.
 
 ## Storage
 
@@ -130,7 +134,7 @@ npm run dev
 Useful local command:
 
 ```bash
-npm test -- --run
+npm run test:unit -- --run
 ```
 
 Environment and secret manual: [docs/environment.md](docs/environment.md).
@@ -140,13 +144,13 @@ Environment and secret manual: [docs/environment.md](docs/environment.md).
 Commands:
 
 ```bash
-npm test -- --run
+npm run test:unit -- --run
 npx tsc --noEmit
 npm audit --audit-level=low
 npm run test:e2e
 ```
 
-E2E tests require real external variables, including `WORKER_BASE_URL` and `EXTERNAL_API_KEY`.
+The default `npm test -- --run` uses the Cloudflare Vitest pool and may need Cloudflare preview access because the Worker has an AI binding. E2E tests require real external variables, including `WORKER_BASE_URL` and `EXTERNAL_API_KEY`.
 
 Testing manual: [docs/testing.md](docs/testing.md).
 
@@ -161,6 +165,7 @@ Scripts:
 
 - `npm run deploy` runs `wrangler deploy`.
 - `scripts/notify-deploy.sh` sends deployment notifications to a configurable target. Production defaults to administrator `8080375150` as a private chat; development retains its group topic. Bot tokens stay in GitHub Secrets.
+- Pushing `main` publishes through GitHub Actions. Do not also run a manual production deploy after the push unless an explicit recovery requires it.
 
 ## Documentation Index
 
@@ -169,6 +174,7 @@ Scripts:
 - [Environment and deployment](docs/environment.md)
 - [Storage](docs/storage.md)
 - [Testing and audit](docs/testing.md)
+- [AI routing and donated credentials](docs/ai-routing.md)
 - [Self-evolution roadmap](docs/self-evolution-roadmap.md)
 - [Web games](docs/web-games.md)
 - [DND system](docs/dnd-design.md)

@@ -144,7 +144,7 @@ describe('/donatetoken', () => {
 
 		expect(TgMessage.deleteMessage).not.toHaveBeenCalled();
 		const reply = vi.mocked(TgMessage.sendText).mock.calls.at(-1)?.[1]?.text ?? '';
-		expect(reply).toContain('/donatetoken deepseek shared_inference YOUR_TOKEN');
+		expect(reply).toContain('/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY');
 		expect(reply).toContain('validation_only');
 	});
 

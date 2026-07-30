@@ -60,7 +60,7 @@ dnd_inventory(chat_id, user_id, template_id, quantity, equipped)
 - 熟练用 d20，非熟练用 d10。
 - 叠加属性调整值、种族加值和物品加成。
 - 回复其他角色时执行 PVP 对抗。
-- 配置可用时调用 DeepSeek 生成叙事。
+- 在本地格式化掷骰结果；DND 技能检定不调用 AI 提供商。
 
 `/skills` 列出可用技能和当前角色调整值。
 

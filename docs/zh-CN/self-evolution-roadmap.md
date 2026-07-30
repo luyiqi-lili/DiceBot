@@ -23,7 +23,7 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 `/issue` 是同义命令。机器人优先使用专用 `GITHUB_ISSUE_TOKEN` 创建公开 GitHub Issue；未配置时复用现有 `GITHUB_TOKEN`。公开正文只包含需求内容，不包含 Telegram chat/user id；私有映射保存在 D1，用于每用户冷却和 30 天重复检查。
 
-写入口必须由 `GITHUB_ISSUE_INTAKE_ENABLED=true` 显式开启。用户创建的 Issue 不会直接获得自治标签，只有维护者或付费高级模型门禁批准后才添加 `bot:ready`。
+写入口必须由 `GITHUB_ISSUE_INTAKE_ENABLED=true` 显式开启。用户创建的 Issue 不会直接获得自治标签，只有维护者或 Ollama Cloud/Workers AI 免费额度大模型门禁批准后才添加 `bot:ready`。
 
 ### PR 优先、Issue 回退
 
@@ -55,10 +55,10 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 `usagePolicy` 有两种：
 
-- `validation_only`：默认值，只允许管理员显式验证，不进入推理路由。
+- `validation_only`：默认值；接收时仍执行平台支持的只读验证，但不进入推理路由。
 - `shared_inference`：捐赠者明确允许验证、健康检查和后续共享推理路由。
 
-`DONATION_ADMIN_KEY` 保护以下管理接口：
+`DONATION_ADMIN_KEY` 保护以下管理接口；生产当前未配置该 secret，因此这些管理接口关闭：
 
 - `GET /api/donations/api-keys`：只返回平台、指纹、状态、授权用途和模型目录等非敏感字段。
 - `POST /api/donations/api-keys/:id/validate`：经 AI Gateway alias 调用只读模型列表；Ollama 使用 `/api/tags`，Gemini 使用 `models.list`。
@@ -66,7 +66,9 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 每小时最多轮询一个 `shared_inference` 凭据。Gemini 验证调用官方 `models.list`，Ollama Cloud 验证调用 `/api/tags`；成功后只记录可见模型名称。健康检查不会发送用户需求内容。
 
-当前免费候选种子为 `gemini-2.5-flash-lite`、`gemini-2.5-flash` 与 `gemini-2.5-pro`，核对日期为 2026-07-20，来源为 Google 官方[模型列表](https://ai.google.dev/gemini-api/docs/models)与[价格页](https://ai.google.dev/gemini-api/docs/pricing)。免费层受地区、账号和速率限制影响，种子不等于永久可用承诺。
+捐赠者本人仍可在私聊使用 `/revoketoken`。撤销会先删除 Secrets Store 密钥，再把 D1 元数据标为 revoked；删除失败时默认拒绝修改。新托管的 DeepSeek alias 因无法读回密钥，只记录项目支持的高级模型目录；只有旧 D1 加密 DeepSeek 记录可调用直连余额接口。
+
+当前免费候选种子为 `gemini-2.5-flash-lite`、`gemini-2.5-flash` 与 `gemini-2.5-pro`，核对日期为 2026-07-20，来源为 Google 官方[模型列表](https://ai.google.dev/gemini-api/docs/models)与[价格页](https://ai.google.dev/gemini-api/docs/pricing)。免费层受地区、账号和速率限制影响，种子不等于永久可用承诺。该目录与实际翻译路由分开；`/trans` 当前请求 `gemini-3.5-flash-lite`。
 
 受 `EXTERNAL_API_KEY` 保护的接口：
 
@@ -105,19 +107,18 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 ## 配置清单
 
-Worker secrets：
+当前 AI/捐赠路径使用的 Worker secrets：
 
 - `DONATION_INTAKE_KEY`：捐赠接收专用 bearer token。
-- `DONATION_ADMIN_KEY`：捐赠验证、查看和撤销专用 bearer token。
-- `DONATION_ENCRYPTION_KEY`：解码后 32 字节的 base64 AES 主密钥。
-- `GEMINI_API_KEY`：`/trans` 的 Google AI Studio key，通过 AI Gateway 原生提供商调用。
-- `AI_GATEWAY_TOKEN`：仅含 AI Gateway Run 权限的 token，供 Gemini 原生调用使用。
+- `DONATION_ENCRYPTION_KEY`：捐赠者 HMAC 匿名标签和旧 D1 密文迁移使用的 32 字节 base64 主密钥。
+- `AI_GATEWAY_TOKEN`：仅含 AI Gateway Run 权限的 token，供全部推理调用使用。
+- `AI_GATEWAY_MANAGEMENT_TOKEN`、`AI_GATEWAY_ACCOUNT_ID`：创建/删除 Gateway Provider Key 和 Secrets Store 项目。
 - `GITHUB_TOKEN`：Worker 鉴权扫描 PR/Issue，并在没有专用 Issue token 时执行写入；本地 `.env` 的 `GH_TOKEN` 同步到此名称。
-- `GITHUB_ISSUE_TOKEN`：可选的专用 Issue 写 token；未配置时显式开启的入口复用现有 `GITHUB_TOKEN`，避免复制秘密。
+- `DONATION_ADMIN_KEY`、`GITHUB_ISSUE_TOKEN`：代码支持但当前生产未配置的可选窄权限 secrets。
 
-Worker vars：
+Worker 明文 vars：
 
-- `TON_DONATION_ADDRESS`：公开的 TON 主网收款地址；缺失时 `/donate ton` 安全关闭。
+- `AI_GATEWAY_ID`（dev/prod 都为 `default`）
 - `GITHUB_REPOSITORY`
 - `GITHUB_PR_SCAN_LIMIT`
 - `GITHUB_AUTONOMY_LABEL`（默认 `bot:ready`）
@@ -131,3 +132,5 @@ Worker vars：
 上线前需先执行 `schema/d1.sql`，再配置 secrets，最后才把 Issue intake 开关改为 `true`。推送 `main` 会自动发布，发布后不要再次手动部署。
 
 仓库端还必须预先创建与 `GITHUB_AUTONOMY_LABEL` 同名的标签；Worker 只会把这个现有标签添加到已批准 Issue，不会创建标签或改动 GitHub 仓库配置。
+
+完整模型偏好、费用分类、轮询行为和当前生产配置见 [AI 路由与凭据捐赠](ai-routing.md)。

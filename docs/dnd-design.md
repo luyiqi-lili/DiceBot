@@ -69,7 +69,7 @@ Table definitions are maintained in code and docs rather than in a single migrat
 - Uses d20 if proficient, otherwise d10.
 - Adds attribute modifier, race bonus, and item bonuses.
 - If replying to another character, performs a PVP comparison.
-- Calls DeepSeek for narrative text where configured.
+- Formats the roll result locally; DND skill checks do not call an AI provider.
 
 `/skills` lists available skills and the current character's modifiers.
 

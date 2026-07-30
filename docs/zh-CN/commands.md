@@ -4,13 +4,16 @@ English source: [../commands.md](../commands.md)
 
 本参考以 `src/index.ts` 的运行时分发为准。`src/routes.ts` 的元数据不完整，因此命令可用性以 `loadCommand()` 为准。
 
-> 聊天功能已不再依赖旧 DeepSeek 兼容 API。`/trans`、`/ask`、`/report` 和内联 `@bot` 智能回复仍然下线。`/wish` 已以新语义恢复：创建公开源码需求 Issue，不调用聊天模型。
+`/trans` 已恢复，使用 AI Gateway 下的免费翻译池：捐赠 Gemini、捐赠 Ollama Cloud 小模型、Workers AI。`/ask`、`/report` 和内联 `@bot` 智能回复仍然下线。`/wish` 创建公开源码需求 Issue，不调用聊天模型。
 
 ## 通用命令
 
 | 命令 | Handler | 说明 |
 |------|---------|------|
 | `/help` | `handleHelp` | 主帮助文本 |
+| `/trans [目标语言] [文本]` | `handleTrans` | 经 AI Gateway 翻译；支持回复消息，不写目标语言时默认翻译为简体中文 |
+| `/status` | `handleStatus` | 公开只读地显示运行就绪情况、捐赠密钥池数量、费用分级和 AI 路由可用性；不读取或显示密钥值 |
+| `/quota` | `handleQuota` | 仅限私聊；显示本人捐赠凭据的缓存健康状态、模型示例，以及旧凭据可取得的余额信息 |
 | `/whoami` | `handleWhoami` | 显示 Telegram 用户/聊天信息 |
 | `/echo` | `handleEcho` | 掷骰给用户文本一个静态态度评价 |
 | `/em`, `/me`, `/emote` | `handleEmote` | 动作文本 |
@@ -25,9 +28,26 @@ English source: [../commands.md](../commands.md)
 | `/perm` | `handlePerm` | 群主为具体用户授予/移除管理权限（见下文）|
 | `/topic` | `handleTopic` | 群主配置「仅特定主题可用」的功能在本群的可用主题（见下文）|
 | `/wish <需求>`、`/issue <需求>` | `handleWish` | intake 已开启且 GitHub token 具备 Issues 写权限时创建公开 Issue |
-| `/donatetoken <平台> <授权范围> <Token>`、`/donate_token ...` | `handleDonateToken` | 仅限机器人私聊；先删除原消息，再加密接收 AI Token |
+| `/donatetoken <平台> <授权范围> <Token>`、`/donate_token ...` | `handleDonateToken` | 仅限机器人私聊；先删除原消息，再把密钥托管到 Cloudflare AI Gateway Secrets Store |
+| `/revoketoken [编号\|平台\|all] [confirm]`、`/revoke token ...` | `handleRevokeToken` | 仅限私聊；列出本人捐赠，或在明确确认后永久删除选中的 Gateway Secret |
 | `/donate`、`/donate stars <数量>`、`/donate ton [数量]` | `handleDonate` | 私聊生成 Stars 发票，或创建带唯一备注的 TON 转账意向 |
 | `/terms`、`/paysupport` | 支付支持处理器 | 查看捐赠说明和支付支持指南 |
+
+## AI 翻译与凭据命令
+
+`/trans` 支持直接输入和回复两种方式：
+
+- `/trans English 你好`：把输入文本翻译为英文。
+- 回复一条消息发送 `/trans English`：翻译被回复的文本。
+- 回复一条消息只发送 `/trans`：默认翻译为简体中文。
+
+当前路由顺序是捐赠 Gemini（`gemini-3.5-flash-lite`）→ 捐赠 Ollama Cloud 小模型 → Workers AI `@cf/meta/llama-3.2-3b-instruct`。所有调用都经过 AI Gateway，同类多把捐赠密钥按轮询使用。
+
+可捐赠平台为 `gemini`、`ollama`、`deepseek`、`openai`、`anthropic`、`openrouter`。`validation_only` 仅允许验证和模型发现，绝不进入共享推理；`shared_inference` 只有验证健康后才进入路由池。新密钥值不写入 D1，机器人也不能把密钥读回。
+
+不带参数的 `/revoketoken` 会列出本人尚未撤销的捐赠。可按凭证编号、平台名或 `all` 选择，再追加 `confirm` 确认；系统先删除 Secrets Store 中对应密钥，再把 D1 元数据标为已撤销。Gateway 删除失败时默认拒绝撤销。
+
+平台、模型、费用分级和生产配置详见 [AI 路由与凭据捐赠](ai-routing.md)。
 
 ## 权限控制
 

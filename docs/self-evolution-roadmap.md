@@ -12,7 +12,7 @@ Autonomy is opened in explicit permission stages. Stages 1 and 2 are now impleme
 
 ## Implemented: Stage 2A Issues and Candidate Selection
 
-When explicitly enabled, `/wish` and `/issue` create public GitHub issues using a dedicated issue-write token when configured, otherwise the existing Worker GitHub token. Telegram identities stay in private D1 rate-limit records and are not copied into the public issue. User submissions do not directly receive `bot:ready`; a maintainer or the conservative Workers AI gate must approve them.
+When explicitly enabled, `/wish` and `/issue` create public GitHub issues using a dedicated issue-write token when configured, otherwise the existing Worker GitHub token. Telegram identities stay in private D1 rate-limit records and are not copied into the public issue. User submissions do not directly receive `bot:ready`; a maintainer or the conservative Ollama Cloud/Workers AI gate must approve them.
 
 The hourly review gives suitable low-risk community PRs priority. Only when the PR scan succeeds and finds none does it rank `bot:ready` issues. Assigned, locked, PR-linked, underspecified, blocked, or protected topics (credentials, money, auth, permissions, workflows, deploys, schemas, migrations, encryption, and security) are excluded. `GET /api/evolution/candidate`, protected by `EXTERNAL_API_KEY`, exposes the selected read-only candidate to a future isolated executor.
 
@@ -20,9 +20,9 @@ The hourly review gives suitable low-risk community PRs priority. Only when the 
 
 Provider aliases are canonicalized, so Gemini/Google donations are stored as `google-gemini` and Ollama donations as `ollama-cloud`. Each donation declares `validation_only` (default) or explicit `shared_inference` consent. Only the latter can enter routing after validation. Ollama Cloud uses an account-level AI Gateway Custom Provider pointing at `https://ollama.com`; keys remain in Secrets Store and are selected by alias.
 
-`DONATION_ADMIN_KEY` protects metadata listing, validation, disable, and revoke operations. Revocation clears ciphertext. Gemini validation calls the official read-only models list and records visible `generateContent` models; DeepSeek validation calls the official balance endpoint and records only availability, not an exact balance. One shared credential can be health-checked per hourly run.
+`DONATION_ADMIN_KEY` protects metadata listing, validation, disable, and revoke operations; production currently leaves those admin APIs disabled by not configuring it. Donor-owned `/revoketoken` remains available and deletes the Secrets Store key before marking metadata revoked. Gemini and Ollama validation call read-only model-list endpoints through Gateway and cache visible models. A managed DeepSeek alias records the supported premium-model catalog without reading the key back; only legacy encrypted DeepSeek records can call the direct balance endpoint. One shared credential can be health-checked per hourly run.
 
-Gemini 2.5 Flash-Lite, Flash, and Pro are seeded from Google's official [model list](https://ai.google.dev/gemini-api/docs/models) and [pricing](https://ai.google.dev/gemini-api/docs/pricing), verified 2026-07-20. Free availability remains account, region, and rate-limit dependent. `/api/ai/models` lists seeds; `/api/ai/route` returns a recommendation and clearly distinguishes a validated credential from an unverified catalog seed.
+Gemini 2.5 Flash-Lite, Flash, and Pro are seeded from Google's official [model list](https://ai.google.dev/gemini-api/docs/models) and [pricing](https://ai.google.dev/gemini-api/docs/pricing), verified 2026-07-20. Free availability remains account, region, and rate-limit dependent. `/api/ai/models` lists seeds; `/api/ai/route` returns a recommendation and clearly distinguishes a validated credential from an unverified catalog seed. This catalog is separate from active translation, which requests `gemini-3.5-flash-lite`.
 
 ## Implemented: Stage 2C Free-Limited Large-Model Issue Approval
 
@@ -43,3 +43,5 @@ Every outcome is recorded in `ai_issue_triage_runs` without storing a prompt or 
 The bot never harvests or uses unknown shared keys found on the internet. See the Chinese source for the complete endpoint and configuration checklist.
 
 The repository must create the label named by `GITHUB_AUTONOMY_LABEL` before enabling triage. The Worker may add that existing label to an approved Issue, but it does not create labels or change repository configuration.
+
+See [AI routing and donated credentials](ai-routing.md) for the exact model preferences, cost classes, rotation behavior, and current production configuration.

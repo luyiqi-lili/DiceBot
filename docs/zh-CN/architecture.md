@@ -12,7 +12,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` 独立启动 `runCoinCheck(env)` 与 `runSelfEvolutionReview(env)`；后者扫描 PR、通过付费高级模型门禁审核至多一个未 ready Issue、选择 ready Issue，并至多检查一个已授权共享凭据的健康状态。
+`scheduled()` 独立启动 `runCoinCheck(env)` 与 `runSelfEvolutionReview(env)`；后者扫描 PR、通过捐赠 Ollama Cloud 大模型或 Workers AI 回退模型审核至多一个未 ready Issue、选择 ready Issue，并至多检查一个已授权共享凭据的健康状态。两种模型调用都经过 AI Gateway。
 
 `fetch()` 处理 Web 页面、外部 API、Telegram webhook update 和健康检查。
 
@@ -33,12 +33,33 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 | `/api/coin/*` | 去掉 `/api/coin` 后转发给 `CoinDO` |
 | `/api/lottery/*` | 去掉 `/api/lottery` 后转发给 `LotteryDO` |
 | `/api/donations/api-keys` | 使用独立 bearer token 接收 API Key，并托管到 Cloudflare AI Gateway Secrets Store |
-| `/api/donations/api-keys/:id/validate`、`.../status` | 使用独立管理 token 验证或变更生命周期，不返回秘密 |
+| `GET /api/donations/api-keys`、`POST .../:id/validate`、`POST .../:id/status` | 使用捐赠管理 token 列出元数据、验证或变更生命周期，不返回秘密 |
+| `POST /api/donations/api-keys/:id/migrate` | 把一条旧 D1 加密密钥迁移到 Gateway Secrets Store |
 | `/api/ai/models`、`/api/ai/route` | 受保护的非敏感目录与模型路由建议 |
 | `/api/evolution/candidate` | 受保护地读取最新 Issue 候选 |
+| `/api/evolution/github-auth` | 受保护、只读的 GitHub token 权限诊断 |
 | `/api/health` | JSON 状态响应 |
 
-普通 `/api/*` 路由校验 `EXTERNAL_API_KEY`；捐赠接收单独校验 `DONATION_INTAKE_KEY`，凭据管理使用 `DONATION_ADMIN_KEY`。
+普通 `/api/*` 路由校验 `EXTERNAL_API_KEY`，缺失时默认拒绝。捐赠接收单独校验 `DONATION_INTAKE_KEY`；列表、验证和状态接口要求 `DONATION_ADMIN_KEY`；旧凭据迁移还可使用 intake key 或 AI Gateway management token。生产环境当前没有配置 `DONATION_ADMIN_KEY`，因此管理 API 关闭；Telegram 捐赠、状态、额度和捐赠者本人撤销不依赖该管理 key。
+
+## AI Gateway 路由
+
+所有启用 AI 的用户路径和定时路径都不直接请求模型提供商：
+
+```text
+/trans
+  -> 捐赠 Gemini alias
+  -> 捐赠 Ollama Cloud alias
+  -> Workers AI 3B
+
+Issue 门禁
+  -> 捐赠 Ollama Cloud alias
+  -> Workers AI 70B
+```
+
+每一跳都经过 AI Gateway。多个健康的 `shared_inference` alias 使用 D1 游标轮询。Ollama Cloud 注册为账户级 custom provider，模型目录通过 `/api/tags` 发现。
+
+新捐赠密钥值只保存在 Cloudflare AI Gateway Secrets Store。D1 仅保存指纹、Gateway alias、secret/store id、授权范围、健康状态、费用分类和缓存模型目录。`validation_only` 凭据不会进入共享路由；收费凭据可以进入目录，但默认不自动选择。详见 [AI 路由与凭据捐赠](ai-routing.md)。
 
 ## Telegram Update 分发
 

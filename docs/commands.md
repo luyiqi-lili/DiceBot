@@ -4,15 +4,16 @@ Chinese translation: [zh-CN/commands.md](zh-CN/commands.md)
 
 This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/routes.ts` is incomplete, so use this document and `loadCommand()` as the source of truth.
 
-`/trans` uses Gemini Flash through AI Gateway. `/ask`, `/report`, and inline `@bot` AI assist remain removed. `/wish` creates a GitHub source request and does not call a chat model.
+`/trans` uses the free translation pool through AI Gateway: donated Gemini aliases, donated Ollama Cloud small models, then Workers AI. `/ask`, `/report`, and inline `@bot` AI assist remain removed. `/wish` creates a GitHub source request and does not call a chat model.
 
 ## General Commands
 
 | Command | Handler | Notes |
 |---------|---------|-------|
 | `/help` | `handleHelp` | Main help text |
-| `/trans <target language> <text>` | `handleTrans` | Gemini Flash translation through AI Gateway |
-| `/quota` | `handleQuota` | Private chat only; checks the caller's donated API balances or lightweight availability endpoints |
+| `/trans [target language] [text]` | `handleTrans` | AI Gateway translation; may reply to a message, defaulting to Simplified Chinese when no target is supplied |
+| `/status` | `handleStatus` | Public, read-only runtime readiness, donated-key pool counts, cost classes, and active AI route availability; never reads or displays key values |
+| `/quota` | `handleQuota` | Private chat only; shows the caller's cached donation health, model samples, and any provider balance data available for legacy credentials |
 | `/whoami` | `handleWhoami` | Shows Telegram user/chat details |
 | `/echo` | `handleEcho` | Rolls a die and gives the user's text a static attitude verdict |
 | `/em`, `/me`, `/emote` | `handleEmote` | Action text |
@@ -27,9 +28,26 @@ This reference follows `src/index.ts` runtime dispatch. Some metadata in `src/ro
 | `/perm` | `handlePerm` | Group owner grants/revokes admin permissions per user (see below) |
 | `/topic` | `handleTopic` | Group owner configures which topics the topic-gated features run in (see below) |
 | `/wish <request>`, `/issue <request>` | `handleWish` | Creates a public GitHub Issue when intake is enabled and a GitHub Issues write token is available |
-| `/donatetoken <provider> <usage-policy> <token>`, `/donate_token ...` | `handleDonateToken` | Private chat only; deletes the source message before encrypting an AI token donation |
+| `/donatetoken <provider> <usage-policy> <token>`, `/donate_token ...` | `handleDonateToken` | Private chat only; deletes the source message before storing the key in Cloudflare AI Gateway Secrets Store |
+| `/revoketoken [id\|provider\|all] [confirm]`, `/revoke token ...` | `handleRevokeToken` | Private chat only; lists owned donations or permanently deletes selected Gateway secrets after explicit confirmation |
 | `/donate`, `/donate stars <amount>`, `/donate ton [amount]` | `handleDonate` | Private Stars invoice or a tracked TON transfer intent with a unique memo |
 | `/terms`, `/paysupport` | payment support handlers | Donation terms and payment-support guidance |
+
+## AI Translation And Credential Commands
+
+`/trans` supports both direct and reply modes:
+
+- `/trans English 你好` translates the supplied text to English.
+- Reply to a message with `/trans English` to translate the replied-to text.
+- Reply with `/trans` to translate the replied-to text to Simplified Chinese.
+
+The active route is donated Gemini (`gemini-3.5-flash-lite`) → donated Ollama Cloud small model → Workers AI `@cf/meta/llama-3.2-3b-instruct`. Each hop goes through AI Gateway, and multiple eligible donated aliases are round-robined.
+
+Donation providers are `gemini`, `ollama`, `deepseek`, `openai`, `anthropic`, and `openrouter`. `validation_only` permits validation and model discovery but never shared requests; `shared_inference` becomes eligible only after a healthy validation. New key values are never stored in D1 and cannot be read back by the bot.
+
+`/revoketoken` without arguments lists the caller's non-revoked donations. Selection accepts a credential id, a provider name, or `all`; the same command with `confirm` deletes matching Secrets Store entries before marking D1 metadata revoked. If Gateway deletion fails, revocation fails closed.
+
+The provider/model policy and production configuration are documented in [AI routing and donated credentials](ai-routing.md).
 
 ## Access Control And Permissions
 

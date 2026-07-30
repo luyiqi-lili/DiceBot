@@ -12,7 +12,7 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 - `CoinDO`
 - `LotteryDO`
 
-`scheduled()` independently starts `runCoinCheck(env)` and `runSelfEvolutionReview(env)`. The latter scans PRs, triages at most one unready Issue with Workers AI through AI Gateway, ranks ready issues, and performs at most one consented credential health check.
+`scheduled()` independently starts `runCoinCheck(env)` and `runSelfEvolutionReview(env)`. The latter scans PRs, triages at most one unready Issue with a donated Ollama Cloud large model or Workers AI fallback through AI Gateway, ranks ready issues, and performs at most one consented credential health check.
 
 `fetch()` handles web pages, external APIs, Telegram webhook updates, and health checks.
 
@@ -35,12 +35,33 @@ DiceBot runs as a Cloudflare Worker. The Worker exports:
 | `/api/coin/*` | Forwarded to `CoinDO` after stripping `/api/coin` |
 | `/api/lottery/*` | Forwarded to `LotteryDO` after stripping `/api/lottery` |
 | `/api/donations/api-keys` | Accepts API-key donations with a dedicated bearer token and stores keys in Cloudflare AI Gateway Secrets Store |
-| `/api/donations/api-keys/:id/validate`, `.../status` | Separate donation-admin bearer token; validates or changes lifecycle without returning secrets |
+| `GET /api/donations/api-keys`, `POST .../:id/validate`, `POST .../:id/status` | Donation-admin bearer token; lists metadata, validates, or changes lifecycle without returning secrets |
+| `POST /api/donations/api-keys/:id/migrate` | Moves one legacy D1-encrypted key into Gateway Secrets Store |
 | `/api/ai/models`, `/api/ai/route` | Protected non-secret catalog and routing recommendation |
 | `/api/evolution/candidate` | Protected read-only latest issue candidate |
+| `/api/evolution/github-auth` | Protected, read-only GitHub token capability diagnostic |
 | `/api/health` | JSON status response |
 
-Regular `/api/*` routes validate `EXTERNAL_API_KEY`. Donation intake separately validates `DONATION_INTAKE_KEY`; credential administration uses `DONATION_ADMIN_KEY`.
+Regular `/api/*` routes validate `EXTERNAL_API_KEY` and fail closed when it is absent. Donation intake separately validates `DONATION_INTAKE_KEY`. List, validate, and status operations require `DONATION_ADMIN_KEY`; legacy migration additionally accepts the intake key or AI Gateway management token. Production currently leaves the donation-admin API disabled by not configuring `DONATION_ADMIN_KEY`; Telegram donation, status, quota, and donor-owned revocation do not depend on that admin key.
+
+## AI Gateway Routing
+
+AI-enabled user and scheduled paths never call a provider directly:
+
+```text
+/trans
+  -> donated Gemini aliases
+  -> donated Ollama Cloud aliases
+  -> Workers AI 3B
+
+Issue gate
+  -> donated Ollama Cloud aliases
+  -> Workers AI 70B
+```
+
+All arrows are AI Gateway requests. Multiple healthy `shared_inference` aliases rotate through D1-backed cursors. Ollama Cloud is registered as an account-level custom provider and its model catalog is discovered through `/api/tags`.
+
+New donated key values live only in Cloudflare AI Gateway Secrets Store. D1 retains the fingerprint, Gateway alias and secret/store ids, consent policy, health, cost class, and cached model catalog. `validation_only` credentials never enter shared routing. Paid credentials may be catalogued but are not automatically selected. See [AI routing and donated credentials](ai-routing.md).
 
 ## Telegram Update Dispatch
 
@@ -124,4 +145,4 @@ Top-level web routes:
 
 ## Scheduled Work
 
-Production `wrangler.jsonc` schedules `59 * * * *`. Before candidate selection, the review statically filters unready Issues and may add `bot:ready` to at most one. That write is allowed only when Workers AI returns a low-risk decision at or above the configured confidence threshold; the request is logged through AI Gateway. Each decision is stored in `ai_issue_triage_runs`; unchanged rejected Issues are not repeatedly reviewed. The Worker still does not edit source, comment, create branches, approve PRs, or merge. See the [self-evolution roadmap](self-evolution-roadmap.md).
+Production `wrangler.jsonc` schedules `59 * * * *`. Before candidate selection, the review statically filters unready Issues and may add `bot:ready` to at most one. That write is allowed only when an Ollama Cloud or Workers AI large model returns a low-risk decision at or above the configured confidence threshold; both routes go through AI Gateway. Each decision is stored in `ai_issue_triage_runs`; unchanged rejected Issues are not repeatedly reviewed. The Worker still does not edit source, comment, create branches, approve PRs, or merge. See the [self-evolution roadmap](self-evolution-roadmap.md).

@@ -45,7 +45,7 @@ describe('/help', () => {
 		expect(c.text).toContain('Workers AI 70B');
 		expect(c.text).toContain('/trans [目标语言]');
 		expect(c.text).toContain('安全捐赠 AI Token');
-		expect(c.text).toContain('/donatetoken deepseek shared_inference YOUR_TOKEN');
+		expect(c.text).toContain('/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY');
 		expect(c.text).toContain('/revoketoken');
 		expect(c.text).toContain('撤销后 Gateway 密钥不可恢复');
 		expect(c.text).toContain('POST /api/donations/api-keys');

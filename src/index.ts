@@ -42,7 +42,7 @@ export type Env = {
 	// Durable Objects
 	COIN_DO: DurableObjectNamespace;
 	LOTTERY_DO: DurableObjectNamespace;
-	// D1 数据库（仅 prod）
+	// D1 数据库（dev/prod 分别绑定独立实例）
 	DB?: D1Database;
 	// 外部 API
 	EXTERNAL_API_KEY?: string;
@@ -55,7 +55,7 @@ export type Env = {
 	AI?: Ai;
 	AI_GATEWAY_ID?: string;
 	AI_GATEWAY_TOKEN?: string;
-	/** Narrow token: AI Gateway/Secrets Store write, used only for donated-key lifecycle. */
+	/** AI Gateway/Secrets Store management credential used for donated-key lifecycle. */
 	AI_GATEWAY_MANAGEMENT_TOKEN?: string;
 	AI_GATEWAY_ACCOUNT_ID?: string;
 	GEMINI_API_KEY?: string;

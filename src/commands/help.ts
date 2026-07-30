@@ -71,16 +71,16 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
 
 <b>🌐 翻译</b>
  回复文字后发送 <code>/trans [目标语言]</code> — 经 AI Gateway 使用免费小模型翻译，默认简体中文；也支持 <code>/trans English 你好，世界</code>
- <code>/quota</code> — 仅私聊：查询自己捐赠 API 的余额或可用性
+ <code>/quota</code> — 仅私聊：查看自己捐赠凭据的缓存健康、模型和可用余额信息
 
 <b>🔑 安全捐赠 AI Token</b>
  请勿把 Token 发到群聊、Issue 或普通表单。与机器人单独聊天并发送：
- <code>/donatetoken deepseek shared_inference YOUR_TOKEN</code>
- Ollama Cloud 示例：<code>/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY</code>
+ <code>/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY</code>
+ Gemini 示例：<code>/donatetoken gemini shared_inference YOUR_GEMINI_API_KEY</code>
  也兼容 <code>/donate_token</code>。机器人必须先删除含 Token 的原消息，才会托管到 Cloudflare AI Gateway；删除失败则拒绝保存。每位用户 24 小时最多捐赠 5 个 Token。
  <code>/revoketoken</code> — 私聊查看自己的捐赠；撤销后 Gateway 密钥不可恢复。
  <code>validation_only</code> 仅验证；<code>shared_inference</code> 才授权共享推理。
- 运维入口：<code>POST /api/donations/api-keys</code>。支持 Gemini、Ollama Cloud、DeepSeek、OpenAI、Anthropic、OpenRouter；Token 只托管到 AI Gateway。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/self-evolution-roadmap.md">完整说明</a>
+ 运维入口：<code>POST /api/donations/api-keys</code>。支持 Gemini、Ollama Cloud、DeepSeek、OpenAI、Anthropic、OpenRouter；Token 只托管到 AI Gateway。<a href="https://github.com/luyiqi-lili/DiceBot/blob/main/docs/zh-CN/ai-routing.md">完整说明</a>
 
 <b>💝 Stars / TON 捐赠</b>
  与机器人私聊发送 <code>/donate</code> 打开捐赠菜单；也可使用 <code>/donate stars 25</code> 或 <code>/donate ton 0.5</code>。
