@@ -106,6 +106,8 @@ Current production secret audit (names only, verified 2026-07-30; never values):
 
 External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordinated migration window.
 
+`POST /api/evolution/review` is protected by the same key and manually runs the hourly self-evolution review. It may add `bot:ready` to an approved Issue, so it is an operational write endpoint rather than a health check.
+
 Apply `schema/d1.sql` and ensure `GITHUB_TOKEN` has Issues write permission before enabling intake. A narrower `GITHUB_ISSUE_TOKEN` remains preferred when one is available. With no `DONATION_ADMIN_KEY`, list/validate/status admin APIs are intentionally unavailable; donor-owned Telegram revocation remains available.
 
 AI triage fails closed unless its switch, D1, GitHub Issues write permission, AI Gateway, and a valid high-confidence low-risk response are all present. It prefers a donated Ollama Cloud large model and falls back to Workers AI Qwen 3.8 27B; either route is enough, and both go through AI Gateway. It only adds the existing `bot:ready` label; it never edits code, creates a PR, or merges.

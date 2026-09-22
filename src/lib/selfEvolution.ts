@@ -23,6 +23,15 @@ export async function runSelfEvolutionReview(env: Env) {
 	return { pullRequests, aiTriage, issues, credentialHealth };
 }
 
+/**
+ * Authenticated operational endpoint for manually running the same review used
+ * by the hourly Cron. The outer API router enforces EXTERNAL_API_KEY.
+ */
+export async function handleSelfEvolutionReviewApi(request: Request, env: Env): Promise<Response> {
+	if (request.method !== 'POST') return json({ error: 'Method Not Allowed' }, 405);
+	return json(await runSelfEvolutionReview(env));
+}
+
 function json(body: unknown, status = 200): Response {
 	return new Response(JSON.stringify(body), {
 		status,

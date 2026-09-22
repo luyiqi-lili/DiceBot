@@ -90,6 +90,8 @@ dev 和 prod 分别定义 Durable Object migrations。
 
 `EXTERNAL_API_KEY` 有外部调用方依赖，不能未经迁移窗口直接轮换。
 
+`POST /api/evolution/review` 受同一密钥保护，可手工执行每小时自进化审核。审批通过时它可能给 Issue 添加 `bot:ready`，因此属于运维写入接口，不是健康检查。
+
 先执行 `schema/d1.sql` 并确认 `GITHUB_TOKEN` 具备 Issues 写权限，再开启 intake。有条件时仍应换成权限更窄的 `GITHUB_ISSUE_TOKEN`。未配置 `DONATION_ADMIN_KEY` 时，列表/验证/状态管理 API 会保持关闭；捐赠者通过 Telegram 撤销自己的密钥仍然可用。
 
 AI 审批只有在开关、D1、GitHub Issues 写权限、AI Gateway 和高置信度低风险响应全部满足时才执行。调用优先使用捐赠的 Ollama Cloud 大模型，回退 Workers AI Qwen 3.8 27B；两者任一可用即可，并全部经 AI Gateway。它只会添加已有的 `bot:ready` 标签，不会改代码、创建 PR 或合并。

@@ -17,7 +17,7 @@ import { handleWebRequest } from './web/router';
 import { createWebGameAuth, isTelegramWebhookRequest } from './lib/telegramAuth';
 import { handleApiCredentialAdmin, handleApiKeyDonation } from './lib/apiKeyDonations';
 import { handleModelRoutingApi } from './lib/modelRouting';
-import { handleGithubTokenHealthApi, handleSelfEvolutionApi, runSelfEvolutionReview } from './lib/selfEvolution';
+import { handleGithubTokenHealthApi, handleSelfEvolutionApi, handleSelfEvolutionReviewApi, runSelfEvolutionReview } from './lib/selfEvolution';
 import { handlePreCheckoutUpdate, handleSuccessfulPaymentUpdate } from './lib/paymentUpdates';
 import { LEGACY_CHAT_ID, scopeKey } from './lib/groupScope';
 
@@ -113,6 +113,7 @@ async function handleExternalAPI(request: Request, env: Env): Promise<Response> 
 	if (path.startsWith('/api/ai/')) return handleModelRoutingApi(request, env);
 	if (path === '/api/evolution/candidate') return handleSelfEvolutionApi(request, env);
 	if (path === '/api/evolution/github-auth') return handleGithubTokenHealthApi(request, env);
+	if (path === '/api/evolution/review') return handleSelfEvolutionReviewApi(request, env);
 
 	if (path === '/api/health') {
 		return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
