@@ -62,7 +62,7 @@ Cloudflare 需要构建工具能静态分析模块导入，因此 `src/index.ts`
 
 ## 自进化底座
 
-当前实现阶段 1–2 的安全底座：生产 Cron 每小时评估开放 PR；无合适社区 PR 时从低风险 `bot:ready` Issue 中选择候选。选择前，每轮最多由捐赠的 Ollama Cloud 大模型或 Workers AI 70B 回退模型批准一个未 ready Issue。显式开启后，`/wish`/`/issue` 可创建公开需求。新捐赠密钥只保存在 Cloudflare AI Gateway Secrets Store，D1 仅保存指纹、路由、健康状态和模型缓存等非敏感元数据。当前不会自动改源码、评论、批准、合并、支付或切换 Cloudflare 套餐。
+当前实现阶段 1–2 的安全底座：生产 Cron 每小时评估开放 PR；无合适社区 PR 时从低风险 `bot:ready` Issue 中选择候选。选择前，每轮最多由捐赠的 Ollama Cloud 大模型或 Workers AI Qwen 3.8 27B 回退模型批准一个未 ready Issue。显式开启后，`/wish`/`/issue` 可创建公开需求。新捐赠密钥只保存在 Cloudflare AI Gateway Secrets Store，D1 仅保存指纹、路由、健康状态和模型缓存等非敏感元数据。当前不会自动改源码、评论、批准、合并、支付或切换 Cloudflare 套餐。
 
 分阶段范围、验收标准和后续路线见[自进化系统路线图](docs/zh-CN/self-evolution-roadmap.md)。
 当前模型顺序、费用分级和凭据生命周期见 [AI 路由与凭据捐赠](docs/zh-CN/ai-routing.md)。

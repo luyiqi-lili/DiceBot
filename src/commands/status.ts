@@ -104,7 +104,7 @@ export async function handleStatus(parsed: ParsedUpdate, env: Env): Promise<void
 		'<b>免费但有限额</b>',
 		...poolLines(pools, 'free_limited', ['ollama-cloud']),
 		`• Ollama Cloud 大模型：${ollama.largeKeys > 0 ? `✅ ${ollama.largeKeys} 把捐赠密钥可用（轮询）` : '➖ 暂无可用捐赠密钥'}`,
-		`• Workers AI 大模型：${Boolean(env.AI) ? '✅ Llama 3.3 70B（经 AI Gateway）' : '❌ 不可用'}`,
+		`• Workers AI 大模型：${Boolean(env.AI) ? '✅ Qwen 3.8 27B（经 AI Gateway）' : '❌ 不可用'}`,
 		'',
 		'<b>收费</b>',
 		...poolLines(pools, 'paid'),

@@ -9,7 +9,7 @@ This page is the source of truth for the active AI paths. The free-model seed ca
 | Feature | Route order | Purpose |
 |---------|-------------|---------|
 | `/trans` | donated Gemini → donated Ollama Cloud small model → Workers AI 3B | Translation |
-| Hourly GitHub Issue gate | donated Ollama Cloud large model → Workers AI 70B | Decide whether one statically eligible Issue may receive `bot:ready` |
+| Hourly GitHub Issue gate | donated Ollama Cloud large model → Workers AI Qwen 3.8 27B | Decide whether one statically eligible Issue may receive `bot:ready` |
 
 Every inference goes through Cloudflare AI Gateway. There is no direct provider fallback. `/ask`, `/report`, and inline AI chat are not active.
 
@@ -24,7 +24,7 @@ Translation currently requests:
 Issue triage currently requests:
 
 - Ollama Cloud: first available preferred model in `qwen3.5:397b`, `qwen3.5`, `gpt-oss:120b`, `nemotron-3-super:120b`, `mistral-large-3`, `deepseek-v4-flash`; otherwise the largest discovered model at or above 70B.
-- Workers AI: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
+- Workers AI: `@cf/qwen/qwen3.8-27b`.
 
 Ollama choices come from each credential's last successful OpenAI-compatible `/v1/models` validation. A model name in this preference list is not a guarantee that every donor account can access it.
 
@@ -35,7 +35,7 @@ These classes are routing policy, not a guarantee of a provider's future pricing
 | Class | Project interpretation | Current examples | Automatic use |
 |-------|------------------------|------------------|---------------|
 | Completely free | Small/free-tier capacity used for low-cost translation | Gemini free-tier keys, Ollama Cloud small models, Workers AI 3B | Translation |
-| Free but limited | Account or monthly quota is limited; reserve it for larger reasoning | Ollama Cloud large models, Workers AI 70B | Issue gate |
+| Free but limited | Account or monthly quota is limited; reserve it for larger reasoning | Ollama Cloud large models, Workers AI Qwen 3.8 27B | Issue gate |
 | Paid | No free allowance is assumed | DeepSeek, OpenAI, Anthropic, OpenRouter donations | Disabled by default |
 
 The D1 credential row classifies Google as `completely_free`, Ollama Cloud as `free_limited`, and other providers as `paid`. At the feature level, `/status` presents a usable Ollama small-model pool under “completely free” and its large-model pool under “free but limited.”

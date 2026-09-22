@@ -56,7 +56,7 @@ AI-enabled user and scheduled paths never call a provider directly:
 
 Issue gate
   -> donated Ollama Cloud aliases
-  -> Workers AI 70B
+  -> Workers AI Qwen 3.8 27B
 ```
 
 All arrows are AI Gateway requests. Multiple healthy `shared_inference` aliases rotate through D1-backed cursors. Ollama Cloud is registered as an account-level custom provider and uses its OpenAI-compatible `/v1/models` and `/v1/chat/completions` endpoints through the Gateway.

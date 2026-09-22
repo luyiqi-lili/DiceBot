@@ -8,7 +8,7 @@ import {
 	ollamaChatText,
 } from './ollamaCloud';
 
-export const WORKERS_AI_TRIAGE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+export const WORKERS_AI_TRIAGE_MODEL = '@cf/qwen/qwen3.8-27b';
 
 type TriageEnv = Pick<
 	Env,

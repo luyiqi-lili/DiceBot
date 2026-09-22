@@ -65,7 +65,7 @@ export async function handleHelp(parsedMessage: ParsedUpdate, env: EnvLike) {
 <b>🧬 源码共创与 AI 审核</b>
  <code>/wish 具体需求</code> / <code>/issue 具体需求</code> — 创建公开源码 Issue
  请写清场景、结果和限制（8–2000 字）。Cloudflare 每小时审核未标记的 Issue。
- 静态检查后，Ollama Cloud 大模型优先、Workers AI 70B 兜底，均经 AI Gateway。只有 <code>risk=low</code>、置信度 ≥ 85% 且 Issue 未变化才添加 <code>bot:ready</code>。
+ 静态检查后，Ollama Cloud 大模型优先、Workers AI Qwen 3.8 27B 兜底，均经 AI Gateway。只有 <code>risk=low</code>、置信度 ≥ 85% 且 Issue 未变化才添加 <code>bot:ready</code>。
  密钥、资金、权限、部署、工作流、数据库迁移和安全类需求不会自动批准；维护者仍可手动添加 <code>bot:ready</code>。机器人不会自动改源码、创建 PR 或合并。
  <a href="https://github.com/luyiqi-lili/DiceBot/issues">查看公开 Issues 与处理进度</a>
 

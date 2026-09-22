@@ -79,7 +79,7 @@ English source: [../self-evolution-roadmap.md](../self-evolution-roadmap.md)
 
 每小时 Cron 会先静态过滤尚未 ready 的 Issue，排除已指派、锁定、已有 PR 关联、描述不足、被阻止以及鉴权、资金、权限、部署、迁移、安全等受保护主题；每轮最多审核一个合格 Issue。唯一允许的 GitHub 自动写入是添加现有的 `bot:ready` 标签。
 
-当前审核优先轮询捐赠的 Ollama Cloud alias，并从该账号实际可见模型中选择大模型；不可用时回退 Workers AI 的 `@cf/meta/llama-3.3-70b-instruct-fp8-fast`。两者都经 AI Gateway。必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。翻译继续优先 Gemini 免费层，再使用 Ollama Cloud 小模型与 Workers AI `@cf/meta/llama-3.2-3b-instruct`。
+当前审核优先轮询捐赠的 Ollama Cloud alias，并从该账号实际可见模型中选择大模型；不可用时回退 Workers AI 的 `@cf/qwen/qwen3.8-27b`。两者都经 AI Gateway。必须返回 `risk=low`，且置信度达到 `GITHUB_AI_TRIAGE_MIN_CONFIDENCE`（生产为 `0.85`）。翻译继续优先 Gemini 免费层，再使用 Ollama Cloud 小模型与 Workers AI `@cf/meta/llama-3.2-3b-instruct`。
 
 所有结果写入 `ai_issue_triage_runs`，不保存提示词或密钥；未修改的已拒绝 Issue 不会重复消耗模型，Issue 更新后可再次审核。`GET /api/evolution/candidate` 会返回最新非敏感审核记录。
 

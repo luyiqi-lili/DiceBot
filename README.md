@@ -66,7 +66,7 @@ Full command reference: [docs/commands.md](docs/commands.md).
 
 ## Self-Evolution Foundation
 
-Stages 1–2 provide a controlled foundation: the hourly cron evaluates open PRs and, only when no suitable community PR exists, selects a low-risk `bot:ready` issue. Before selection, at most one unready issue may be approved by a donated Ollama Cloud large model or a Workers AI 70B fallback. `/wish` and `/issue` can create public requests when explicitly enabled. New donated keys are held by Cloudflare AI Gateway Secrets Store; D1 stores only non-secret routing metadata, fingerprints, health, and cached model information. The Worker does not edit source, comment, approve, merge, pay bills, or change Cloudflare plans.
+Stages 1–2 provide a controlled foundation: the hourly cron evaluates open PRs and, only when no suitable community PR exists, selects a low-risk `bot:ready` issue. Before selection, at most one unready issue may be approved by a donated Ollama Cloud large model or a Workers AI Qwen 3.8 27B fallback. `/wish` and `/issue` can create public requests when explicitly enabled. New donated keys are held by Cloudflare AI Gateway Secrets Store; D1 stores only non-secret routing metadata, fingerprints, health, and cached model information. The Worker does not edit source, comment, approve, merge, pay bills, or change Cloudflare plans.
 
 See the [self-evolution roadmap](docs/self-evolution-roadmap.md) for scope and later stages.
 See [AI routing and donated credentials](docs/ai-routing.md) for the active model order, cost classes, and credential lifecycle.

@@ -108,7 +108,7 @@ External clients depend on `EXTERNAL_API_KEY`; never rotate it without a coordin
 
 Apply `schema/d1.sql` and ensure `GITHUB_TOKEN` has Issues write permission before enabling intake. A narrower `GITHUB_ISSUE_TOKEN` remains preferred when one is available. With no `DONATION_ADMIN_KEY`, list/validate/status admin APIs are intentionally unavailable; donor-owned Telegram revocation remains available.
 
-AI triage fails closed unless its switch, D1, GitHub Issues write permission, AI Gateway, and a valid high-confidence low-risk response are all present. It prefers a donated Ollama Cloud large model and falls back to the Workers AI 70B binding; either route is enough, and both go through AI Gateway. It only adds the existing `bot:ready` label; it never edits code, creates a PR, or merges.
+AI triage fails closed unless its switch, D1, GitHub Issues write permission, AI Gateway, and a valid high-confidence low-risk response are all present. It prefers a donated Ollama Cloud large model and falls back to Workers AI Qwen 3.8 27B; either route is enough, and both go through AI Gateway. It only adds the existing `bot:ready` label; it never edits code, creates a PR, or merges.
 
 `/quota` only runs in a private chat and only inspects credentials donated by that Telegram user. Gateway-managed Gemini and Ollama Cloud credentials report their latest validated health and model catalog. When a provider exposes no precise remaining-quota API, the response says so explicitly. Keys are never read back from Secrets Store, echoed, or logged.
 

@@ -42,7 +42,7 @@ describe('/help', () => {
 		expect(c.text).toContain('源码共创与 AI 审核');
 		expect(c.text).toContain('/wish 具体需求');
 		expect(c.text).toContain('Ollama Cloud 大模型');
-		expect(c.text).toContain('Workers AI 70B');
+		expect(c.text).toContain('Workers AI Qwen 3.8 27B');
 		expect(c.text).toContain('/trans [目标语言]');
 		expect(c.text).toContain('安全捐赠 AI Token');
 		expect(c.text).toContain('/donatetoken ollama shared_inference YOUR_OLLAMA_API_KEY');

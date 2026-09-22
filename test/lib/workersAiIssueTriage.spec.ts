@@ -17,6 +17,10 @@ function makeDb() {
 }
 
 describe('Workers AI Issue triage', () => {
+	it('uses Qwen 3.8 27B as the Workers AI fallback', () => {
+		expect(WORKERS_AI_TRIAGE_MODEL).toBe('@cf/qwen/qwen3.8-27b');
+	});
+
 	it('records through AI Gateway and labels only a high-confidence low-risk Issue', async () => {
 		const run = vi.fn().mockResolvedValue({ response: JSON.stringify({ approve: true, confidence: 0.94, risk: 'low', reason: 'Clear and testable low-risk feature.' }) });
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {

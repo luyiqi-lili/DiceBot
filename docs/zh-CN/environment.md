@@ -92,7 +92,7 @@ dev 和 prod 分别定义 Durable Object migrations。
 
 先执行 `schema/d1.sql` 并确认 `GITHUB_TOKEN` 具备 Issues 写权限，再开启 intake。有条件时仍应换成权限更窄的 `GITHUB_ISSUE_TOKEN`。未配置 `DONATION_ADMIN_KEY` 时，列表/验证/状态管理 API 会保持关闭；捐赠者通过 Telegram 撤销自己的密钥仍然可用。
 
-AI 审批只有在开关、D1、GitHub Issues 写权限、AI Gateway 和高置信度低风险响应全部满足时才执行。调用优先使用捐赠的 Ollama Cloud 大模型，回退 Workers AI 70B；两者任一可用即可，并全部经 AI Gateway。它只会添加已有的 `bot:ready` 标签，不会改代码、创建 PR 或合并。
+AI 审批只有在开关、D1、GitHub Issues 写权限、AI Gateway 和高置信度低风险响应全部满足时才执行。调用优先使用捐赠的 Ollama Cloud 大模型，回退 Workers AI Qwen 3.8 27B；两者任一可用即可，并全部经 AI Gateway。它只会添加已有的 `bot:ready` 标签，不会改代码、创建 PR 或合并。
 
 `/quota` 只在私聊中检查当前用户捐赠的凭据。AI Gateway 托管的 Gemini 与 Ollama Cloud 显示最近验证的健康状态和模型目录；供应商没有提供精确余额 API 时会明确说明。密钥不会从 Secrets Store 读回、回显或写入日志。
 

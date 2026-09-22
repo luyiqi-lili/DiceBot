@@ -9,7 +9,7 @@ English source: [../ai-routing.md](../ai-routing.md)
 | 功能 | 路由顺序 | 用途 |
 |------|----------|------|
 | `/trans` | 捐赠 Gemini → 捐赠 Ollama Cloud 小模型 → Workers AI 3B | 翻译 |
-| 每小时 GitHub Issue 门禁 | 捐赠 Ollama Cloud 大模型 → Workers AI 70B | 判断一个已通过静态规则的 Issue 能否获得 `bot:ready` |
+| 每小时 GitHub Issue 门禁 | 捐赠 Ollama Cloud 大模型 → Workers AI Qwen 3.8 27B | 判断一个已通过静态规则的 Issue 能否获得 `bot:ready` |
 
 所有推理都经过 Cloudflare AI Gateway，没有直连提供商的回退。`/ask`、`/report` 和内联 AI 聊天当前未启用。
 
@@ -24,7 +24,7 @@ English source: [../ai-routing.md](../ai-routing.md)
 Issue 门禁当前请求：
 
 - Ollama Cloud：依次选择账号可见的 `qwen3.5:397b`、`qwen3.5`、`gpt-oss:120b`、`nemotron-3-super:120b`、`mistral-large-3`、`deepseek-v4-flash`；都没有时，选择发现到的最大不小于 70B 模型。
-- Workers AI：`@cf/meta/llama-3.3-70b-instruct-fp8-fast`。
+- Workers AI：`@cf/qwen/qwen3.8-27b`。
 
 Ollama 选择来自每把凭据最近一次成功的 OpenAI 兼容 `/v1/models` 验证。偏好列表中有某个模型，不代表每个捐赠账号都能访问它。
 
@@ -35,7 +35,7 @@ Ollama 选择来自每把凭据最近一次成功的 OpenAI 兼容 `/v1/models` 
 | 类别 | 项目含义 | 当前示例 | 自动用途 |
 |------|----------|----------|----------|
 | 完全免费 | 小模型或免费层容量，用于低成本翻译 | Gemini 免费层、Ollama Cloud 小模型、Workers AI 3B | 翻译 |
-| 免费但有限额 | 账号或月度额度有限，保留给较大推理 | Ollama Cloud 大模型、Workers AI 70B | Issue 门禁 |
+| 免费但有限额 | 账号或月度额度有限，保留给较大推理 | Ollama Cloud 大模型、Workers AI Qwen 3.8 27B | Issue 门禁 |
 | 收费 | 不假设存在免费额度 | DeepSeek、OpenAI、Anthropic、OpenRouter 捐赠 | 默认不自动调用 |
 
 D1 凭据行把 Google 记为 `completely_free`，Ollama Cloud 记为 `free_limited`，其他提供商记为 `paid`。在功能层面，`/status` 把可用 Ollama 小模型池展示在“完全免费”，把大模型池展示在“免费但有限额”。

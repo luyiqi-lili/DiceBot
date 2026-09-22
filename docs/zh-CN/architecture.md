@@ -54,7 +54,7 @@ DiceBot 运行为 Cloudflare Worker。Worker 导出：
 
 Issue 门禁
   -> 捐赠 Ollama Cloud alias
-  -> Workers AI 70B
+  -> Workers AI Qwen 3.8 27B
 ```
 
 每一跳都经过 AI Gateway。多个健康的 `shared_inference` alias 使用 D1 游标轮询。Ollama Cloud 注册为账户级 custom provider，并通过 Gateway 使用 OpenAI 兼容接口 `/v1/models` 和 `/v1/chat/completions`。
@@ -118,4 +118,4 @@ Cloudflare Workers 构建要求动态导入路径可静态分析。因此运行�
 
 ## 定时任务
 
-生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。审核优先轮询捐赠的 Ollama Cloud 大模型，不可用时回退 Workers AI 70B；两条路径都通过 AI Gateway。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复审核。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
+生产环境 `wrangler.jsonc` 配置 `59 * * * *`。候选选择前，定时任务会静态过滤未 ready Issue，并且每小时最多给一个 Issue 添加 `bot:ready`。审核优先轮询捐赠的 Ollama Cloud 大模型，不可用时回退 Workers AI Qwen 3.8 27B；两条路径都通过 AI Gateway。所有结论写入 `ai_issue_triage_runs`，未修改的已拒绝 Issue 不会重复审核。Worker 仍不会修改源码、发表评论、创建分支、批准 PR 或合并。详见[自进化系统分阶段路线图](self-evolution-roadmap.md)。
