@@ -140,6 +140,15 @@ function parseDecision(response: unknown): ModelDecision | null {
 	}
 }
 
+function workersAiChatText(output: unknown): unknown {
+	if (!output || typeof output !== 'object') return undefined;
+	const payload = output as {
+		response?: unknown;
+		choices?: Array<{ text?: unknown; message?: { content?: unknown } }>;
+	};
+	return payload.response ?? payload.choices?.[0]?.message?.content ?? payload.choices?.[0]?.text;
+}
+
 type OllamaCredential = {
 	id: string;
 	gateway_alias: string;
@@ -308,10 +317,11 @@ export async function runWorkersAiIssueTriage(env: TriageEnv, input: { linkedIss
 		}
 		if (!decision) {
 			const output = await env.AI.run(WORKERS_AI_TRIAGE_MODEL, {
-				prompt,
+				messages: [{ role: 'user', content: prompt }],
 				max_tokens: 320,
 				temperature: 0,
 				chat_template_kwargs: { enable_thinking: false },
+				response_format: { type: 'json_object' },
 			}, {
 				gateway: {
 					id: env.AI_GATEWAY_ID?.trim() || 'default',
@@ -320,7 +330,7 @@ export async function runWorkersAiIssueTriage(env: TriageEnv, input: { linkedIss
 					metadata: { feature: 'issue-triage', issue: String(selected.number), costClass: 'free_limited', modelSize: 'large' },
 				},
 			});
-			decision = parseDecision((output as { response?: unknown }).response);
+			decision = parseDecision(workersAiChatText(output));
 			provider = 'workers-ai';
 			model = WORKERS_AI_TRIAGE_MODEL;
 			credentialSource = 'workers-ai';

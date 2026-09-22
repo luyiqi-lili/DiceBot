@@ -22,7 +22,7 @@ describe('Workers AI Issue triage', () => {
 	});
 
 	it('records through AI Gateway and labels only a high-confidence low-risk Issue', async () => {
-		const run = vi.fn().mockResolvedValue({ response: JSON.stringify({ approve: true, confidence: 0.94, risk: 'low', reason: 'Clear and testable low-risk feature.' }) });
+		const run = vi.fn().mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ approve: true, confidence: 0.94, risk: 'low', reason: 'Clear and testable low-risk feature.' }) } }] });
 		const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
 			const url = String(input);
 			if (url.includes('/issues?')) return new Response(JSON.stringify([issue]), { status: 200 });
@@ -39,7 +39,9 @@ describe('Workers AI Issue triage', () => {
 		expect(result).toMatchObject({ status: 'approved', provider: 'workers-ai', model: WORKERS_AI_TRIAGE_MODEL, confidence: 0.94, paidBalanceVerified: false });
 		expect(run).toHaveBeenCalledWith(WORKERS_AI_TRIAGE_MODEL, expect.objectContaining({
 			max_tokens: 320,
+			messages: [{ role: 'user', content: expect.any(String) }],
 			chat_template_kwargs: { enable_thinking: false },
+			response_format: { type: 'json_object' },
 		}), expect.objectContaining({ gateway: expect.objectContaining({ id: 'default', skipCache: true }) }));
 		const labelCall = fetchFn.mock.calls.find(([url]) => String(url).endsWith('/issues/42/labels'));
 		expect(JSON.parse(String(labelCall?.[1]?.body))).toEqual({ labels: ['bot:ready'] });
