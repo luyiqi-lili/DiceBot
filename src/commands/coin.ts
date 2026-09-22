@@ -15,6 +15,7 @@ import {
   getTreasury,
   addToTreasury,
   takeFromTreasury,
+  claimDailyPrayer,
   TREASURY_KEY,
   sumAllUserBalances,
   transfer
@@ -22,6 +23,7 @@ import {
 import { scopeKey } from "../lib/groupScope";
 import { hasAdminPermission } from "../lib/permissions";
 import { isFeatureAllowed } from "../lib/topicAccess";
+import { TOPIC_ROOM_NAMES } from "../data/topics";
 
 type CoinEnv = Env; // 统一类型，从 ../index 导入
 
@@ -159,8 +161,168 @@ const DAILY_PRAY_FORTUNES = [
   "今日运势：守护\n今天遇到麻烦也别急，先喝口水再处理。"
 ];
 
+export const DAILY_PRAY_REWARD_MIN = 15;
+export const DAILY_PRAY_REWARD_MAX = 20;
+
+/** Successful/already-seen auto claims in this Worker isolate. CoinDO remains authoritative. */
+const automaticPrayerCache = new Map<string, string>();
+
 function randomDailyPrayFortune(): string {
   return DAILY_PRAY_FORTUNES[randomInt(0, DAILY_PRAY_FORTUNES.length - 1)];
+}
+
+/** Prayer-day key. A new day starts at 08:00 in Hong Kong, not midnight. */
+export function currentPrayerDay(now = new Date()): string {
+	const shiftedForEightAmReset = new Date(now.getTime() - 8 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Hong_Kong",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(shiftedForEightAmReset);
+}
+
+function knownTempleThreadId(chatId: number): number | undefined {
+  const topics = TOPIC_ROOM_NAMES[chatId];
+  if (!topics) return undefined;
+  const match = Object.entries(topics).find(([, name]) => name === "神殿");
+  return match ? Number(match[0]) : undefined;
+}
+
+async function resolveFirstName(env: CoinEnv, chatId: number, uid: string | number): Promise<string> {
+  try {
+    const mid = Number(uid);
+    const member = await TgMessage.fetchChatMember(env, chatId, mid);
+    return String(member.first_name ?? member.username ?? mid);
+  } catch {
+    return String(uid);
+  }
+}
+
+type DailyPrayerOutcome = "claimed" | "already" | "error" | "skipped";
+
+async function performDailyPrayer(
+  env: CoinEnv,
+  input: {
+    chatId: number;
+    userId: string;
+    userName: string;
+    destinationThreadId?: number;
+    announceAlready: boolean;
+  },
+): Promise<DailyPrayerOutcome> {
+  const { chatId, userId, userName, destinationThreadId, announceAlready } = input;
+  const doNs = env.COIN_DO;
+  const today = currentPrayerDay();
+  let correctionText = "";
+  let allowRetryAfterCorrection = false;
+
+  // One-off historic correction retained for deterministic replay/tests. It is
+  // inactive on every other date and does not affect the normal auto path.
+  if (today === ERRONEOUS_PRAY_REWARD_FIX_DATE) {
+    const prayKey = `coin_pray:${userId}`;
+    const erroneousPrayFixKey = `coin_pray_fix:${ERRONEOUS_PRAY_REWARD_FIX_DATE}:${userId}`;
+    const lastPrayDate = await doGetRaw(doNs, scopeKey(chatId, prayKey));
+    const erroneousPrayFixDone = await doGetRaw(doNs, scopeKey(chatId, erroneousPrayFixKey));
+    if (lastPrayDate === today && erroneousPrayFixDone !== "done") {
+      const correction = await addToTreasury(env, doNs, chatId, userId, ERRONEOUS_PRAY_REWARD_AMOUNT, "祈祷奖励修正");
+      if (!correction.ok) {
+        if (announceAlready) {
+          await TgMessage.sendText(env, {
+            chat_id: chatId,
+            text: `🙏 ${userName}，莉莉发现今天早些时候把奖励算多了，但现在还没能把这笔记录整理好。先别重复签到，等管理员看一下就好。`,
+            parse_mode: "HTML",
+            message_thread_id: destinationThreadId,
+          });
+        }
+        return "error";
+      }
+      await doPutRaw(doNs, scopeKey(chatId, erroneousPrayFixKey), "done");
+      await doPutRaw(doNs, scopeKey(chatId, prayKey), `${today}:corrected`);
+      allowRetryAfterCorrection = true;
+      correctionText = `莉莉发现今天早些时候把奖励算多啦，已经先把多发的 ${ERRONEOUS_PRAY_REWARD_AMOUNT} 💰收回；现在可以重新签到一次。`;
+    }
+  }
+
+  const duringVioletAnniversary = VIOLET_ANNIVERSARY_PRAY_DATES.has(today);
+  const duringLegacyEvent = today >= "2025-08-12" && today <= "2025-08-17";
+  const gain = duringVioletAnniversary
+    ? VIOLET_ANNIVERSARY_PRAY_REWARD
+    : duringLegacyEvent
+      ? randomInt(11, 20)
+      : randomInt(DAILY_PRAY_REWARD_MIN, DAILY_PRAY_REWARD_MAX);
+  const claim = await claimDailyPrayer(doNs, chatId, userId, today, gain, { allowRetryAfterCorrection });
+
+  if (!claim.ok) {
+    console.error("[coin] daily prayer claim failed", { chatId, userId, reason: claim.reason });
+    if (announceAlready) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `❌ ${userName}，祈祷失败：国库支付出错。`,
+        parse_mode: "HTML",
+        message_thread_id: destinationThreadId,
+      });
+    }
+    return "error";
+  }
+  if (!claim.claimed) {
+    if (announceAlready) {
+      await TgMessage.sendText(env, {
+        chat_id: chatId,
+        text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
+        parse_mode: "HTML",
+        message_thread_id: destinationThreadId,
+      });
+    }
+    return "already";
+  }
+
+  const newBal = claim.newBalance ?? await getBalance(doNs, chatId, userId);
+  const fortuneText = randomDailyPrayFortune();
+  const rewardText = duringVioletAnniversary
+    ? `💜 ${userName}，紫罗兰周年庆签到成功！莉莉把今天的奖励换成了 ${gain} 💰，当前余额 ${newBal} 💰。`
+    : `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`;
+  await TgMessage.sendText(env, {
+    chat_id: chatId,
+    text: `${correctionText ? `${correctionText}\n` : ""}${rewardText}\n\n🔮 ${fortuneText}`,
+    parse_mode: "HTML",
+    message_thread_id: destinationThreadId,
+  });
+  return "claimed";
+}
+
+/**
+ * Silently tries an automatic daily prayer for a user's first normal message.
+ * Only groups with a known topic literally named "神殿" opt in. All result
+ * messages are routed there, leaving the source conversation untouched.
+ */
+export async function handleAutomaticDailyPrayer(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
+  if (parsedMessage.type !== "message" || parsedMessage.isCommand) return;
+  const chatId = parsedMessage.chatId ?? parsedMessage.message?.chat?.id;
+  const from = parsedMessage.from ?? parsedMessage.message?.from;
+  const text = String(parsedMessage.text ?? parsedMessage.message?.text ?? parsedMessage.message?.caption ?? "").trim();
+  if (!chatId || !from?.id || from.is_bot || !text) return;
+
+  const destinationThreadId = knownTempleThreadId(Number(chatId));
+  if (destinationThreadId === undefined) return;
+  if (!(await isFeatureAllowed(env, chatId, destinationThreadId, "pray"))) return;
+
+  const today = currentPrayerDay();
+  const cacheKey = `${chatId}:${from.id}`;
+  if (automaticPrayerCache.get(cacheKey) === today) return;
+
+  const userName = escapeHtml(String(from.first_name || from.username || from.id));
+  const outcome = await performDailyPrayer(env, {
+    chatId: Number(chatId),
+    userId: String(from.id),
+    userName,
+    destinationThreadId,
+    announceAlready: false,
+  });
+  if (outcome === "claimed" || outcome === "already") {
+    automaticPrayerCache.set(cacheKey, today);
+    if (automaticPrayerCache.size > 10_000) automaticPrayerCache.clear();
+  }
 }
 
 export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Promise<void> {
@@ -182,25 +344,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
   const doNs = env.COIN_DO;
   const sub = (args[0] || "").toLowerCase();
 
-  // helper: 获取指定 userId 在本 chat 的 first_name（优先使用 fetchChatMember）
-  async function resolveFirstName(uid: string | number): Promise<string> {
-    try {
-      const mid = Number(uid);
-      const member = await TgMessage.fetchChatMember(env, chatId, mid);
-      return String(member.first_name ?? member.username ?? mid);
-    } catch (e) {
-      // fallback: 尝试直接用消息中的 from 字段或 uid 本身
-      try {
-        if (typeof uid === "string" && !isNaN(Number(uid))) return uid;
-        return String(uid);
-      } catch {
-        return String(uid);
-      }
-    }
-  }
-
   // 获取调用者名字（不进行 escapeHtml）
-  const userName = await resolveFirstName(userId);
+  const userName = await resolveFirstName(env, Number(chatId), userId);
 
   // — 查询余额（默认无子命令）
   if (!sub) {
@@ -228,79 +373,12 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    // 修复：使用专门的祈祷记录存储，而不是余额
-    const prayKey = `coin_pray:${userId}`;
-    const today = new Date().toISOString().split("T")[0];
-    const erroneousPrayFixKey = `coin_pray_fix:${ERRONEOUS_PRAY_REWARD_FIX_DATE}:${userId}`;
-
-    const lastPrayDate = await doGetRaw(doNs, scopeKey(chatId, prayKey));
-    const erroneousPrayFixDone = await doGetRaw(doNs, scopeKey(chatId, erroneousPrayFixKey));
-    const shouldFixErroneousPrayReward =
-      today === ERRONEOUS_PRAY_REWARD_FIX_DATE &&
-      lastPrayDate === today &&
-      erroneousPrayFixDone !== "done";
-
-    if (lastPrayDate === today && !shouldFixErroneousPrayReward) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `🙏 ${userName}，你今天已经祈祷过了，明天再来吧！`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-      return;
-    }
-
-    let correctionText = "";
-    if (shouldFixErroneousPrayReward) {
-      const correction = await addToTreasury(env, doNs, chatId, userId, ERRONEOUS_PRAY_REWARD_AMOUNT, "祈祷奖励修正");
-      if (!correction.ok) {
-        await TgMessage.sendText(env, {
-          chat_id: chatId,
-          text: `🙏 ${userName}，莉莉发现今天早些时候把奖励算多了，但现在还没能把这笔记录整理好。先别重复签到，等管理员看一下就好。`,
-          parse_mode: "HTML",
-          message_thread_id: threadId
-        });
-        return;
-      }
-      await doPutRaw(doNs, scopeKey(chatId, erroneousPrayFixKey), "done");
-      await doPutRaw(doNs, scopeKey(chatId, prayKey), `${today}:corrected`);
-      correctionText = `莉莉发现今天早些时候把奖励算多啦，已经先把多发的 ${ERRONEOUS_PRAY_REWARD_AMOUNT} 💰收回；现在可以重新签到一次。`;
-    }
-
-    const duringVioletAnniversary = VIOLET_ANNIVERSARY_PRAY_DATES.has(today);
-    const todayD = new Date();
-    const duringEvent = todayD >= new Date("2025-08-12") && todayD <= new Date("2025-08-17");
-    const gain = duringVioletAnniversary ? VIOLET_ANNIVERSARY_PRAY_REWARD : duringEvent ? randomInt(11, 20) : randomInt(8, 12);
-
-    // 祈祷：从国库支付（允许国库为负）到用户账户
-    const payoutSuccess = await takeFromTreasury(env, doNs, chatId, userId, gain, "祈祷", true);
-
-    if (!payoutSuccess.ok) {
-      await TgMessage.sendText(env, {
-        chat_id: chatId,
-        text: `❌ ${userName}，祈祷失败：国库支付出错。`,
-        parse_mode: "HTML",
-        message_thread_id: threadId
-      });
-      return;
-    }
-
-    // 标记今天已祈祷（使用专门的存储，不是余额）
-    await doPutRaw(doNs, scopeKey(chatId, prayKey), today);
-    if (today === ERRONEOUS_PRAY_REWARD_FIX_DATE) {
-      await doPutRaw(doNs, scopeKey(chatId, erroneousPrayFixKey), "done");
-    }
-
-    const newBal = await getBalance(doNs, chatId, userId);
-    const fortuneText = randomDailyPrayFortune();
-    const rewardText = duringVioletAnniversary
-      ? `💜 ${userName}，紫罗兰周年庆签到成功！莉莉把今天的奖励换成了 ${gain} 💰，当前余额 ${newBal} 💰。`
-      : `✨ ${userName}，你祈祷获得了 ${gain} 💰，当前余额 ${newBal} 💰。`;
-    await TgMessage.sendText(env, {
-      chat_id: chatId,
-      text: `${correctionText ? `${correctionText}\n` : ""}${rewardText}\n\n🔮 ${fortuneText}`,
-      parse_mode: "HTML",
-      message_thread_id: threadId
+    await performDailyPrayer(env, {
+      chatId: Number(chatId),
+      userId,
+      userName,
+      destinationThreadId: threadId,
+      announceAlready: true,
     });
     return;
   }
@@ -462,7 +540,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       return;
     }
 
-    const targetFirstName = await resolveFirstName(String(repliedFrom.id));
+    const targetFirstName = await resolveFirstName(env, Number(chatId), String(repliedFrom.id));
     const res = await atomicTransferUserToUser(env, chatId, userId, String(repliedFrom.id), amount);
     if (!res.ok) {
       await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${res.reason || "未知原因"}`, parse_mode: "HTML", message_thread_id: threadId });
@@ -504,7 +582,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (repliedFrom && parsedMessage.isReply) {
       const targetId = String(repliedFrom.id);
       const bal = await getBalance(doNs, chatId, targetId);
-      const targetName = await resolveFirstName(targetId);
+      const targetName = await resolveFirstName(env, Number(chatId), targetId);
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text: `👤 ${targetName} 的余额：${bal} 💰。`,
@@ -577,7 +655,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     } else if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
       targetUid = String(r.id);
-      targetLabel = await resolveFirstName(targetUid);
+      targetLabel = await resolveFirstName(env, Number(chatId), targetUid);
     }
     else {
       await TgMessage.sendText(env, {
@@ -635,7 +713,7 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     if (parsedMessage.isReply && parsedMessage.message?.reply_to_message?.from) {
       const r = parsedMessage.message.reply_to_message.from;
       targetUid = String(r.id);
-      targetLabel = await resolveFirstName(targetUid);
+      targetLabel = await resolveFirstName(env, Number(chatId), targetUid);
     }
 
     const treasuryBal = await getTreasury(doNs, chatId);

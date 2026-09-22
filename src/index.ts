@@ -148,6 +148,14 @@ async function handleCoinAPI(request: Request, env: Env, path: string): Promise<
 		return scopeKey(chatId, key);
 	};
 	const defaultChatId = queryChatId || String(LEGACY_CHAT_ID);
+	// Daily prayer is an internal atomic operation. External API clients must
+	// not be able to choose its ledger keys directly.
+	if (doPath === '/daily-pray') {
+		return new Response(JSON.stringify({ error: 'Not Found' }), {
+			status: 404,
+			headers: { 'Content-Type': 'application/json' },
+		});
+	}
 
 	if (doPath === '/get' && request.method === 'GET') {
 		const key = doUrl.searchParams.get('key');
@@ -409,6 +417,14 @@ async function handleTelegramContext(botCtx: Context, env: Env, executionCtx: Ex
 					return;
 				}
 			} else {
+				// A user's first ordinary message of the Hong Kong day can claim the
+				// daily prayer in the background. The handler is silent on repeats and
+				// routes successful notices to the group's known 神殿 topic.
+				executionCtx.waitUntil(
+					import('./commands/coin')
+						.then(({ handleAutomaticDailyPrayer }) => handleAutomaticDailyPrayer(parsedMessage, env))
+						.catch((error) => console.error('[coin] automatic daily prayer failed', error)),
+				);
 				const rawText = (parsedMessage.text ?? parsedMessage.message?.text ?? '').trim();
 				if (rawText.startsWith('*') && !rawText.startsWith('**')) {
 					const starName = rawText.slice(1).trim();

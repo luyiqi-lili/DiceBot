@@ -94,6 +94,16 @@ describe('DiceBot Worker — 基础请求处理', () => {
 		expect(forwardedUrl).not.toContain('chat_id=');
 	});
 
+	it('外部 API 不公开 CoinDO 的 daily-pray 原子端点', async () => {
+		const response = await worker.fetch(new IncomingRequest('https://example.com/api/coin/daily-pray', {
+			method: 'POST',
+			headers: { 'X-API-Key': 'external-key', 'Content-Type': 'application/json' },
+			body: JSON.stringify({}),
+		}), { ...env, EXTERNAL_API_KEY: 'external-key' } as any, createExecutionContext());
+
+		expect(response.status).toBe(404);
+	});
+
 	it('API key 捐赠入口不接受普通外部 API key 代替专用 bearer token', async () => {
 		const request = new IncomingRequest('https://example.com/api/donations/api-keys', {
 			method: 'POST',

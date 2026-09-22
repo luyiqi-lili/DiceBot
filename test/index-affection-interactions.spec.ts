@@ -1,10 +1,11 @@
-import { env, createExecutionContext } from 'cloudflare:test';
+import { env, createExecutionContext, waitOnExecutionContext } from 'cloudflare:test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
 	recordReplyAffection: vi.fn(async () => undefined),
 	recordReactionAffection: vi.fn(async () => undefined),
 	handleBackup: vi.fn(async () => undefined),
+	handleAutomaticDailyPrayer: vi.fn(async () => undefined),
 	handleWishApproval: vi.fn(async () => false),
 	incrementUsageCount: vi.fn(async () => undefined),
 }));
@@ -16,6 +17,10 @@ vi.mock('../src/lib/affectionInteractions', () => ({
 
 vi.mock('../src/lib/backup', () => ({
 	handleBackup: mocks.handleBackup,
+}));
+
+vi.mock('../src/commands/coin', () => ({
+	handleAutomaticDailyPrayer: mocks.handleAutomaticDailyPrayer,
 }));
 
 vi.mock('../src/commands/like', () => ({
@@ -55,7 +60,7 @@ describe('DiceBot Worker — affection interaction dispatch', () => {
 	});
 
 	it('records reply affection for message replies', async () => {
-		const { response } = await postTelegramUpdate({
+		const { response, ctx } = await postTelegramUpdate({
 			update_id: 3000,
 			message: {
 				message_id: 10,
@@ -72,6 +77,7 @@ describe('DiceBot Worker — affection interaction dispatch', () => {
 				},
 			},
 		});
+		await waitOnExecutionContext(ctx);
 
 		expect(response.status).toBe(200);
 		expect(mocks.recordReplyAffection).toHaveBeenCalledWith(
@@ -84,6 +90,11 @@ describe('DiceBot Worker — affection interaction dispatch', () => {
 			}),
 			expect.anything(),
 		);
+		expect(mocks.handleAutomaticDailyPrayer).toHaveBeenCalledWith(
+			expect.objectContaining({ type: 'message', chatId: ALLOWED_CHAT_ID, isCommand: false }),
+			expect.anything(),
+		);
+		expect(mocks.handleBackup).toHaveBeenCalled();
 	});
 
 	it('records reaction affection for message_reaction updates', async () => {

@@ -38,7 +38,9 @@ English source: [../coin-system.md](../coin-system.md)
 
 ## 祈祷
 
-`/coin pray` 限定在代码中的特定 chat/thread。它在 CoinDO raw storage 中记录 `coin_pray:<userId>`，并允许国库为负地向用户支付。
+`/coin pray` 限定在代码中的特定 chat/thread。普通签到奖励为随机 15–20 coin。已知设有“神殿”主题的群组还会在用户每天第一次发送普通文字消息时自动签到；签到通知固定发送到神殿，原话题不插入回复。后续消息保持静默，直到香港时间早上 8:00 开始新的签到日。
+
+CoinDO 的 `/daily-pray` 端点会在同一次 Durable Object 操作内检查 `coin_pray:<userId>`、转账和写入日期，避免同一用户的并发消息重复派发奖励。手动 `/coin pray` 仍保留，并会在当天已经签到时作出提示。
 
 ## Coin Service
 

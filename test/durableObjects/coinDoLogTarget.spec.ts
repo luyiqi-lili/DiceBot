@@ -68,4 +68,49 @@ describe('CoinDO coin log target', () => {
 		expect(logMessages.map(message => message.text).join('\n')).toContain('incr (before=0 delta=2 after=2)');
 		expect(logMessages.map(message => message.text).join('\n')).toContain('INCR END');
 	});
+
+	it('pays a daily prayer only once and stores the date atomically', async () => {
+		const coin = new CoinDO(makeState(), { TOKEN: 'token' });
+		const requestBody = {
+			treasuryKey: '-1002970430696:__treasury__',
+			userKey: '-1002970430696:12345',
+			recordKey: '-1002970430696:coin_pray:12345',
+			date: '2026-09-22',
+			amount: 17,
+		};
+
+		const first = await coin.fetch(new Request('https://do/daily-pray', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(requestBody),
+		}));
+		const second = await coin.fetch(new Request('https://do/daily-pray', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ ...requestBody, amount: 20 }),
+		}));
+
+		expect(await first.json()).toMatchObject({ ok: true, claimed: true, newBalance: 17 });
+		expect(await second.json()).toMatchObject({ ok: true, claimed: false, newBalance: 17 });
+		const balance = await coin.fetch(new Request('https://do/get?key=-1002970430696%3A12345'));
+		expect(await balance.text()).toBe('17');
+	});
+
+	it('rejects daily prayer keys that do not share one chat and user scope', async () => {
+		const coin = new CoinDO(makeState(), { TOKEN: 'token' });
+		const response = await coin.fetch(new Request('https://do/daily-pray', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				treasuryKey: '-1001:__treasury__',
+				userKey: '-1002:12345',
+				recordKey: '-1001:coin_pray:12345',
+				date: '2026-09-22',
+				amount: 20,
+			}),
+		}));
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toMatchObject({ ok: false, claimed: false, reason: 'mismatched prayer scope' });
+	});
 });

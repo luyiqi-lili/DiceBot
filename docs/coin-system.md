@@ -40,7 +40,9 @@ Fees go to `TREASURY_KEY`.
 
 ## Prayer
 
-`/coin pray` is restricted to specific chat/thread combinations in code. It records `coin_pray:<userId>` in CoinDO raw storage and pays from treasury, allowing treasury to go negative for this operation.
+`/coin pray` is restricted to specific chat/thread combinations. The normal reward is 15–20 coins. In groups with a known topic named `神殿`, a user's first ordinary text message of each prayer day also claims the reward automatically. A new prayer day starts at 08:00 Hong Kong time. The notice is routed to that temple topic, while the source conversation remains untouched; later messages stay silent until the next reset.
+
+CoinDO's `/daily-pray` endpoint checks `coin_pray:<userId>`, transfers the reward, and stores the date in one Durable Object operation so concurrent messages cannot pay twice. Manual `/coin pray` remains available and reports an already-completed claim.
 
 ## Coin Service
 

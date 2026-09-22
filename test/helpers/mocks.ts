@@ -26,6 +26,7 @@ export const mockCoinService = {
 	transfer: vi.fn().mockResolvedValue({ ok: true, fromNew: 450, toNew: 550 }),
 	addToTreasury: vi.fn().mockResolvedValue({ ok: true }),
 	takeFromTreasury: vi.fn().mockResolvedValue({ ok: true }),
+	claimDailyPrayer: vi.fn().mockResolvedValue({ ok: true, claimed: true, newBalance: 515 }),
 	sumAllUserBalances: vi.fn().mockResolvedValue(10000),
 	TREASURY_KEY: '__treasury__',
 };
