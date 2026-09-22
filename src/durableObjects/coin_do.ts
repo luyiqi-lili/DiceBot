@@ -225,6 +225,84 @@ export class CoinDO {
       return new Response(JSON.stringify({ ok: true, fromNew: res.fromNew, toNew: res.toNew }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
+    // POST /daily-pray
+    // Atomically checks the daily marker, transfers the reward and records the
+    // claim. This prevents duplicate rewards when several messages arrive at
+    // nearly the same time.
+    if (path === "/daily-pray" && req.method === "POST") {
+      let data: any = {};
+      try {
+        data = await req.json();
+      } catch {
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: "invalid json" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const treasuryKey = String(data.treasuryKey ?? "");
+      const userKey = String(data.userKey ?? "");
+      const recordKey = String(data.recordKey ?? "");
+      const date = String(data.date ?? "");
+      const amount = Number(data.amount);
+      const allowRetryAfterCorrection = data.allowRetryAfterCorrection === true;
+      if (!treasuryKey || !userKey || !recordKey || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: "invalid prayer keys or date" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const scopedUser = /^(-?\d+):(\d+)$/.exec(userKey);
+      if (
+        !scopedUser
+        || treasuryKey !== `${scopedUser[1]}:${CoinDO.TREASURY_KEY}`
+        || recordKey !== `${scopedUser[1]}:coin_pray:${scopedUser[2]}`
+      ) {
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: "mismatched prayer scope" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: "invalid amount" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const map = await this.readMap();
+      const lastPrayer = map[recordKey] ?? "";
+      const correctionMarker = `${date}:corrected`;
+      const alreadyClaimed = lastPrayer === date
+        || (lastPrayer.startsWith(`${date}:`) && !(allowRetryAfterCorrection && lastPrayer === correctionMarker));
+      if (alreadyClaimed) {
+        const currentBalance = await this.getNumericBalance(map, userKey);
+        return new Response(JSON.stringify({ ok: true, claimed: false, newBalance: currentBalance }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const transferResult = await this.atomicTransfer(map, treasuryKey, userKey, amount, true);
+      if (!transferResult.ok) {
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: transferResult.reason }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      map[recordKey] = date;
+      try {
+        await this.writeMap(map);
+      } catch (error) {
+        console.error("[CoinDO] writeMap(daily-pray) failed", error);
+        return new Response(JSON.stringify({ ok: false, claimed: false, reason: "persist failed" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, claimed: true, newBalance: transferResult.toNew }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     // POST /incr  -> 原子自增（新增）
     if (path === "/incr" && req.method === "POST") {
       let data: any = {};

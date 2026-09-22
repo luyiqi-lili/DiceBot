@@ -23,6 +23,12 @@ import { scopeKey } from './groupScope';
 export const TREASURY_KEY = "__treasury__";
 
 type TransferResult = { ok: boolean; reason?: string; fromNew?: number; toNew?: number };
+export type DailyPrayerResult = {
+  ok: boolean;
+  claimed: boolean;
+  reason?: string;
+  newBalance?: number;
+};
 type BalanceListResponse = { keys?: Array<{ name?: string }>; cursor?: string };
 
 function getDOStub(doNs: DurableObjectNamespace, name = "coins") {
@@ -132,6 +138,50 @@ export async function takeFromTreasury(
   return await transfer(envOrNull, doNs, chatId, TREASURY_KEY, to, amount, allowNegativeTreasury, name);
 }
 
+/**
+ * Atomically claim one daily prayer reward inside CoinDO.
+ *
+ * The date check, treasury transfer and prayer-date write happen in one
+ * Durable Object request, so two near-simultaneous messages cannot both pay.
+ */
+export async function claimDailyPrayer(
+  doNs: DurableObjectNamespace,
+  chatId: string | number,
+  userId: string,
+  date: string,
+  amount: number,
+  options: { allowRetryAfterCorrection?: boolean; name?: string } = {},
+): Promise<DailyPrayerResult> {
+  try {
+    const stub = getDOStub(doNs, options.name ?? "coins");
+    const response = await stub.fetch("https://do/daily-pray", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        treasuryKey: scopeKey(chatId, TREASURY_KEY),
+        userKey: scopeKey(chatId, userId),
+        recordKey: scopeKey(chatId, `coin_pray:${userId}`),
+        date,
+        amount,
+        allowRetryAfterCorrection: options.allowRetryAfterCorrection === true,
+      }),
+    });
+    const result = await response.json().catch(() => null) as Partial<DailyPrayerResult> | null;
+    if (!response.ok || !result || typeof result.ok !== "boolean" || typeof result.claimed !== "boolean") {
+      return { ok: false, claimed: false, reason: "invalid_response" };
+    }
+    return {
+      ok: result.ok,
+      claimed: result.claimed,
+      reason: result.reason,
+      newBalance: result.newBalance,
+    };
+  } catch (error) {
+    console.error("[coinService] claimDailyPrayer failed", error);
+    return { ok: false, claimed: false, reason: "internal_error" };
+  }
+}
+
 
 export async function getTreasury(doNs: DurableObjectNamespace, chatId: string | number, name = "coins"): Promise<number> {
   return await getBalance(doNs, chatId, TREASURY_KEY, name);
@@ -186,6 +236,7 @@ export default {
   transfer,
   addToTreasury,
   takeFromTreasury,
+  claimDailyPrayer,
    getTreasury,
   sumAllUserBalances,
  };
