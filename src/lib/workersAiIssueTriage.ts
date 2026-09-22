@@ -307,7 +307,12 @@ export async function runWorkersAiIssueTriage(env: TriageEnv, input: { linkedIss
 			break;
 		}
 		if (!decision) {
-			const output = await env.AI.run(WORKERS_AI_TRIAGE_MODEL, { prompt, max_tokens: 320, temperature: 0 }, {
+			const output = await env.AI.run(WORKERS_AI_TRIAGE_MODEL, {
+				prompt,
+				max_tokens: 320,
+				temperature: 0,
+				chat_template_kwargs: { enable_thinking: false },
+			}, {
 				gateway: {
 					id: env.AI_GATEWAY_ID?.trim() || 'default',
 					skipCache: true,

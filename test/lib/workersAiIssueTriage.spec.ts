@@ -37,7 +37,10 @@ describe('Workers AI Issue triage', () => {
 		} as any, {}, { fetchFn: fetchFn as typeof fetch });
 
 		expect(result).toMatchObject({ status: 'approved', provider: 'workers-ai', model: WORKERS_AI_TRIAGE_MODEL, confidence: 0.94, paidBalanceVerified: false });
-		expect(run).toHaveBeenCalledWith(WORKERS_AI_TRIAGE_MODEL, expect.objectContaining({ max_tokens: 320 }), expect.objectContaining({ gateway: expect.objectContaining({ id: 'default', skipCache: true }) }));
+		expect(run).toHaveBeenCalledWith(WORKERS_AI_TRIAGE_MODEL, expect.objectContaining({
+			max_tokens: 320,
+			chat_template_kwargs: { enable_thinking: false },
+		}), expect.objectContaining({ gateway: expect.objectContaining({ id: 'default', skipCache: true }) }));
 		const labelCall = fetchFn.mock.calls.find(([url]) => String(url).endsWith('/issues/42/labels'));
 		expect(JSON.parse(String(labelCall?.[1]?.body))).toEqual({ labels: ['bot:ready'] });
 		expect(db.calls.some((call) => call.sql.includes('INSERT INTO ai_issue_triage_runs') && call.values.includes('approved'))).toBe(true);
