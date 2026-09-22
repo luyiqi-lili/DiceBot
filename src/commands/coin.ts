@@ -305,7 +305,8 @@ export async function handleAutomaticDailyPrayer(parsedMessage: ParsedUpdate, en
 
   const destinationThreadId = knownTempleThreadId(Number(chatId));
   if (destinationThreadId === undefined) return;
-  if (!(await isFeatureAllowed(env, chatId, destinationThreadId, "pray"))) return;
+  // The temple is only the notification destination. Command topic permissions
+  // must not disable attendance from ordinary messages anywhere in this group.
 
   const today = currentPrayerDay();
   const cacheKey = `${chatId}:${from.id}`;
@@ -361,7 +362,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
 
   // pray
   if (sub === "pray") {
-    const allowed = await isFeatureAllowed(env, chatId, threadId, 'pray');
+    const templeThreadId = knownTempleThreadId(Number(chatId));
+    const allowed = templeThreadId !== undefined || await isFeatureAllowed(env, chatId, threadId, 'pray');
 
     if (!allowed) {
       await TgMessage.sendText(env, {
@@ -377,8 +379,8 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
       chatId: Number(chatId),
       userId,
       userName,
-      destinationThreadId: threadId,
-      announceAlready: true,
+      destinationThreadId: templeThreadId ?? threadId,
+      announceAlready: templeThreadId === undefined,
     });
     return;
   }

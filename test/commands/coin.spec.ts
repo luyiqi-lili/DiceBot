@@ -49,7 +49,11 @@ describe('pray', () => {
 		vi.mocked(coinService.claimDailyPrayer).mockResolvedValue({ ok: true, claimed: true, newBalance: 515 });
 	});
 	afterEach(() => vi.useRealTimers());
-	it('祈祷（非许可主题被拦截）', async () => { await handleCoin(makeParsed({ args: ['pray'], chatId: -1002970430696, threadId: 999 }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText)).toHaveBeenCalled(); });
+	it('没有神殿的其他群仍保留手动祈祷话题限制', async () => {
+		await handleCoin(makeParsed({ args: ['pray'], chatId: -1002848481881, threadId: 999 }), MOCK_ENV);
+		expect(coinService.claimDailyPrayer).not.toHaveBeenCalled();
+		expect(TgMessage.sendText).toHaveBeenCalled();
+	});
 	it.each(['2026-06-19', '2026-06-21'])('紫罗兰周年庆 %s 签到固定奖励 50 coin', async (date) => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date(`${date}T12:00:00.000Z`));
@@ -76,7 +80,7 @@ describe('pray', () => {
 		await handleCoin(makeAllowedPrayParsed(), env);
 
 		expect(coinService.addToTreasury).not.toHaveBeenCalled();
-		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('今天已经祈祷过了');
+		expect(TgMessage.sendText).not.toHaveBeenCalled();
 	});
 	it('修正 6 月 29 日已记录的错误 50 coin 签到并允许重签', async () => {
 		vi.useFakeTimers();
@@ -107,7 +111,7 @@ describe('pray', () => {
 		await handleCoin(makeAllowedPrayParsed(), env);
 
 		expect(coinService.addToTreasury).not.toHaveBeenCalled();
-		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('今天已经祈祷过了');
+		expect(TgMessage.sendText).not.toHaveBeenCalled();
 	});
 	it('紫罗兰周年庆未指定日期不使用固定 50 coin', async () => {
 		vi.useFakeTimers();
@@ -170,6 +174,30 @@ describe('pray', () => {
 			chat_id: -1002970430696,
 			message_thread_id: 157,
 		}));
+	});
+	it.each([undefined, 1, 210, 157, 89, 999999])('任意话题 %s 发言或手动签到只通知神殿', async (threadId) => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-09-24T12:00:00Z'));
+		const query = { bind: vi.fn(), all: vi.fn(async () => ({ results: [{ thread_id: 89 }] })) };
+		query.bind.mockReturnValue(query);
+		const env = { COIN_DO: makeCoinDo(), DB: { prepare: vi.fn(() => query) } } as any;
+		const parsed = makeParsed({
+			chatId: -1002970430696, threadId, isCommand: false,
+			text: '測試自動簽到', from: { id: 9000000 + (threadId ?? 0), first_name: '测试' },
+		});
+		await handleAutomaticDailyPrayer(parsed, env);
+		expect(coinService.claimDailyPrayer).toHaveBeenCalledTimes(1);
+		expect(TgMessage.sendText).toHaveBeenCalledTimes(1);
+		expect(TgMessage.sendText).toHaveBeenCalledWith(env, expect.objectContaining({
+			chat_id: -1002970430696, message_thread_id: 157,
+			text: expect.stringContaining('当前余额 515'),
+		}));
+		await handleAutomaticDailyPrayer({ ...parsed, threadId: 178 }, env);
+		expect(coinService.claimDailyPrayer).toHaveBeenCalledTimes(1);
+		expect(TgMessage.sendText).toHaveBeenCalledTimes(1);
+		vi.clearAllMocks();
+		await handleCoin({ ...parsed, isCommand: true, args: ['pray'] }, env);
+		expect(TgMessage.sendText).toHaveBeenCalledWith(env, expect.objectContaining({ message_thread_id: 157 }));
 	});
 	it('自動簽到發現今日已完成時保持靜默', async () => {
 		vi.useFakeTimers();
