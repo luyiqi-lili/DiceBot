@@ -114,7 +114,7 @@ Feature names: `pray`, `fate`, `fish`. `allow`/`disallow`/`anywhere`/`reset` req
 |---------|---------|-------|
 | `/coin` | `handleCoin` | Balance |
 | `/coin pray` | `handleCoin` | Daily prayer in allowed topics only |
-| `/coin send <amount>` | `handleCoin` | Reply transfer with dynamic fee |
+| `/coin send <amount>` | `handleCoin` | Reply transfer with no fee |
 | `/coin check` | `handleCoin` | Admin treasury/balance check |
 | `/coin take <amount>` | `handleCoin` | Admin treasury withdrawal |
 | `/coin create <amount>` | `handleCoin` | Admin mint |

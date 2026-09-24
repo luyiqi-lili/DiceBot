@@ -216,7 +216,22 @@ describe('pray', () => {
 });
 describe('send', () => {
 	beforeEach(() => vi.clearAllMocks());
-	it('回复转账', async () => { vi.mocked(coinService.getBalance).mockResolvedValue(500); await handleCoin(makeParsed({ args: ['send', '50'], message: { message_id: 1, from: { id: 12345 }, chat: { id: -100999 }, reply_to_message: { message_id: 99, from: { id: 67890 } } }, isReply: true }), MOCK_ENV); expect(coinService.transfer).toHaveBeenCalled(); });
+	it('回复转账会全额送达且不收手续费', async () => {
+		vi.mocked(coinService.getBalance).mockResolvedValue(500);
+		await handleCoin(makeParsed({ args: ['send', '50'], message: { message_id: 1, from: { id: 12345 }, chat: { id: -100999 }, reply_to_message: { message_id: 99, from: { id: 67890 } } }, isReply: true }), MOCK_ENV);
+		expect(coinService.transfer).toHaveBeenCalledTimes(1);
+		expect(coinService.transfer).toHaveBeenCalledWith(MOCK_ENV, MOCK_ENV.COIN_DO, -100999, '12345', '67890', 50);
+		const text = vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text;
+		expect(text).not.toContain('手续费');
+		expect(text).not.toContain('宝库');
+	});
+	it('指定用户转账同样全额送达且不收手续费', async () => {
+		vi.mocked(coinService.getBalance).mockResolvedValue(500);
+		await handleCoin(makeParsed({ args: ['send', '80', '67890'] }), MOCK_ENV);
+		expect(coinService.transfer).toHaveBeenCalledTimes(1);
+		expect(coinService.transfer).toHaveBeenCalledWith(MOCK_ENV, MOCK_ENV.COIN_DO, -100999, '12345', '67890', 80);
+		expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).not.toContain('手续费');
+	});
 	it('余额不足', async () => { vi.mocked(coinService.getBalance).mockResolvedValue(10); await handleCoin(makeParsed({ args: ['send', '50'], message: { message_id: 1, from: { id: 12345 }, chat: { id: -100999 }, reply_to_message: { message_id: 88, from: { id: 67890 } } }, isReply: true }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('转账失败'); });
 	it('未回复', async () => { await handleCoin(makeParsed({ args: ['send', '50'] }), MOCK_ENV); expect(vi.mocked(TgMessage.sendText).mock.calls[0]?.[1]?.text).toContain('回复'); });
 });

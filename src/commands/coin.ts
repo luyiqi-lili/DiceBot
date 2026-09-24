@@ -30,18 +30,6 @@ type CoinEnv = Env; // 统一类型，从 ../index 导入
 /* ------------------------- 全局配置（统一在顶部） ------------------------- */
 // ADMIN_UIDS_* 已迁移至 src/lib/liveConfig.ts
 
-/** 费率计算 */
-
-/** ease-in-out 300 -> 0.1, 3000 -> 0.3，端点导数为0 */
-function calcTransferFeeRate(targetBal: number): number {
-  if (targetBal < 300) return 0;
-  if (targetBal >= 3000) return 0.5;
-  const t = (targetBal - 300) / (3000 - 300); // 0..1
-  const ease = 3 * t * t - 2 * t * t * t; // cubic ease-in-out
-  return 0.1 + ease * (0.3 - 0.1);
-}
-
-
 /* ------------------------- DO 低级封装（仅用于祈祷记录） ------------------------- */
 
 function getCoinsStub(doNs: DurableObjectNamespace) {
@@ -85,16 +73,8 @@ async function doPutRaw(doNs: DurableObjectNamespace, key: string, value: string
 
 /* ------------------------- 使用 coinService 的高级封装 ------------------------- */
 
-/**
- * atomicTransferUserToUser
- * - 先读取发起人余额以做前置检查（避免在中间出现因余额不足导致部分转账）
- * - 对于 fee = 0，直接尝试 single transfer (from -> to)
- * - 对于 fee > 0，先从 sender -> treasury 扣除 fee，再执行 sender -> recipient(amount - fee)
- *   （在极少数第二步失败时会尝试回滚已扣的手续费）
- *
- * 返回 { ok, reason?, fee?, fromNew?, toNew? }
- */
-async function atomicTransferUserToUser(env: CoinEnv, chatId: number, fromId: string, toId: string, amount: number): Promise<{ ok: boolean; reason?: string; fee?: number; fromNew?: number; toNew?: number }> {
+/** Transfer the full amount directly between users. */
+async function atomicTransferUserToUser(env: CoinEnv, chatId: number, fromId: string, toId: string, amount: number): Promise<{ ok: boolean; reason?: string; fromNew?: number; toNew?: number }> {
   const doNs = env.COIN_DO;
   if (!doNs) return { ok: false, reason: "no_do_namespace" };
   if (amount <= 0) return { ok: false, reason: "invalid amount" };
@@ -103,43 +83,9 @@ async function atomicTransferUserToUser(env: CoinEnv, chatId: number, fromId: st
   const senderBal = await getBalance(doNs, chatId, fromId);
   if (senderBal < amount) return { ok: false, reason: "insufficient" };
 
-  const targetBal = await getBalance(doNs, chatId, toId);
-  const rate = calcTransferFeeRate(targetBal+amount);
-  const fee = Math.floor(amount * rate);
-
-  // if no fee -> single atomic transfer (from -> to amount)
-  if (fee === 0) {
-    const res = await transfer(env, doNs, chatId, fromId, toId, amount);
-    if (!res.ok) return { ok: false, reason: res.reason || "transfer_failed" };
-    return { ok: true, fee: 0, fromNew: res.fromNew, toNew: res.toNew };
-  }
-
-  // fee > 0: sequence: 1) from->treasury fee ; 2) from->to (amount - fee)
-  // Step1: 支付手续费到国库
-  const step1 = await transfer(env, doNs, chatId, fromId, TREASURY_KEY, fee);
-  if (!step1.ok) {
-    return { ok: false, reason: step1.reason || "charge_fee_failed" };
-  }
-
-  // Step2: 转账给接收者
-  const transferAmount = amount - fee;
-  const step2 = await transfer(env, doNs, chatId, fromId, toId, transferAmount);
-  if (!step2.ok) {
-    // 极端回滚尝试：把已扣的 fee 从宝库退回给发送者
-    try {
-      await transfer(env, doNs, chatId, TREASURY_KEY, fromId, fee, true);
-      console.warn("[coin] transfer step2 failed, rollback fee attempted");
-    } catch (e) {
-      console.error("[coin] rollback failed", e);
-    }
-    return { ok: false, reason: step2.reason || "transfer_recipient_failed" };
-  }
-
-  // 获取最新余额
-  const newFrom = await getBalance(doNs, chatId, fromId);
-  const newTo = await getBalance(doNs, chatId, toId);
-
-  return { ok: true, fee, fromNew: newFrom, toNew: newTo };
+  const res = await transfer(env, doNs, chatId, fromId, toId, amount);
+  if (!res.ok) return { ok: false, reason: res.reason || "transfer_failed" };
+  return { ok: true, fromNew: res.fromNew, toNew: res.toNew };
 }
 
 /* ------------------------- 命令处理 ------------------------- */
@@ -511,12 +457,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
         await TgMessage.sendText(env, { chat_id: chatId, text: `❌ 转账失败：${res.reason || "未知原因"}`, parse_mode: "HTML", message_thread_id: threadId });
         return;
       }
-      const feePercent = res.fee && amount ? Math.round((res.fee / amount) * 100) : 0;
       await TgMessage.sendText(env, {
         chat_id: chatId,
         text:
           `💸 ${userName} 向 ${String(userInfo.first_name ?? userInfo.username ?? targetID)} 转账 ${amount} 💰。\n` +
-          `📊 原有余额更新完毕，手续费 ${res.fee ?? 0} 💰（已入艾丽莎宝库）。\n` +
           `✅ 转账后 新余额：${res.toNew} 💰；\n` +
           `🪙 你的新余额：${res.fromNew} 💰。`,
         parse_mode: "HTML",
@@ -550,12 +494,10 @@ export async function handleCoin(parsedMessage: ParsedUpdate, env: CoinEnv): Pro
     }
 
     const targetName = String(targetFirstName ?? "TA");
-    const feePercent = res.fee && amount ? Math.round((res.fee / amount) * 100) : 0;
     await TgMessage.sendText(env, {
       chat_id: chatId,
       text:
         `💸 ${userName} 向 ${targetName} 转账 ${amount} 💰。\n` +
-        `📊 手续费 ${res.fee ?? 0} 💰（已入艾丽莎宝库）。\n` +
         `✅ 转账后 ${targetName} 新余额：${res.toNew} 💰；\n` +
         `🪙 你的新余额：${res.fromNew} 💰。`,
       parse_mode: "HTML",
