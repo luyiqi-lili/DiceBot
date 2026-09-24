@@ -28,15 +28,9 @@ Handled by `src/commands/coin.ts`.
 
 Admin allowlists come from `src/lib/liveConfig.ts` and data modules.
 
-## Transfer Fees
+## Transfers
 
-User-to-user transfer fee depends on target balance after transfer:
-
-- target balance below 300: no fee
-- 300 to 3000: cubic ease-in-out between 0.1% and 0.3%
-- 3000 and above: 0.5%
-
-Fees go to `TREASURY_KEY`.
+User-to-user transfers have no fee. The recipient receives the full amount and no portion is sent to the treasury.
 
 ## Prayer
 
